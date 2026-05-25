@@ -13,21 +13,25 @@ class Plan extends Model
         'name',
         'slug',
         'price',
-        'currency',
         'billing_cycle',
-        'is_active',
+        'status',
+        'description',
     ];
 
     protected function casts(): array
     {
         return [
             'price' => 'decimal:2',
-            'is_active' => 'boolean',
         ];
     }
 
     public function features(): HasMany
     {
         return $this->hasMany(PlanFeature::class);
+    }
+
+    public function tenants(): HasMany
+    {
+        return $this->hasMany(Tenant::class);
     }
 }

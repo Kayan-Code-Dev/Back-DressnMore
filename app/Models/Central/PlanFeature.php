@@ -13,6 +13,7 @@ class PlanFeature extends Model
         'plan_id',
         'feature_key',
         'feature_value',
+        'value_type',
     ];
 
     public function plan(): BelongsTo

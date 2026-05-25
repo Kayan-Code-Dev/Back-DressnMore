@@ -11,9 +11,10 @@ return new class extends Migration {
     {
         Schema::connection($this->connection)->create('tenant_provisioning_logs', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->string('level', 30)->default('info');
-            $table->string('message');
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants')->nullOnDelete();
+            $table->string('step');
+            $table->string('status');
+            $table->string('message')->nullable();
             $table->json('context')->nullable();
             $table->timestamps();
         });

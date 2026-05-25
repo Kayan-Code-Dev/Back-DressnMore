@@ -36,7 +36,7 @@ class SetTenantDatabase
                 'error' => $exception->getMessage(),
             ]);
 
-            return ApiResponse::error('Failed to connect to tenant database', 500);
+            return ApiResponse::error('Tenant database connection failed', 500);
         }
 
         return $next($request);

@@ -13,6 +13,7 @@ class TenantDomain extends Model
         'tenant_id',
         'domain',
         'is_primary',
+        'status',
     ];
 
     protected function casts(): array

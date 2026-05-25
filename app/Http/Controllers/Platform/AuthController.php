@@ -25,13 +25,15 @@ class AuthController extends Controller
 
         return ApiResponse::success([
             'token' => $result['token'],
-            'admin' => new SuperAdminResource($result['admin']),
+            'user' => new SuperAdminResource($result['admin']),
         ], 'Platform login successful');
     }
 
     public function me(Request $request): JsonResponse
     {
-        return ApiResponse::success(new SuperAdminResource($request->user()));
+        return ApiResponse::success([
+            'user' => new SuperAdminResource($request->user()),
+        ]);
     }
 
     public function logout(Request $request): JsonResponse

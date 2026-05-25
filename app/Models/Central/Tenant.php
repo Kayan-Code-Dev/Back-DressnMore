@@ -3,6 +3,7 @@
 namespace App\Models\Central;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tenant extends Model
@@ -14,17 +15,43 @@ class Tenant extends Model
         'slug',
         'database_name',
         'status',
-        'owner_name',
-        'owner_email',
+        'plan_id',
+        'subscription_starts_at',
+        'subscription_ends_at',
+        'metadata',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'subscription_starts_at' => 'datetime',
+            'subscription_ends_at' => 'datetime',
+            'metadata' => 'array',
+        ];
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
 
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
     public function domains(): HasMany
     {
         return $this->hasMany(TenantDomain::class);
+    }
+
+    public function provisioningLogs(): HasMany
+    {
+        return $this->hasMany(TenantProvisioningLog::class);
     }
 }

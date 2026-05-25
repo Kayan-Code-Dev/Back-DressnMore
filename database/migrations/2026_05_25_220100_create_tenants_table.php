@@ -14,12 +14,13 @@ return new class extends Migration {
             $table->string('name');
             $table->string('slug')->unique();
             $table->string('database_name')->unique();
-            $table->string('status')->default('provisioning');
-            $table->string('owner_name');
-            $table->string('owner_email');
+            $table->enum('status', ['provisioning', 'active', 'suspended', 'expired', 'provisioning_failed'])
+                ->default('provisioning');
+            $table->unsignedBigInteger('plan_id')->nullable();
+            $table->timestamp('subscription_starts_at')->nullable();
+            $table->timestamp('subscription_ends_at')->nullable();
+            $table->json('metadata')->nullable();
             $table->timestamps();
-
-            $table->index(['status', 'slug']);
         });
     }
 

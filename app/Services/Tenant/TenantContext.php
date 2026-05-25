@@ -3,6 +3,7 @@
 namespace App\Services\Tenant;
 
 use App\Models\Central\Tenant;
+use RuntimeException;
 
 class TenantContext
 {
@@ -15,6 +16,15 @@ class TenantContext
 
     public function tenant(): ?Tenant
     {
+        return $this->tenant;
+    }
+
+    public function requireTenant(): Tenant
+    {
+        if ($this->tenant === null) {
+            throw new RuntimeException('Tenant has not been resolved.');
+        }
+
         return $this->tenant;
     }
 
@@ -36,5 +46,10 @@ class TenantContext
     public function isResolved(): bool
     {
         return $this->tenant !== null;
+    }
+
+    public function clear(): void
+    {
+        $this->tenant = null;
     }
 }

@@ -11,14 +11,12 @@ class Payment extends Model
 
     protected $fillable = [
         'tenant_id',
-        'subscription_id',
         'amount',
-        'currency',
+        'method',
+        'reference',
         'status',
-        'payment_method',
         'paid_at',
-        'provider_reference',
-        'meta',
+        'notes',
     ];
 
     protected function casts(): array
@@ -26,7 +24,6 @@ class Payment extends Model
         return [
             'amount' => 'decimal:2',
             'paid_at' => 'datetime',
-            'meta' => 'array',
         ];
     }
 
@@ -35,8 +32,4 @@ class Payment extends Model
         return $this->belongsTo(Tenant::class);
     }
 
-    public function subscription(): BelongsTo
-    {
-        return $this->belongsTo(Subscription::class);
-    }
 }

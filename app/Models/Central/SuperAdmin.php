@@ -17,7 +17,7 @@ class SuperAdmin extends Authenticatable
         'name',
         'email',
         'password',
-        'is_active',
+        'status',
     ];
 
     protected $hidden = [
@@ -28,9 +28,7 @@ class SuperAdmin extends Authenticatable
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
             'password' => 'hashed',
-            'email_verified_at' => 'datetime',
         ];
     }
 }

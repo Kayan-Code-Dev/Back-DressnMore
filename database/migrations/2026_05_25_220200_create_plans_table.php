@@ -14,9 +14,9 @@ return new class extends Migration {
             $table->string('name');
             $table->string('slug')->unique();
             $table->decimal('price', 12, 2)->default(0);
-            $table->string('currency', 10)->default('USD');
             $table->string('billing_cycle', 30)->default('monthly');
-            $table->boolean('is_active')->default(true);
+            $table->string('status')->default('active');
+            $table->text('description')->nullable();
             $table->timestamps();
         });
     }

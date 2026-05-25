@@ -2,19 +2,17 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\Billing\SubscriptionService;
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class CheckTenantSubscription
 {
-    public function __construct(
-        private readonly TenantContext $tenantContext,
-        private readonly SubscriptionService $subscriptionService
-    ) {
+    public function __construct(private readonly TenantContext $tenantContext)
+    {
     }
 
     public function handle(Request $request, Closure $next): Response
@@ -25,25 +23,25 @@ class CheckTenantSubscription
             return ApiResponse::error('Tenant workspace is required', 400);
         }
 
-        if ($tenant->status === 'suspended') {
-            return ApiResponse::error('Tenant is suspended', 403);
+        $status = (string) $tenant->status;
+        if ($status !== 'active') {
+            $message = match ($status) {
+                'suspended' => 'Tenant is suspended',
+                'expired' => 'Tenant subscription expired',
+                'provisioning_failed' => 'Tenant provisioning failed',
+                'provisioning' => 'Tenant is still provisioning',
+                default => 'Tenant is not active',
+            };
+
+            return ApiResponse::error($message, 403);
         }
 
-        if ($tenant->status !== 'active') {
-            return ApiResponse::error('Subscription expired', 403);
+        if ($tenant->subscription_ends_at !== null) {
+            $endsAt = CarbonImmutable::parse((string) $tenant->subscription_ends_at);
+            if ($endsAt->lt(CarbonImmutable::today())) {
+                return ApiResponse::error('Tenant subscription expired', 403);
+            }
         }
-
-        $activeSubscription = $this->subscriptionService->activeForTenant($tenant);
-
-        if ($activeSubscription === null) {
-            return ApiResponse::error('Subscription expired', 403);
-        }
-
-        if (! $activeSubscription->plan || ! $activeSubscription->plan->is_active) {
-            return ApiResponse::error('Plan inactive', 403);
-        }
-
-        $request->attributes->set('active_subscription', $activeSubscription);
 
         return $next($request);
     }

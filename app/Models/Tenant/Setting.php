@@ -8,4 +8,11 @@ class Setting extends BaseTenantModel
         'key',
         'value',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'value' => 'array',
+        ];
+    }
 }

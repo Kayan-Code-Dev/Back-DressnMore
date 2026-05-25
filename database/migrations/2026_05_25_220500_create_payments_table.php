@@ -12,14 +12,12 @@ return new class extends Migration {
         Schema::connection($this->connection)->create('payments', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('subscription_id')->nullable()->constrained('subscriptions')->nullOnDelete();
             $table->decimal('amount', 12, 2);
-            $table->string('currency', 10)->default('USD');
+            $table->string('method')->nullable();
+            $table->string('reference')->nullable();
             $table->string('status')->default('pending');
-            $table->string('payment_method')->nullable();
             $table->timestamp('paid_at')->nullable();
-            $table->string('provider_reference')->nullable();
-            $table->json('meta')->nullable();
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }

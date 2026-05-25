@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Central\Tenant;
+use App\Models\Tenant\Role;
 use App\Models\Tenant\Setting;
 use App\Models\Tenant\User;
-use App\Services\Billing\SubscriptionService;
 use App\Services\Tenant\TenantDatabaseManager;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
@@ -15,12 +15,10 @@ class TenantHealthCommand extends Command
 {
     protected $signature = 'tenant:health {slug}';
 
-    protected $description = 'Check tenant health status';
+    protected $description = 'Check tenant health status by slug';
 
-    public function __construct(
-        private readonly TenantDatabaseManager $tenantDatabaseManager,
-        private readonly SubscriptionService $subscriptionService
-    ) {
+    public function __construct(private readonly TenantDatabaseManager $tenantDatabaseManager)
+    {
         parent::__construct();
     }
 
@@ -43,12 +41,11 @@ class TenantHealthCommand extends Command
             $this->line('PASS: Tenant status is active');
         }
 
-        $subscription = $this->subscriptionService->activeForTenant($tenant);
-        if (! $subscription) {
-            $this->line('FAIL: No active subscription');
+        if ($tenant->subscription_ends_at !== null && now()->greaterThan($tenant->subscription_ends_at)) {
+            $this->line('FAIL: Subscription date is expired');
             $failed = true;
         } else {
-            $this->line('PASS: Active subscription found');
+            $this->line('PASS: Subscription date is valid');
         }
 
         try {
@@ -64,9 +61,6 @@ class TenantHealthCommand extends Command
             'roles',
             'permissions',
             'settings',
-            'invoices',
-            'dresses',
-            'customers',
         ];
 
         foreach ($requiredTables as $table) {
@@ -78,26 +72,31 @@ class TenantHealthCommand extends Command
             }
         }
 
-        $ownerExists = User::query()
-            ->whereRaw('LOWER(email) = ?', [strtolower($tenant->owner_email)])
-            ->exists();
+        if (Schema::connection('tenant')->hasTable('users') && Schema::connection('tenant')->hasTable('roles')) {
+            $ownerRole = Role::query()->where('slug', 'owner')->first();
+            $ownerExists = $ownerRole !== null
+                ? User::query()->whereHas('roles', fn ($query) => $query->where('roles.id', $ownerRole->id))->exists()
+                : false;
 
-        if (! $ownerExists) {
-            $this->line('FAIL: Owner/admin user does not exist');
-            $failed = true;
-        } else {
-            $this->line('PASS: Owner/admin user exists');
+            if (! $ownerExists) {
+                $this->line('FAIL: Owner user does not exist');
+                $failed = true;
+            } else {
+                $this->line('PASS: Owner user exists');
+            }
         }
 
-        $defaultSettingExists = Setting::query()
-            ->where('key', 'company.name')
-            ->exists();
+        if (Schema::connection('tenant')->hasTable('settings')) {
+            $defaultSettingExists = Setting::query()
+                ->where('key', 'app.settings')
+                ->exists();
 
-        if (! $defaultSettingExists) {
-            $this->line('FAIL: Default settings are missing');
-            $failed = true;
-        } else {
-            $this->line('PASS: Default settings exist');
+            if (! $defaultSettingExists) {
+                $this->line('FAIL: Default settings are missing');
+                $failed = true;
+            } else {
+                $this->line('PASS: Default settings exist');
+            }
         }
 
         return $failed ? self::FAILURE : self::SUCCESS;

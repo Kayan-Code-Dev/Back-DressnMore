@@ -11,7 +11,8 @@ class TenantProvisioningLog extends Model
 
     protected $fillable = [
         'tenant_id',
-        'level',
+        'step',
+        'status',
         'message',
         'context',
     ];

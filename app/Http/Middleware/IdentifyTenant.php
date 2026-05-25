@@ -17,6 +17,8 @@ class IdentifyTenant
 
     public function handle(Request $request, Closure $next): Response
     {
+        $this->tenantContext->clear();
+
         $workspace = $request->input('workspace')
             ?? $request->header('X-Tenant')
             ?? $request->query('tenant');

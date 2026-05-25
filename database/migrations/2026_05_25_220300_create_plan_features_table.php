@@ -14,6 +14,7 @@ return new class extends Migration {
             $table->foreignId('plan_id')->constrained('plans')->cascadeOnDelete();
             $table->string('feature_key');
             $table->string('feature_value')->nullable();
+            $table->string('value_type')->nullable();
             $table->timestamps();
 
             $table->unique(['plan_id', 'feature_key']);

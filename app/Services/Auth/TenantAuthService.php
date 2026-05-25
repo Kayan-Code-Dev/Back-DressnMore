@@ -2,7 +2,6 @@
 
 namespace App\Services\Auth;
 
-use App\Models\Central\Subscription;
 use App\Models\Tenant\User;
 use App\Services\Tenant\TenantContext;
 use Illuminate\Support\Facades\Hash;
@@ -34,7 +33,7 @@ class TenantAuthService
             ]);
         }
 
-        if (! $user->is_active) {
+        if ((string) $user->status !== 'active') {
             throw ValidationException::withMessages([
                 'email' => ['This account is inactive.'],
             ]);
@@ -42,16 +41,12 @@ class TenantAuthService
 
         $permissions = $this->permissionsForUser($user);
 
-        /** @var Subscription|null $subscription */
-        $subscription = request()->attributes->get('active_subscription');
-        $plan = $subscription?->plan;
-
         return [
             'token' => $user->createToken('tenant-token')->plainTextToken,
             'user' => $user,
             'tenant' => $tenant,
             'permissions' => $permissions,
-            'plan' => $plan,
+            'plan' => $tenant->plan,
         ];
     }
 
@@ -61,11 +56,11 @@ class TenantAuthService
     public function permissionsForUser(User $user): array
     {
         return $user->roles()
-            ->with('permissions:id,name')
+            ->with('permissions:id,key')
             ->get()
             ->pluck('permissions')
             ->flatten()
-            ->pluck('name')
+            ->pluck('key')
             ->unique()
             ->values()
             ->all();

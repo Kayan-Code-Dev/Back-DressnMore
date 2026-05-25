@@ -12,30 +12,26 @@ Clean Laravel backend for DressnMore SaaS with strict multi-tenant architecture.
   - `CheckTenantSubscription`
   - `SetTenantDatabase`
 - Separate platform and tenant auth controllers/services
-- Provisioning service and `tenant:health` command
+- `tenant:health` command
 - Initial central and tenant migrations
+- Central and tenant seeders for bootstrap defaults
 
 ## API structure
 
 - `routes/api/platform.php`
+  - `/api/platform/health`
   - `/api/platform/login`
   - `/api/platform/logout`
   - `/api/platform/me`
-  - `/api/platform/tenants`
-  - `/api/platform/plans`
-  - `/api/platform/subscriptions`
 
 - `routes/api/tenant.php`
+  - `/api/tenant/health`
   - `/api/tenant/login`
   - `/api/tenant/logout`
   - `/api/tenant/me`
-  - `/api/tenant/dashboard`
-  - tenant module resources (users, roles, branches, employees, customers, dresses, invoices, suppliers, settings)
 
-## Migration planning document
+## Documentation
 
-See:
-
-- `docs/migration-refactor-plan.md`
-
-This file maps old repository files/modules to keep/refactor/remove decisions and new target paths.
+- `docs/architecture.md`
+- `docs/local-setup.md`
+- `docs/tenant-flow.md`

@@ -8,7 +8,7 @@ class Role extends BaseTenantModel
 {
     protected $fillable = [
         'name',
-        'display_name',
+        'slug',
     ];
 
     public function users(): BelongsToMany

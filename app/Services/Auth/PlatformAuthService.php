@@ -20,7 +20,7 @@ class PlatformAuthService
             ]);
         }
 
-        if (! $admin->is_active) {
+        if ((string) $admin->status !== 'active') {
             throw ValidationException::withMessages([
                 'email' => ['This account is inactive.'],
             ]);

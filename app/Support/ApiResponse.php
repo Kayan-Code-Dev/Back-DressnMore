@@ -2,64 +2,53 @@
 
 namespace App\Support;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 
 class ApiResponse
 {
-    public static function success(
-        mixed $data = null,
-        string $message = 'OK',
-        int $status = 200,
-        array $meta = []
-    ): JsonResponse {
-        $payload = [
+    public static function success(mixed $data = null, string $message = 'Success', int $status = 200): JsonResponse
+    {
+        return response()->json([
             'message' => $message,
             'data' => $data,
-        ];
-
-        if ($meta !== []) {
-            $payload['meta'] = $meta;
-        }
-
-        return response()->json($payload, $status);
+        ], $status);
     }
 
-    public static function error(
-        string $message,
-        int $status = 400,
-        array $errors = [],
-        array $meta = []
-    ): JsonResponse {
+    public static function error(string $message = 'Error', int $status = 400, mixed $errors = null): JsonResponse
+    {
         $payload = [
             'message' => $message,
         ];
 
-        if ($errors !== []) {
+        if ($errors !== null) {
             $payload['errors'] = $errors;
         }
 
-        if ($meta !== []) {
-            $payload['meta'] = $meta;
-        }
-
         return response()->json($payload, $status);
     }
 
-    public static function paginated(LengthAwarePaginator $paginator): JsonResponse
+    public static function validation(mixed $errors, string $message = 'Validation failed'): JsonResponse
     {
-        return self::success(
-            $paginator->items(),
-            'OK',
-            200,
-            [
-                'pagination' => [
-                    'current_page' => $paginator->currentPage(),
-                    'last_page' => $paginator->lastPage(),
-                    'per_page' => $paginator->perPage(),
-                    'total' => $paginator->total(),
-                ],
-            ]
-        );
+        return self::error($message, 422, $errors);
+    }
+
+    public static function unauthorized(string $message = 'Unauthenticated'): JsonResponse
+    {
+        return self::error($message, 401);
+    }
+
+    public static function forbidden(string $message = 'Forbidden'): JsonResponse
+    {
+        return self::error($message, 403);
+    }
+
+    public static function notFound(string $message = 'Not found'): JsonResponse
+    {
+        return self::error($message, 404);
+    }
+
+    public static function serverError(string $message = 'Server error'): JsonResponse
+    {
+        return self::error($message, 500);
     }
 }

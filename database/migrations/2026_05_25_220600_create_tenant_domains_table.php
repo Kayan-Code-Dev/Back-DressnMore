@@ -14,6 +14,7 @@ return new class extends Migration {
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->string('domain')->unique();
             $table->boolean('is_primary')->default(false);
+            $table->string('status')->default('active');
             $table->timestamps();
         });
     }

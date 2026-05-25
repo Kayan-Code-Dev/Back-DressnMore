@@ -14,23 +14,23 @@ return new class extends Migration {
             $table->string('name');
             $table->string('email')->unique();
             $table->string('password');
-            $table->boolean('is_active')->default(true);
-            $table->timestamp('email_verified_at')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('status')->default('active');
             $table->rememberToken();
             $table->timestamps();
         });
 
         Schema::connection($this->connection)->create('roles', function (Blueprint $table): void {
             $table->id();
-            $table->string('name')->unique();
-            $table->string('display_name')->nullable();
+            $table->string('name');
+            $table->string('slug')->unique();
             $table->timestamps();
         });
 
         Schema::connection($this->connection)->create('permissions', function (Blueprint $table): void {
             $table->id();
-            $table->string('name')->unique();
-            $table->string('display_name')->nullable();
+            $table->string('name');
+            $table->string('key')->unique();
             $table->timestamps();
         });
 
@@ -49,10 +49,18 @@ return new class extends Migration {
             $table->timestamps();
             $table->unique(['permission_id', 'role_id']);
         });
+
+        Schema::connection($this->connection)->create('settings', function (Blueprint $table): void {
+            $table->id();
+            $table->string('key')->unique();
+            $table->json('value')->nullable();
+            $table->timestamps();
+        });
     }
 
     public function down(): void
     {
+        Schema::connection($this->connection)->dropIfExists('settings');
         Schema::connection($this->connection)->dropIfExists('permission_role');
         Schema::connection($this->connection)->dropIfExists('role_user');
         Schema::connection($this->connection)->dropIfExists('permissions');

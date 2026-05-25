@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\LoginRequest;
 use App\Http\Resources\Tenant\UserResource;
-use App\Models\Central\Subscription;
 use App\Services\Auth\TenantAuthService;
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
@@ -42,17 +41,15 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        /** @var Subscription|null $subscription */
-        $subscription = $request->attributes->get('active_subscription');
-
         return ApiResponse::success([
             'user' => new UserResource($request->user()),
             'tenant' => [
                 'id' => $this->tenantContext->id(),
+                'name' => $this->tenantContext->tenant()?->name,
                 'slug' => $this->tenantContext->slug(),
             ],
             'permissions' => $this->tenantAuthService->permissionsForUser($request->user()),
-            'plan' => $subscription?->plan,
+            'plan' => $this->tenantContext->tenant()?->plan,
         ]);
     }
 
