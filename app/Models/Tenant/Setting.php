@@ -4,6 +4,8 @@ namespace App\Models\Tenant;
 
 class Setting extends BaseTenantModel
 {
+    protected $connection = 'tenant';
+
     protected $fillable = [
         'key',
         'value',

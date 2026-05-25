@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Role extends BaseTenantModel
 {
+    protected $connection = 'tenant';
+
     protected $fillable = [
         'name',
         'slug',

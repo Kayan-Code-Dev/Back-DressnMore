@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
-use Throwable;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,10 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'identify.tenant' => \App\Http\Middleware\IdentifyTenant::class,
             'check.tenant.subscription' => \App\Http\Middleware\CheckTenantSubscription::class,
             'set.tenant.database' => \App\Http\Middleware\SetTenantDatabase::class,
+            'tenant.permission' => \App\Http\Middleware\CheckTenantPermission::class,
+            'plan.feature' => \App\Http\Middleware\CheckPlanFeature::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (Throwable $exception, Request $request) {
+        $exceptions->render(function (\Throwable $exception, Request $request) {
             if (! $request->is('api/*')) {
                 return null;
             }
