@@ -2,6 +2,7 @@
 
 namespace App\Services\Tenant;
 
+use App\Enums\SecurityDepositStatus;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoiceItem;
 use App\Models\Tenant\InvoicePayment;
@@ -80,7 +81,8 @@ class InvoiceService
                 'delivery_date' => $data['delivery_date'] ?? null,
                 'return_date' => $data['return_date'] ?? null,
                 'security_deposit' => $data['security_deposit'] ?? null,
-                'security_deposit_status' => $data['security_deposit_status'] ?? null,
+                'security_deposit_status' => $data['security_deposit_status']
+                    ?? ((float) ($data['security_deposit'] ?? 0) > 0 ? SecurityDepositStatus::NONE->value : null),
                 'tailoring_due_date' => $data['tailoring_due_date'] ?? null,
                 'tailoring_notes' => $data['tailoring_notes'] ?? null,
                 'notes' => $data['notes'] ?? null,
@@ -168,7 +170,10 @@ class InvoiceService
                 'delivery_date' => $data['delivery_date'] ?? $invoice->delivery_date,
                 'return_date' => $data['return_date'] ?? $invoice->return_date,
                 'security_deposit' => $data['security_deposit'] ?? $invoice->security_deposit,
-                'security_deposit_status' => $data['security_deposit_status'] ?? $invoice->security_deposit_status,
+                'security_deposit_status' => $data['security_deposit_status']
+                    ?? ((float) ($data['security_deposit'] ?? $invoice->security_deposit) > 0
+                        ? ($invoice->security_deposit_status ?: SecurityDepositStatus::NONE->value)
+                        : null),
                 'tailoring_due_date' => $data['tailoring_due_date'] ?? $invoice->tailoring_due_date,
                 'tailoring_notes' => $data['tailoring_notes'] ?? $invoice->tailoring_notes,
                 'notes' => $data['notes'] ?? $invoice->notes,
@@ -327,8 +332,12 @@ class InvoiceService
         float $paidAmount,
         float $remainingAmount
     ): string {
-        if ($currentStatus === Invoice::STATUS_CANCELLED) {
-            return Invoice::STATUS_CANCELLED;
+        if (in_array($currentStatus, [
+            Invoice::STATUS_CANCELLED,
+            Invoice::STATUS_DELIVERED,
+            Invoice::STATUS_RETURNED,
+        ], true)) {
+            return $currentStatus;
         }
 
         if ($paidAmount <= 0) {

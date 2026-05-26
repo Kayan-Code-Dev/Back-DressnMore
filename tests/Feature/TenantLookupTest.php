@@ -46,7 +46,10 @@ class TenantLookupTest extends TestCase
             ->assertJsonPath('data.invoice_types.0.value', 'rent')
             ->assertJsonPath('data.invoice_statuses.0.value', 'draft')
             ->assertJsonPath('data.payment_methods.0.value', 'cash')
-            ->assertJsonPath('data.inventory_movement_types.0.value', 'created');
+            ->assertJsonPath('data.inventory_movement_types.0.value', 'created')
+            ->assertJsonPath('data.delivery_record_types.0.value', 'delivered')
+            ->assertJsonPath('data.security_deposit_transaction_types.0.value', 'collected')
+            ->assertJsonPath('data.dress_status_after_return.0.value', 'available');
     }
 
     public function test_lookup_endpoint_requires_auth(): void

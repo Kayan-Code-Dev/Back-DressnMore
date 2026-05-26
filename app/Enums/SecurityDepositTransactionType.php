@@ -2,19 +2,17 @@
 
 namespace App\Enums;
 
-enum SecurityDepositStatus: string
+enum SecurityDepositTransactionType: string
 {
-    case NONE = 'none';
-    case PARTIALLY_DEDUCTED = 'partially_deducted';
-    case FULLY_DEDUCTED = 'fully_deducted';
+    case COLLECTED = 'collected';
+    case DEDUCTED = 'deducted';
     case REFUNDED = 'refunded';
 
     public function label(): string
     {
         return match ($this) {
-            self::NONE => 'None',
-            self::PARTIALLY_DEDUCTED => 'Partially Deducted',
-            self::FULLY_DEDUCTED => 'Fully Deducted',
+            self::COLLECTED => 'Collected',
+            self::DEDUCTED => 'Deducted',
             self::REFUNDED => 'Refunded',
         };
     }
@@ -33,7 +31,7 @@ enum SecurityDepositStatus: string
     public static function options(): array
     {
         return array_map(
-            fn (self $status): array => ['value' => $status->value, 'label' => $status->label()],
+            fn (self $type): array => ['value' => $type->value, 'label' => $type->label()],
             self::cases()
         );
     }

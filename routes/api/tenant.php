@@ -6,6 +6,7 @@ use App\Http\Controllers\Tenant\DressCategoryController;
 use App\Http\Controllers\Tenant\DressController;
 use App\Http\Controllers\Tenant\HealthController;
 use App\Http\Controllers\Tenant\InvoiceController;
+use App\Http\Controllers\Tenant\InvoiceDeliveryController;
 use App\Http\Controllers\Tenant\LookupController;
 use Illuminate\Support\Facades\Route;
 
@@ -98,6 +99,23 @@ Route::prefix('tenant')->group(function (): void {
             Route::post('/{invoice}/payments', [InvoiceController::class, 'addPayment'])
                 ->whereNumber('invoice')
                 ->middleware('tenant.permission:invoice_payments.create');
+
+            Route::post('/{invoice}/deliver', [InvoiceDeliveryController::class, 'deliver'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoice_delivery.deliver');
+            Route::post('/{invoice}/return', [InvoiceDeliveryController::class, 'returnInvoice'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoice_delivery.return');
+            Route::get('/{invoice}/delivery-records', [InvoiceDeliveryController::class, 'deliveryRecords'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoice_delivery.view');
+
+            Route::post('/{invoice}/security-deposit/deductions', [InvoiceDeliveryController::class, 'addSecurityDepositDeduction'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:security_deposit.deduct');
+            Route::get('/{invoice}/security-deposit/transactions', [InvoiceDeliveryController::class, 'securityDepositTransactions'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:security_deposit.view');
         });
     });
 });

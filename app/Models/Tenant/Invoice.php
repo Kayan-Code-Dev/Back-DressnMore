@@ -83,6 +83,16 @@ class Invoice extends BaseTenantModel
         return $this->hasMany(InvoicePayment::class);
     }
 
+    public function deliveryRecords(): HasMany
+    {
+        return $this->hasMany(DeliveryRecord::class);
+    }
+
+    public function securityDepositTransactions(): HasMany
+    {
+        return $this->hasMany(SecurityDepositTransaction::class);
+    }
+
     /**
      * @return list<string>
      */
