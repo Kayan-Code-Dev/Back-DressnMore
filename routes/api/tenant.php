@@ -6,6 +6,7 @@ use App\Http\Controllers\Tenant\DressCategoryController;
 use App\Http\Controllers\Tenant\DressController;
 use App\Http\Controllers\Tenant\HealthController;
 use App\Http\Controllers\Tenant\InvoiceController;
+use App\Http\Controllers\Tenant\LookupController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('tenant')->group(function (): void {
@@ -23,6 +24,7 @@ Route::prefix('tenant')->group(function (): void {
     ])->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::get('/lookups', [LookupController::class, 'index']);
 
         Route::prefix('/customers')->group(function (): void {
             Route::get('/', [CustomerController::class, 'index'])

@@ -2,6 +2,7 @@
 
 namespace App\Models\Tenant;
 
+use App\Enums\CustomerStatus;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends BaseTenantModel
@@ -20,4 +21,12 @@ class Customer extends BaseTenantModel
         'notes',
         'status',
     ];
+
+    /**
+     * @return list<string>
+     */
+    public static function statuses(): array
+    {
+        return CustomerStatus::values();
+    }
 }

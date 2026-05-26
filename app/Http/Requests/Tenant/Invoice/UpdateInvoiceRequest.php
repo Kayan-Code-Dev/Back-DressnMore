@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Tenant\Invoice;
 
+use App\Enums\SecurityDepositStatus;
 use App\Models\Tenant\Invoice;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -29,7 +30,7 @@ class UpdateInvoiceRequest extends FormRequest
             'delivery_date' => ['nullable', 'date'],
             'return_date' => ['nullable', 'date'],
             'security_deposit' => ['nullable', 'numeric', 'min:0'],
-            'security_deposit_status' => ['nullable', 'string', 'max:100'],
+            'security_deposit_status' => ['nullable', 'string', Rule::in(SecurityDepositStatus::values())],
 
             'tailoring_due_date' => ['nullable', 'date'],
             'tailoring_notes' => ['nullable', 'string'],

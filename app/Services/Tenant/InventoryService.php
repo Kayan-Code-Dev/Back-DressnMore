@@ -17,6 +17,8 @@ class InventoryService
         ?int $referenceId = null,
         ?string $notes = null,
         ?int $createdBy = null,
+        ?int $fromBranchId = null,
+        ?int $toBranchId = null,
     ): InventoryMovement {
         return InventoryMovement::query()->create([
             'dress_id' => $dress->id,
@@ -27,12 +29,15 @@ class InventoryService
             'reference_id' => $referenceId,
             'notes' => $notes,
             'created_by' => $createdBy,
+            'from_branch_id' => $fromBranchId,
+            'to_branch_id' => $toBranchId,
         ]);
     }
 
     public function paginateForDress(Dress $dress, int $perPage = 15): LengthAwarePaginator
     {
         return $dress->inventoryMovements()
+            ->with(['fromBranch', 'toBranch'])
             ->latest('id')
             ->paginate($perPage)
             ->withQueryString();

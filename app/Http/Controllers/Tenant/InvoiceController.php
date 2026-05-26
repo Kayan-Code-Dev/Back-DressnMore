@@ -34,15 +34,7 @@ class InvoiceController extends Controller
             'date_to' => $request->query('date_to'),
         ], $perPage);
 
-        return ApiResponse::success([
-            'items' => InvoiceResource::collection($invoices->items()),
-            'pagination' => [
-                'current_page' => $invoices->currentPage(),
-                'last_page' => $invoices->lastPage(),
-                'per_page' => $invoices->perPage(),
-                'total' => $invoices->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($invoices, InvoiceResource::collection($invoices->items())->resolve());
     }
 
     public function store(StoreInvoiceRequest $request): JsonResponse
@@ -88,15 +80,7 @@ class InvoiceController extends Controller
         $perPage = max(1, min(100, $request->integer('per_page', 15)));
         $payments = $this->invoicePaymentService->paginateForInvoice($invoiceModel, $perPage);
 
-        return ApiResponse::success([
-            'items' => InvoicePaymentResource::collection($payments->items()),
-            'pagination' => [
-                'current_page' => $payments->currentPage(),
-                'last_page' => $payments->lastPage(),
-                'per_page' => $payments->perPage(),
-                'total' => $payments->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($payments, InvoicePaymentResource::collection($payments->items())->resolve());
     }
 
     public function addPayment(AddInvoicePaymentRequest $request, int $invoice): JsonResponse

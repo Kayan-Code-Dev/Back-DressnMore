@@ -23,18 +23,13 @@ class DressCategoryController extends Controller
         $categories = $this->dressCategoryService->paginate(
             search: $request->query('search'),
             status: $request->query('status'),
+            parentId: $request->query('parent_id'),
+            onlyParents: $request->boolean('only_parents'),
+            onlyChildren: $request->boolean('only_children'),
             perPage: $perPage,
         );
 
-        return ApiResponse::success([
-            'items' => DressCategoryResource::collection($categories->items()),
-            'pagination' => [
-                'current_page' => $categories->currentPage(),
-                'last_page' => $categories->lastPage(),
-                'per_page' => $categories->perPage(),
-                'total' => $categories->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($categories, DressCategoryResource::collection($categories->items())->resolve());
     }
 
     public function store(StoreDressCategoryRequest $request): JsonResponse

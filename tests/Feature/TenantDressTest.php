@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Central\Tenant;
+use App\Models\Tenant\Branch;
 use App\Models\Tenant\Dress;
 use App\Models\Tenant\DressCategory;
 use App\Models\Tenant\InventoryMovement;
@@ -41,6 +42,7 @@ class TenantDressTest extends TestCase
             'dresses.update',
             'dresses.delete',
             'inventory.view',
+            'inventory.manage',
         ]);
     }
 
@@ -68,8 +70,9 @@ class TenantDressTest extends TestCase
         $response = $this->getJson('/api/tenant/dresses?search=classic', $this->tenantHeaders());
 
         $response->assertOk()
-            ->assertJsonPath('data.pagination.total', 1)
-            ->assertJsonPath('data.items.0.code', 'DR-001');
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.code', 'DR-001');
     }
 
     public function test_tenant_user_can_create_dress(): void
@@ -94,7 +97,8 @@ class TenantDressTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('message', 'Dress created')
-            ->assertJsonPath('data.code', 'DR-CREATE-01');
+            ->assertJsonPath('data.code', 'DR-CREATE-01')
+            ->assertJsonPath('data.display_name', 'DR-CREATE-01 - Evening');
 
         $this->assertDatabaseHas('dresses', [
             'code' => 'DR-CREATE-01',
@@ -237,8 +241,187 @@ class TenantDressTest extends TestCase
         );
 
         $response->assertOk()
-            ->assertJsonPath('data.pagination.total', 1)
-            ->assertJsonPath('data.items.0.code', 'DR-FILTER-RED');
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.code', 'DR-FILTER-RED');
+    }
+
+    public function test_dress_resource_returns_display_name_as_code_category_subcategory(): void
+    {
+        $category = DressCategory::query()->create(['name' => 'Bridal', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create([
+            'name' => 'Princess',
+            'status' => 'active',
+            'parent_id' => $category->id,
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->postJson('/api/tenant/dresses', [
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
+            'code' => 'DR-DISPLAY-01',
+            'name' => 'Display Dress',
+            'status' => 'available',
+        ], $this->tenantHeaders());
+
+        $response->assertCreated()
+            ->assertJsonPath('data.display_name', 'DR-DISPLAY-01 - Bridal - Princess');
+    }
+
+    public function test_dress_listing_returns_code_category_subcategory_separately(): void
+    {
+        $category = DressCategory::query()->create(['name' => 'Bridal', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create([
+            'name' => 'Classic',
+            'status' => 'active',
+            'parent_id' => $category->id,
+        ]);
+        Dress::query()->create([
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
+            'code' => 'DR-LIST-01',
+            'name' => 'List Dress',
+            'status' => 'available',
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->getJson('/api/tenant/dresses?search=DR-LIST-01', $this->tenantHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('data.0.code', 'DR-LIST-01')
+            ->assertJsonPath('data.0.category.name', 'Bridal')
+            ->assertJsonPath('data.0.subcategory.name', 'Classic');
+    }
+
+    public function test_search_works_by_category_name(): void
+    {
+        $category = DressCategory::query()->create(['name' => 'Bridal Search', 'status' => 'active']);
+        Dress::query()->create([
+            'dress_category_id' => $category->id,
+            'code' => 'DR-CAT-SRCH',
+            'name' => 'Search Dress',
+            'status' => 'available',
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->getJson('/api/tenant/dresses?search=bridal search', $this->tenantHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.code', 'DR-CAT-SRCH');
+    }
+
+    public function test_search_works_by_subcategory_name(): void
+    {
+        $category = DressCategory::query()->create(['name' => 'Main Cat', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create([
+            'name' => 'Princess Search',
+            'status' => 'active',
+            'parent_id' => $category->id,
+        ]);
+        Dress::query()->create([
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
+            'code' => 'DR-SUB-SRCH',
+            'name' => 'Sub Search Dress',
+            'status' => 'available',
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->getJson('/api/tenant/dresses?search=princess search', $this->tenantHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.code', 'DR-SUB-SRCH');
+    }
+
+    public function test_can_create_use_branch_in_test_setup(): void
+    {
+        $branch = Branch::query()->create([
+            'name' => 'Main Branch',
+            'code' => 'BR-MAIN',
+            'status' => 'active',
+        ]);
+
+        $this->assertDatabaseHas('branches', [
+            'id' => $branch->id,
+            'name' => 'Main Branch',
+        ], 'tenant');
+    }
+
+    public function test_dress_can_belong_to_branch(): void
+    {
+        $branch = Branch::query()->create(['name' => 'Downtown', 'status' => 'active']);
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->postJson('/api/tenant/dresses', [
+            'code' => 'DR-BR-01',
+            'name' => 'Branch Dress',
+            'branch_id' => $branch->id,
+            'status' => 'available',
+        ], $this->tenantHeaders());
+
+        $response->assertCreated()
+            ->assertJsonPath('data.branch.id', $branch->id)
+            ->assertJsonPath('data.branch.name', 'Downtown');
+    }
+
+    public function test_dress_list_can_filter_by_branch_id(): void
+    {
+        $branchA = Branch::query()->create(['name' => 'A', 'status' => 'active']);
+        $branchB = Branch::query()->create(['name' => 'B', 'status' => 'active']);
+
+        Dress::query()->create([
+            'code' => 'DR-BR-A',
+            'name' => 'Branch A Dress',
+            'branch_id' => $branchA->id,
+            'status' => 'available',
+        ]);
+        Dress::query()->create([
+            'code' => 'DR-BR-B',
+            'name' => 'Branch B Dress',
+            'branch_id' => $branchB->id,
+            'status' => 'available',
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->getJson("/api/tenant/dresses?branch_id={$branchA->id}", $this->tenantHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.code', 'DR-BR-A');
+    }
+
+    public function test_inventory_movement_supports_from_branch_id_and_to_branch_id(): void
+    {
+        $branchA = Branch::query()->create(['name' => 'From Branch', 'status' => 'active']);
+        $branchB = Branch::query()->create(['name' => 'To Branch', 'status' => 'active']);
+        $dress = Dress::query()->create([
+            'code' => 'DR-MV-BR',
+            'name' => 'Movement Branch Dress',
+            'status' => 'available',
+        ]);
+
+        InventoryMovement::query()->create([
+            'dress_id' => $dress->id,
+            'type' => InventoryMovement::TYPE_BRANCH_TRANSFER,
+            'quantity' => 1,
+            'from_branch_id' => $branchA->id,
+            'to_branch_id' => $branchB->id,
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->getJson("/api/tenant/dresses/{$dress->id}/inventory-movements", $this->tenantHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.from_branch_id', $branchA->id)
+            ->assertJsonPath('data.0.to_branch_id', $branchB->id);
     }
 
     public function test_unauthenticated_request_rejected(): void

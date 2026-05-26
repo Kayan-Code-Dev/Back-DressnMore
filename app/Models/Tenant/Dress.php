@@ -2,6 +2,7 @@
 
 namespace App\Models\Tenant;
 
+use App\Enums\DressStatus;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,16 +11,18 @@ class Dress extends BaseTenantModel
 {
     use SoftDeletes;
 
-    public const STATUS_AVAILABLE = 'available';
-    public const STATUS_RENTED = 'rented';
-    public const STATUS_SOLD = 'sold';
-    public const STATUS_MAINTENANCE = 'maintenance';
-    public const STATUS_UNAVAILABLE = 'unavailable';
+    public const STATUS_AVAILABLE = DressStatus::AVAILABLE->value;
+    public const STATUS_RENTED = DressStatus::RENTED->value;
+    public const STATUS_SOLD = DressStatus::SOLD->value;
+    public const STATUS_MAINTENANCE = DressStatus::MAINTENANCE->value;
+    public const STATUS_UNAVAILABLE = DressStatus::UNAVAILABLE->value;
 
     protected $connection = 'tenant';
 
     protected $fillable = [
         'dress_category_id',
+        'dress_subcategory_id',
+        'branch_id',
         'code',
         'name',
         'description',
@@ -46,6 +49,16 @@ class Dress extends BaseTenantModel
         return $this->belongsTo(DressCategory::class, 'dress_category_id');
     }
 
+    public function subcategory(): BelongsTo
+    {
+        return $this->belongsTo(DressCategory::class, 'dress_subcategory_id');
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'branch_id');
+    }
+
     public function images(): HasMany
     {
         return $this->hasMany(DressImage::class);
@@ -61,12 +74,20 @@ class Dress extends BaseTenantModel
      */
     public static function statuses(): array
     {
-        return [
-            self::STATUS_AVAILABLE,
-            self::STATUS_RENTED,
-            self::STATUS_SOLD,
-            self::STATUS_MAINTENANCE,
-            self::STATUS_UNAVAILABLE,
-        ];
+        return DressStatus::values();
+    }
+
+    public function displayName(): string
+    {
+        $categoryName = $this->category?->name;
+        $subcategoryName = $this->subcategory?->name;
+
+        $parts = array_values(array_filter([
+            $this->code,
+            $categoryName,
+            $subcategoryName,
+        ], fn (?string $value): bool => is_string($value) && trim($value) !== ''));
+
+        return implode(' - ', $parts);
     }
 }

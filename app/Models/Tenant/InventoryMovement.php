@@ -2,17 +2,19 @@
 
 namespace App\Models\Tenant;
 
+use App\Enums\InventoryMovementType;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InventoryMovement extends BaseTenantModel
 {
-    public const TYPE_CREATED = 'created';
-    public const TYPE_STATUS_CHANGED = 'status_changed';
-    public const TYPE_MAINTENANCE = 'maintenance';
-    public const TYPE_SOLD = 'sold';
-    public const TYPE_RENTED = 'rented';
-    public const TYPE_RETURNED = 'returned';
-    public const TYPE_MANUAL_ADJUSTMENT = 'manual_adjustment';
+    public const TYPE_CREATED = InventoryMovementType::CREATED->value;
+    public const TYPE_STATUS_CHANGED = InventoryMovementType::STATUS_CHANGED->value;
+    public const TYPE_MAINTENANCE = InventoryMovementType::MAINTENANCE->value;
+    public const TYPE_SOLD = InventoryMovementType::SOLD->value;
+    public const TYPE_RENTED = InventoryMovementType::RENTED->value;
+    public const TYPE_RETURNED = InventoryMovementType::RETURNED->value;
+    public const TYPE_MANUAL_ADJUSTMENT = InventoryMovementType::MANUAL_ADJUSTMENT->value;
+    public const TYPE_BRANCH_TRANSFER = InventoryMovementType::BRANCH_TRANSFER->value;
 
     protected $connection = 'tenant';
 
@@ -25,6 +27,8 @@ class InventoryMovement extends BaseTenantModel
         'reference_id',
         'notes',
         'created_by',
+        'from_branch_id',
+        'to_branch_id',
     ];
 
     public function dress(): BelongsTo
@@ -32,19 +36,21 @@ class InventoryMovement extends BaseTenantModel
         return $this->belongsTo(Dress::class);
     }
 
+    public function fromBranch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'from_branch_id');
+    }
+
+    public function toBranch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'to_branch_id');
+    }
+
     /**
      * @return list<string>
      */
     public static function types(): array
     {
-        return [
-            self::TYPE_CREATED,
-            self::TYPE_STATUS_CHANGED,
-            self::TYPE_MAINTENANCE,
-            self::TYPE_SOLD,
-            self::TYPE_RENTED,
-            self::TYPE_RETURNED,
-            self::TYPE_MANUAL_ADJUSTMENT,
-        ];
+        return InventoryMovementType::values();
     }
 }

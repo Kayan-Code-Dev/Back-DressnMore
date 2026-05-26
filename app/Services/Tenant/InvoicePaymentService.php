@@ -38,7 +38,7 @@ class InvoicePaymentService
             return $this->invoiceService->refreshFinancials($invoice->refresh());
         });
 
-        return $updatedInvoice->refresh()->load(['items', 'payments']);
+        return $updatedInvoice->refresh()->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function paginateForInvoice(Invoice $invoice, int $perPage = 15): LengthAwarePaginator

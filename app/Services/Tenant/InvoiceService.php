@@ -16,7 +16,7 @@ class InvoiceService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = Invoice::query()
-            ->with('items')
+            ->with(['items.dress.category', 'items.dress.subcategory'])
             ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -105,13 +105,13 @@ class InvoiceService
             return $this->refreshFinancials($invoice, $status);
         });
 
-        return $invoice->load(['items', 'payments']);
+        return $invoice->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function findOrFail(int $invoiceId): Invoice
     {
         return Invoice::query()
-            ->with(['items', 'payments'])
+            ->with(['items.dress.category', 'items.dress.subcategory', 'payments'])
             ->findOrFail($invoiceId);
     }
 
@@ -183,7 +183,7 @@ class InvoiceService
             return $this->refreshFinancials($invoice, $newStatus);
         });
 
-        return $updatedInvoice->refresh()->load(['items', 'payments']);
+        return $updatedInvoice->refresh()->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function delete(Invoice $invoice): void

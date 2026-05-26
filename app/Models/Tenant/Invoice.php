@@ -2,6 +2,9 @@
 
 namespace App\Models\Tenant;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\InvoiceType;
+use App\Enums\SecurityDepositStatus;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,17 +13,17 @@ class Invoice extends BaseTenantModel
 {
     use SoftDeletes;
 
-    public const TYPE_RENT = 'rent';
-    public const TYPE_SELL = 'sell';
-    public const TYPE_TAILORING = 'tailoring';
+    public const TYPE_RENT = InvoiceType::RENT->value;
+    public const TYPE_SELL = InvoiceType::SELL->value;
+    public const TYPE_TAILORING = InvoiceType::TAILORING->value;
 
-    public const STATUS_DRAFT = 'draft';
-    public const STATUS_CONFIRMED = 'confirmed';
-    public const STATUS_PARTIALLY_PAID = 'partially_paid';
-    public const STATUS_PAID = 'paid';
-    public const STATUS_DELIVERED = 'delivered';
-    public const STATUS_RETURNED = 'returned';
-    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_DRAFT = InvoiceStatus::DRAFT->value;
+    public const STATUS_CONFIRMED = InvoiceStatus::CONFIRMED->value;
+    public const STATUS_PARTIALLY_PAID = InvoiceStatus::PARTIALLY_PAID->value;
+    public const STATUS_PAID = InvoiceStatus::PAID->value;
+    public const STATUS_DELIVERED = InvoiceStatus::DELIVERED->value;
+    public const STATUS_RETURNED = InvoiceStatus::RETURNED->value;
+    public const STATUS_CANCELLED = InvoiceStatus::CANCELLED->value;
 
     protected $connection = 'tenant';
 
@@ -85,11 +88,7 @@ class Invoice extends BaseTenantModel
      */
     public static function types(): array
     {
-        return [
-            self::TYPE_RENT,
-            self::TYPE_SELL,
-            self::TYPE_TAILORING,
-        ];
+        return InvoiceType::values();
     }
 
     /**
@@ -97,14 +96,14 @@ class Invoice extends BaseTenantModel
      */
     public static function statuses(): array
     {
-        return [
-            self::STATUS_DRAFT,
-            self::STATUS_CONFIRMED,
-            self::STATUS_PARTIALLY_PAID,
-            self::STATUS_PAID,
-            self::STATUS_DELIVERED,
-            self::STATUS_RETURNED,
-            self::STATUS_CANCELLED,
-        ];
+        return InvoiceStatus::values();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function securityDepositStatuses(): array
+    {
+        return SecurityDepositStatus::values();
     }
 }

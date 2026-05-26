@@ -33,30 +33,34 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($exception instanceof ValidationException) {
-                return response()->json([
-                    'message' => 'The given data was invalid.',
-                    'errors' => $exception->errors(),
-                ], 422);
+                return \App\Support\ApiResponse::error(
+                    message: 'The given data was invalid.',
+                    status: 422,
+                    errors: $exception->errors(),
+                );
             }
 
             if ($exception instanceof AuthenticationException) {
-                return response()->json(['message' => 'Unauthenticated'], 401);
+                return \App\Support\ApiResponse::error('Unauthenticated', 401);
             }
 
             if ($exception instanceof AuthorizationException) {
-                return response()->json(['message' => 'Forbidden'], 403);
+                return \App\Support\ApiResponse::error('Forbidden', 403);
             }
 
             if ($exception instanceof ModelNotFoundException) {
-                return response()->json(['message' => 'Resource not found'], 404);
+                return \App\Support\ApiResponse::error('Resource not found', 404);
             }
 
             if ($exception instanceof HttpExceptionInterface) {
-                return response()->json(['message' => $exception->getMessage() ?: 'Request failed'], $exception->getStatusCode());
+                return \App\Support\ApiResponse::error(
+                    message: $exception->getMessage() ?: 'Request failed',
+                    status: $exception->getStatusCode(),
+                );
             }
 
             report($exception);
 
-            return response()->json(['message' => 'Server error'], 500);
+            return \App\Support\ApiResponse::error('Server error', 500);
         });
     })->create();

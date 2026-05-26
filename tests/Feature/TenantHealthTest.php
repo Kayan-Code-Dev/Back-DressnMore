@@ -11,6 +11,7 @@ class TenantHealthTest extends TestCase
         $response = $this->getJson('/api/tenant/health');
 
         $response->assertStatus(400)
+            ->assertJsonPath('success', false)
             ->assertJson([
                 'message' => 'Tenant workspace is required',
             ]);

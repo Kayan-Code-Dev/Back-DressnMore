@@ -12,6 +12,8 @@ class DressResource extends JsonResource
         return [
             'id' => $this->id,
             'dress_category_id' => $this->dress_category_id,
+            'dress_subcategory_id' => $this->dress_subcategory_id,
+            'branch_id' => $this->branch_id,
             'code' => $this->code,
             'name' => $this->name,
             'description' => $this->description,
@@ -22,7 +24,12 @@ class DressResource extends JsonResource
             'sale_price' => $this->sale_price,
             'status' => $this->status,
             'notes' => $this->notes,
+            'display_name' => method_exists($this->resource, 'displayName')
+                ? $this->resource->displayName()
+                : $this->code,
             'category' => $this->whenLoaded('category', fn () => new DressCategoryResource($this->category)),
+            'subcategory' => $this->whenLoaded('subcategory', fn () => new DressCategoryResource($this->subcategory)),
+            'branch' => $this->whenLoaded('branch', fn () => new BranchResource($this->branch)),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'deleted_at' => $this->deleted_at?->toISOString(),

@@ -60,8 +60,9 @@ class TenantCustomerTest extends TestCase
         $response = $this->getJson('/api/tenant/customers?search=alice', $this->tenantHeaders());
 
         $response->assertOk()
-            ->assertJsonPath('data.pagination.total', 1)
-            ->assertJsonPath('data.items.0.name', 'Alice Tailor');
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.name', 'Alice Tailor');
     }
 
     public function test_tenant_user_can_create_customer(): void

@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Tenant\Invoice;
 
+use App\Enums\PaymentMethod;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class AddInvoicePaymentRequest extends FormRequest
 {
@@ -15,7 +17,7 @@ class AddInvoicePaymentRequest extends FormRequest
     {
         return [
             'amount' => ['required', 'numeric', 'gt:0'],
-            'method' => ['nullable', 'string', 'max:100'],
+            'method' => ['nullable', 'string', Rule::in(PaymentMethod::values())],
             'reference' => ['nullable', 'string', 'max:255'],
             'paid_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],

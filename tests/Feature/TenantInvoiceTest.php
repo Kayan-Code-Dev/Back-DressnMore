@@ -65,7 +65,8 @@ class TenantInvoiceTest extends TestCase
         $response = $this->getJson('/api/tenant/invoices', $this->tenantHeaders());
 
         $response->assertOk()
-            ->assertJsonPath('data.pagination.total', 2);
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('meta.total', 2);
     }
 
     public function test_tenant_user_can_create_sell_invoice(): void
@@ -243,8 +244,76 @@ class TenantInvoiceTest extends TestCase
         );
 
         $response->assertOk()
-            ->assertJsonPath('data.pagination.total', 1)
-            ->assertJsonPath('data.items.0.invoice_number', 'INV-FLT-ALPHA');
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.invoice_number', 'INV-FLT-ALPHA');
+    }
+
+    public function test_invoice_item_returns_dress_display_name(): void
+    {
+        $category = \App\Models\Tenant\DressCategory::query()->create(['name' => 'Bridal', 'status' => 'active']);
+        $subcategory = \App\Models\Tenant\DressCategory::query()->create([
+            'name' => 'Princess',
+            'status' => 'active',
+            'parent_id' => $category->id,
+        ]);
+        $dress = Dress::query()->create([
+            'code' => 'DR-ITEM-01',
+            'name' => 'Invoice Item Dress',
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
+            'status' => 'available',
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $create = $this->postJson('/api/tenant/invoices', [
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_CONFIRMED,
+            'items' => [
+                ['dress_id' => $dress->id, 'quantity' => 1, 'unit_price' => 100],
+            ],
+        ], $this->tenantHeaders());
+
+        $invoiceId = (int) $create->json('data.id');
+        $show = $this->getJson("/api/tenant/invoices/{$invoiceId}", $this->tenantHeaders());
+
+        $show->assertOk()
+            ->assertJsonPath('data.items.0.dress_display_name', 'DR-ITEM-01 - Bridal - Princess');
+    }
+
+    public function test_invoice_item_returns_dress_code_category_subcategory(): void
+    {
+        $category = \App\Models\Tenant\DressCategory::query()->create(['name' => 'Bridal 2', 'status' => 'active']);
+        $subcategory = \App\Models\Tenant\DressCategory::query()->create([
+            'name' => 'Mermaid',
+            'status' => 'active',
+            'parent_id' => $category->id,
+        ]);
+        $dress = Dress::query()->create([
+            'code' => 'DR-ITEM-02',
+            'name' => 'Invoice Item Dress 2',
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
+            'status' => 'available',
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $create = $this->postJson('/api/tenant/invoices', [
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_CONFIRMED,
+            'items' => [
+                ['dress_id' => $dress->id, 'quantity' => 1, 'unit_price' => 120],
+            ],
+        ], $this->tenantHeaders());
+
+        $invoiceId = (int) $create->json('data.id');
+        $show = $this->getJson("/api/tenant/invoices/{$invoiceId}", $this->tenantHeaders());
+
+        $show->assertOk()
+            ->assertJsonPath('data.items.0.dress_code', 'DR-ITEM-02')
+            ->assertJsonPath('data.items.0.dress_category', 'Bridal 2')
+            ->assertJsonPath('data.items.0.dress_subcategory', 'Mermaid');
     }
 
     public function test_unauthenticated_request_rejected(): void

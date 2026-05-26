@@ -17,7 +17,7 @@ class DressService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = Dress::query()
-            ->with('category')
+            ->with(['category', 'subcategory', 'branch'])
             ->latest('id');
 
         $searchTerm = trim((string) ($filters['search'] ?? ''));
@@ -27,11 +27,15 @@ class DressService
                 $builder->whereRaw('LOWER(code) LIKE ?', [$wildcard])
                     ->orWhereRaw('LOWER(name) LIKE ?', [$wildcard])
                     ->orWhereRaw('LOWER(color) LIKE ?', [$wildcard])
-                    ->orWhereRaw('LOWER(size) LIKE ?', [$wildcard]);
+                    ->orWhereRaw('LOWER(size) LIKE ?', [$wildcard])
+                    ->orWhereHas('category', fn (Builder $q) => $q->whereRaw('LOWER(name) LIKE ?', [$wildcard]))
+                    ->orWhereHas('subcategory', fn (Builder $q) => $q->whereRaw('LOWER(name) LIKE ?', [$wildcard]));
             });
         }
 
         $this->applyExactFilter($query, 'dress_category_id', $filters['dress_category_id'] ?? null);
+        $this->applyExactFilter($query, 'dress_subcategory_id', $filters['dress_subcategory_id'] ?? null);
+        $this->applyExactFilter($query, 'branch_id', $filters['branch_id'] ?? null);
         $this->applyExactFilter($query, 'status', $filters['status'] ?? null);
         $this->applyExactFilter($query, 'color', $filters['color'] ?? null);
         $this->applyExactFilter($query, 'size', $filters['size'] ?? null);
@@ -56,12 +60,12 @@ class DressService
             return $dress;
         });
 
-        return $dress->load('category');
+        return $dress->load(['category', 'subcategory', 'branch']);
     }
 
     public function findOrFail(int $dressId): Dress
     {
-        return Dress::query()->with('category')->findOrFail($dressId);
+        return Dress::query()->with(['category', 'subcategory', 'branch'])->findOrFail($dressId);
     }
 
     public function update(Dress $dress, array $data, ?int $actorId = null): Dress
@@ -87,7 +91,7 @@ class DressService
             return $dress;
         });
 
-        return $updatedDress->refresh()->load('category');
+        return $updatedDress->refresh()->load(['category', 'subcategory', 'branch']);
     }
 
     public function delete(Dress $dress): void

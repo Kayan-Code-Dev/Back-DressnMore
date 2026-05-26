@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Tenant\DressCategory;
 
+use App\Enums\CustomerStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,6 +18,14 @@ class UpdateDressCategoryRequest extends FormRequest
         $dressCategoryId = (int) $this->route('dressCategory');
 
         return [
+            'parent_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('tenant.dress_categories', 'id')
+                    ->where(fn ($query) => $query
+                        ->whereNull('deleted_at')
+                        ->where('id', '!=', $dressCategoryId)),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'slug' => [
                 'nullable',
@@ -27,7 +36,7 @@ class UpdateDressCategoryRequest extends FormRequest
                     ->whereNull('deleted_at'),
             ],
             'description' => ['nullable', 'string'],
-            'status' => ['nullable', 'string', Rule::in(['active', 'inactive'])],
+            'status' => ['nullable', 'string', Rule::in(CustomerStatus::values())],
         ];
     }
 }

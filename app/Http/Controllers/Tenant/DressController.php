@@ -27,20 +27,14 @@ class DressController extends Controller
         $dresses = $this->dressService->paginate([
             'search' => $request->query('search'),
             'dress_category_id' => $request->query('dress_category_id'),
+            'dress_subcategory_id' => $request->query('dress_subcategory_id'),
+            'branch_id' => $request->query('branch_id'),
             'status' => $request->query('status'),
             'color' => $request->query('color'),
             'size' => $request->query('size'),
         ], $perPage);
 
-        return ApiResponse::success([
-            'items' => DressResource::collection($dresses->items()),
-            'pagination' => [
-                'current_page' => $dresses->currentPage(),
-                'last_page' => $dresses->lastPage(),
-                'per_page' => $dresses->perPage(),
-                'total' => $dresses->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($dresses, DressResource::collection($dresses->items())->resolve());
     }
 
     public function store(StoreDressRequest $request): JsonResponse
@@ -86,14 +80,6 @@ class DressController extends Controller
         $perPage = max(1, min(100, $request->integer('per_page', 15)));
         $movements = $this->inventoryService->paginateForDress($dressModel, $perPage);
 
-        return ApiResponse::success([
-            'items' => InventoryMovementResource::collection($movements->items()),
-            'pagination' => [
-                'current_page' => $movements->currentPage(),
-                'last_page' => $movements->lastPage(),
-                'per_page' => $movements->perPage(),
-                'total' => $movements->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($movements, InventoryMovementResource::collection($movements->items())->resolve());
     }
 }

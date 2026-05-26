@@ -51,11 +51,12 @@ class TenantDressCategoryTest extends TestCase
         $response = $this->getJson('/api/tenant/dress-categories?search=wedd&status=active', $this->tenantHeaders());
 
         $response->assertOk()
-            ->assertJsonPath('data.pagination.total', 1)
-            ->assertJsonPath('data.items.0.name', 'Wedding');
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.name', 'Wedding');
     }
 
-    public function test_tenant_user_can_create_category(): void
+    public function test_can_create_parent_category(): void
     {
         Sanctum::actingAs($this->ownerUser, ['*']);
 
@@ -68,12 +69,35 @@ class TenantDressCategoryTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('message', 'Dress category created')
+            ->assertJsonPath('data.parent_id', null)
             ->assertJsonPath('data.name', 'Bridal');
 
         $this->assertDatabaseHas('dress_categories', [
             'name' => 'Bridal',
             'slug' => 'bridal',
         ], 'tenant');
+    }
+
+    public function test_can_create_subcategory_with_parent_id(): void
+    {
+        $parent = DressCategory::query()->create([
+            'name' => 'Bridal',
+            'slug' => 'bridal-parent',
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->postJson('/api/tenant/dress-categories', [
+            'parent_id' => $parent->id,
+            'name' => 'Princess',
+            'slug' => 'princess-sub',
+            'status' => 'active',
+        ], $this->tenantHeaders());
+
+        $response->assertCreated()
+            ->assertJsonPath('data.parent_id', $parent->id)
+            ->assertJsonPath('data.name', 'Princess');
     }
 
     public function test_tenant_user_can_update_category(): void
@@ -119,6 +143,50 @@ class TenantDressCategoryTest extends TestCase
             ->assertJsonPath('message', 'Dress category deleted');
 
         $this->assertSoftDeleted('dress_categories', ['id' => $category->id], 'tenant');
+    }
+
+    public function test_can_filter_only_parents(): void
+    {
+        $parent = DressCategory::query()->create(['name' => 'Parent', 'status' => 'active']);
+        DressCategory::query()->create(['name' => 'Child', 'status' => 'active', 'parent_id' => $parent->id]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->getJson('/api/tenant/dress-categories?only_parents=true', $this->tenantHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.name', 'Parent');
+    }
+
+    public function test_can_filter_only_children(): void
+    {
+        $parent = DressCategory::query()->create(['name' => 'Parent Two', 'status' => 'active']);
+        DressCategory::query()->create(['name' => 'Child Two', 'status' => 'active', 'parent_id' => $parent->id]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->getJson('/api/tenant/dress-categories?only_children=true', $this->tenantHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.name', 'Child Two')
+            ->assertJsonPath('data.0.parent_id', $parent->id);
+    }
+
+    public function test_can_filter_by_parent_id(): void
+    {
+        $parent = DressCategory::query()->create(['name' => 'Parent Three', 'status' => 'active']);
+        DressCategory::query()->create(['name' => 'Child Three', 'status' => 'active', 'parent_id' => $parent->id]);
+        DressCategory::query()->create(['name' => 'Child Other', 'status' => 'active']);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->getJson("/api/tenant/dress-categories?parent_id={$parent->id}", $this->tenantHeaders());
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.name', 'Child Three');
     }
 
     public function test_unauthenticated_request_rejected(): void

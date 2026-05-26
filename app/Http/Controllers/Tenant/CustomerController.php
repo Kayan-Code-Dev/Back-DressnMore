@@ -25,15 +25,7 @@ class CustomerController extends Controller
             perPage: $perPage,
         );
 
-        return ApiResponse::success([
-            'items' => CustomerResource::collection($customers->items()),
-            'pagination' => [
-                'current_page' => $customers->currentPage(),
-                'last_page' => $customers->lastPage(),
-                'per_page' => $customers->perPage(),
-                'total' => $customers->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($customers, CustomerResource::collection($customers->items())->resolve());
     }
 
     public function store(StoreCustomerRequest $request): JsonResponse

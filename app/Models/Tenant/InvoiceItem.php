@@ -33,6 +33,6 @@ class InvoiceItem extends BaseTenantModel
 
     public function dress(): BelongsTo
     {
-        return $this->belongsTo(Dress::class);
+        return $this->belongsTo(Dress::class)->withTrashed();
     }
 }

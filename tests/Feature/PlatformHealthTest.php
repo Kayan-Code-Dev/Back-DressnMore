@@ -12,6 +12,7 @@ class PlatformHealthTest extends TestCase
 
         $response->assertOk()
             ->assertJsonStructure([
+                'success',
                 'message',
                 'data' => [
                     'app_name',
@@ -19,6 +20,7 @@ class PlatformHealthTest extends TestCase
                     'central_database_connection',
                     'timestamp',
                 ],
+                'meta',
             ]);
     }
 }

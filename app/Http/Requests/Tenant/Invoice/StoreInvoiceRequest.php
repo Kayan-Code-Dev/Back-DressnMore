@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Tenant\Invoice;
 
+use App\Enums\PaymentMethod;
+use App\Enums\SecurityDepositStatus;
 use App\Models\Tenant\Invoice;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -28,7 +30,7 @@ class StoreInvoiceRequest extends FormRequest
             'delivery_date' => ['nullable', 'date'],
             'return_date' => ['nullable', 'date'],
             'security_deposit' => ['nullable', 'numeric', 'min:0'],
-            'security_deposit_status' => ['nullable', 'string', 'max:100'],
+            'security_deposit_status' => ['nullable', 'string', Rule::in(SecurityDepositStatus::values())],
 
             'tailoring_due_date' => ['nullable', 'date'],
             'tailoring_notes' => ['nullable', 'string'],
@@ -44,7 +46,7 @@ class StoreInvoiceRequest extends FormRequest
 
             'initial_payment' => ['nullable', 'array'],
             'initial_payment.amount' => ['required_with:initial_payment', 'numeric', 'gt:0'],
-            'initial_payment.method' => ['nullable', 'string', 'max:100'],
+            'initial_payment.method' => ['nullable', 'string', Rule::in(PaymentMethod::values())],
             'initial_payment.reference' => ['nullable', 'string', 'max:255'],
             'initial_payment.paid_at' => ['nullable', 'date'],
             'initial_payment.notes' => ['nullable', 'string'],
