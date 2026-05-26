@@ -11,17 +11,28 @@ class CashMovement extends BaseTenantModel
     use SoftDeletes;
 
     public const TYPE_INCOME = CashMovementType::INCOME->value;
+
     public const TYPE_EXPENSE = CashMovementType::EXPENSE->value;
+
     public const TYPE_INVOICE_PAYMENT = CashMovementType::INVOICE_PAYMENT->value;
+
     public const TYPE_SECURITY_DEPOSIT_DEDUCTION = CashMovementType::SECURITY_DEPOSIT_DEDUCTION->value;
+
     public const TYPE_MANUAL_ADJUSTMENT = CashMovementType::MANUAL_ADJUSTMENT->value;
 
+    public const TYPE_SUPPLIER_PAYMENT = CashMovementType::SUPPLIER_PAYMENT->value;
+
     public const DIRECTION_IN = CashMovementDirection::IN->value;
+
     public const DIRECTION_OUT = CashMovementDirection::OUT->value;
 
     public const REFERENCE_EXPENSE = 'expense';
+
     public const REFERENCE_INVOICE_PAYMENT = 'invoice_payment';
+
     public const REFERENCE_SECURITY_DEPOSIT_TRANSACTION = 'security_deposit_transaction';
+
+    public const REFERENCE_SUPPLIER_PAYMENT = 'supplier_payment';
 
     protected $connection = 'tenant';
 

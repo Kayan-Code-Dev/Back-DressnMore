@@ -13,9 +13,7 @@ use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
-    public function __construct(private readonly CustomerService $customerService)
-    {
-    }
+    public function __construct(private readonly CustomerService $customerService) {}
 
     public function index(Request $request): JsonResponse
     {

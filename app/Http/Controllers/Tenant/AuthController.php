@@ -16,8 +16,7 @@ class AuthController extends Controller
     public function __construct(
         private readonly TenantAuthService $tenantAuthService,
         private readonly TenantContext $tenantContext
-    ) {
-    }
+    ) {}
 
     public function login(LoginRequest $request): JsonResponse
     {

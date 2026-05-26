@@ -4,8 +4,8 @@ namespace App\Services\Tenant;
 
 use App\Enums\SecurityDepositStatus;
 use App\Models\Tenant\Dress;
-use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InventoryMovement;
+use App\Models\Tenant\Invoice;
 use App\Models\Tenant\SecurityDepositTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +16,7 @@ class SecurityDepositService
     public function __construct(
         private readonly InventoryService $inventoryService,
         private readonly CashMovementService $cashMovementService
-    ) {
-    }
+    ) {}
 
     public function addDeduction(Invoice $invoice, array $data, ?int $actorId = null): Invoice
     {

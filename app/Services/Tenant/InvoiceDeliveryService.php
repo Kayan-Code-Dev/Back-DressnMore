@@ -4,6 +4,7 @@ namespace App\Services\Tenant;
 
 use App\Models\Tenant\DeliveryRecord;
 use App\Models\Tenant\Dress;
+use App\Models\Tenant\InventoryMovement;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoiceItem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -13,9 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class InvoiceDeliveryService
 {
-    public function __construct(private readonly InventoryService $inventoryService)
-    {
-    }
+    public function __construct(private readonly InventoryService $inventoryService) {}
 
     public function deliver(Invoice $invoice, array $data, ?int $actorId = null): Invoice
     {
@@ -39,8 +38,8 @@ class InvoiceDeliveryService
                     : Dress::STATUS_SOLD;
 
                 $movementType = $invoice->type === Invoice::TYPE_RENT
-                    ? \App\Models\Tenant\InventoryMovement::TYPE_RENTED
-                    : \App\Models\Tenant\InventoryMovement::TYPE_SOLD;
+                    ? InventoryMovement::TYPE_RENTED
+                    : InventoryMovement::TYPE_SOLD;
 
                 /** @var InvoiceItem $item */
                 foreach ($invoice->items()->whereNotNull('dress_id')->with('dress')->get() as $item) {
@@ -111,7 +110,7 @@ class InvoiceDeliveryService
 
                 $this->inventoryService->recordMovement(
                     dress: $dress,
-                    type: \App\Models\Tenant\InventoryMovement::TYPE_RETURNED,
+                    type: InventoryMovement::TYPE_RETURNED,
                     quantity: max(1, (int) $item->quantity),
                     reason: 'Invoice returned',
                     referenceType: Invoice::class,
@@ -123,7 +122,7 @@ class InvoiceDeliveryService
                 if ($statusAfterReturn === Dress::STATUS_MAINTENANCE) {
                     $this->inventoryService->recordMovement(
                         dress: $dress,
-                        type: \App\Models\Tenant\InventoryMovement::TYPE_MAINTENANCE,
+                        type: InventoryMovement::TYPE_MAINTENANCE,
                         quantity: max(1, (int) $item->quantity),
                         reason: 'Moved to maintenance after return',
                         referenceType: Invoice::class,

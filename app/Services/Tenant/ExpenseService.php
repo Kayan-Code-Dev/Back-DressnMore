@@ -9,9 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class ExpenseService
 {
-    public function __construct(private readonly CashMovementService $cashMovementService)
-    {
-    }
+    public function __construct(private readonly CashMovementService $cashMovementService) {}
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {

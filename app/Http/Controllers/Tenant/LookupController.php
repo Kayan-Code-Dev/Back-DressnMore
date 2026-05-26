@@ -9,9 +9,7 @@ use Illuminate\Http\JsonResponse;
 
 class LookupController extends Controller
 {
-    public function __construct(private readonly LookupService $lookupService)
-    {
-    }
+    public function __construct(private readonly LookupService $lookupService) {}
 
     public function index(): JsonResponse
     {

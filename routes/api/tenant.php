@@ -11,6 +11,9 @@ use App\Http\Controllers\Tenant\HealthController;
 use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Tenant\InvoiceDeliveryController;
 use App\Http\Controllers\Tenant\LookupController;
+use App\Http\Controllers\Tenant\PurchaseOrderController;
+use App\Http\Controllers\Tenant\SupplierController;
+use App\Http\Controllers\Tenant\SupplierPaymentController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('tenant')->group(function (): void {
@@ -44,6 +47,47 @@ Route::prefix('tenant')->group(function (): void {
             Route::delete('/{customer}', [CustomerController::class, 'destroy'])
                 ->whereNumber('customer')
                 ->middleware('tenant.permission:customers.delete');
+        });
+
+        Route::prefix('/suppliers')->group(function (): void {
+            Route::get('/', [SupplierController::class, 'index'])
+                ->middleware('tenant.permission:suppliers.view');
+            Route::post('/', [SupplierController::class, 'store'])
+                ->middleware('tenant.permission:suppliers.create');
+            Route::get('/{supplier}', [SupplierController::class, 'show'])
+                ->whereNumber('supplier')
+                ->middleware('tenant.permission:suppliers.view');
+            Route::put('/{supplier}', [SupplierController::class, 'update'])
+                ->whereNumber('supplier')
+                ->middleware('tenant.permission:suppliers.update');
+            Route::delete('/{supplier}', [SupplierController::class, 'destroy'])
+                ->whereNumber('supplier')
+                ->middleware('tenant.permission:suppliers.delete');
+            Route::get('/{supplier}/payments', [SupplierPaymentController::class, 'indexForSupplier'])
+                ->whereNumber('supplier')
+                ->middleware('tenant.permission:supplier_payments.view');
+            Route::post('/{supplier}/payments', [SupplierPaymentController::class, 'storeForSupplier'])
+                ->whereNumber('supplier')
+                ->middleware('tenant.permission:supplier_payments.create');
+        });
+
+        Route::prefix('/purchase-orders')->group(function (): void {
+            Route::get('/', [PurchaseOrderController::class, 'index'])
+                ->middleware('tenant.permission:purchase_orders.view');
+            Route::post('/', [PurchaseOrderController::class, 'store'])
+                ->middleware('tenant.permission:purchase_orders.create');
+            Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
+                ->whereNumber('purchaseOrder')
+                ->middleware('tenant.permission:purchase_orders.view');
+            Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update'])
+                ->whereNumber('purchaseOrder')
+                ->middleware('tenant.permission:purchase_orders.update');
+            Route::delete('/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])
+                ->whereNumber('purchaseOrder')
+                ->middleware('tenant.permission:purchase_orders.delete');
+            Route::get('/{purchaseOrder}/payments', [SupplierPaymentController::class, 'indexForPurchaseOrder'])
+                ->whereNumber('purchaseOrder')
+                ->middleware('tenant.permission:supplier_payments.view');
         });
 
         Route::prefix('/expense-categories')->group(function (): void {

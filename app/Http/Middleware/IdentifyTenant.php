@@ -11,9 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class IdentifyTenant
 {
-    public function __construct(private readonly TenantContext $tenantContext)
-    {
-    }
+    public function __construct(private readonly TenantContext $tenantContext) {}
 
     public function handle(Request $request, Closure $next): Response
     {

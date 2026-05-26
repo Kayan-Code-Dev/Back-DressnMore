@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class SecurityDepositTransaction extends BaseTenantModel
 {
     public const TYPE_COLLECTED = SecurityDepositTransactionType::COLLECTED->value;
+
     public const TYPE_DEDUCTED = SecurityDepositTransactionType::DEDUCTED->value;
+
     public const TYPE_REFUNDED = SecurityDepositTransactionType::REFUNDED->value;
 
     protected $connection = 'tenant';

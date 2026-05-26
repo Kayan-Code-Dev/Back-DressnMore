@@ -13,9 +13,8 @@ class ApiResponse
         string $message = 'Success',
         int $status = 200,
         array $meta = []
-    ): JsonResponse
-    {
-        $metaPayload = $meta === [] ? new stdClass() : $meta;
+    ): JsonResponse {
+        $metaPayload = $meta === [] ? new stdClass : $meta;
 
         return response()->json([
             'success' => true,
@@ -47,8 +46,8 @@ class ApiResponse
     public static function error(string $message = 'Error', int $status = 400, mixed $errors = []): JsonResponse
     {
         $errorsPayload = match (true) {
-            $errors === null => new stdClass(),
-            $errors === [] => new stdClass(),
+            $errors === null => new stdClass,
+            $errors === [] => new stdClass,
             default => $errors,
         };
 

@@ -10,9 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckPlanFeature
 {
-    public function __construct(private readonly TenantContext $tenantContext)
-    {
-    }
+    public function __construct(private readonly TenantContext $tenantContext) {}
 
     public function handle(Request $request, Closure $next, string $featureKey): Response
     {

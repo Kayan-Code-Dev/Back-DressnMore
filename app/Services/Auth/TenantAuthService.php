@@ -9,9 +9,7 @@ use Illuminate\Validation\ValidationException;
 
 class TenantAuthService
 {
-    public function __construct(private readonly TenantContext $tenantContext)
-    {
-    }
+    public function __construct(private readonly TenantContext $tenantContext) {}
 
     public function login(string $email, string $password): array
     {

@@ -10,9 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class DressService
 {
-    public function __construct(private readonly InventoryService $inventoryService)
-    {
-    }
+    public function __construct(private readonly InventoryService $inventoryService) {}
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {

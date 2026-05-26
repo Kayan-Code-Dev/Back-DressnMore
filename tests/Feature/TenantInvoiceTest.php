@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\Customer;
 use App\Models\Tenant\Dress;
+use App\Models\Tenant\DressCategory;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\Permission;
 use App\Models\Tenant\Role;
@@ -250,8 +251,8 @@ class TenantInvoiceTest extends TestCase
 
     public function test_invoice_item_returns_dress_display_name(): void
     {
-        $category = \App\Models\Tenant\DressCategory::query()->create(['name' => 'Bridal', 'status' => 'active']);
-        $subcategory = \App\Models\Tenant\DressCategory::query()->create([
+        $category = DressCategory::query()->create(['name' => 'Bridal', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create([
             'name' => 'Princess',
             'status' => 'active',
             'parent_id' => $category->id,
@@ -283,8 +284,8 @@ class TenantInvoiceTest extends TestCase
 
     public function test_invoice_item_returns_dress_code_category_subcategory(): void
     {
-        $category = \App\Models\Tenant\DressCategory::query()->create(['name' => 'Bridal 2', 'status' => 'active']);
-        $subcategory = \App\Models\Tenant\DressCategory::query()->create([
+        $category = DressCategory::query()->create(['name' => 'Bridal 2', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create([
             'name' => 'Mermaid',
             'status' => 'active',
             'parent_id' => $category->id,

@@ -95,6 +95,8 @@ Frontend recommendation:
 - Provides option arrays for:
   - statuses
   - expense statuses
+  - supplier statuses
+  - purchase order statuses
   - invoice types/statuses
   - payment methods
   - inventory movement types
@@ -113,6 +115,8 @@ src/services/dresses.service.ts
 src/services/invoices.service.ts
 src/services/expenses.service.ts
 src/services/cash-movements.service.ts
+src/services/suppliers.service.ts
+src/services/purchase-orders.service.ts
 src/services/lookups.service.ts
 
 src/types/api.ts
@@ -121,6 +125,8 @@ src/types/dress.ts
 src/types/invoice.ts
 src/types/expense.ts
 src/types/cash-movement.ts
+src/types/supplier.ts
+src/types/purchase-order.ts
 src/types/lookups.ts
 ```
 
@@ -159,6 +165,14 @@ src/types/lookups.ts
   - list cash movements
   - create manual cash movement
 
+- `suppliers.service.ts`
+  - suppliers CRUD
+  - supplier payments list/create per supplier
+
+- `purchase-orders.service.ts`
+  - purchase orders CRUD
+  - optional purchase order payments list
+
 ## 9) Suggested Type Shapes
 
 - `customer.ts`
@@ -175,6 +189,10 @@ src/types/lookups.ts
   - `ExpenseCategory`, `Expense`
 - `cash-movement.ts`
   - `CashMovement`
+- `supplier.ts`
+  - `Supplier`, `SupplierPayment`
+- `purchase-order.ts`
+  - `PurchaseOrder`, `PurchaseOrderItem`
 - `lookups.ts`
   - `LookupOption { value: string; label: string }`
   - `LookupsResponse`
@@ -211,6 +229,16 @@ src/types/lookups.ts
   - manual entries support `manual_adjustment`, `income`, `expense`.
   - for `income`, direction must be `in`; for `expense`, direction must be `out`.
   - security deposit deductions write `security_deposit_deduction` cash movements automatically.
+  - supplier payments write `supplier_payment` cash movements automatically with `direction=out`.
+
+- Suppliers:
+  - supplier payload includes `opening_balance`, `current_balance`, `total_purchase_orders`, `total_paid`, `total_remaining`.
+  - list supports search by contact/name fields and status filter.
+
+- Purchase Orders:
+  - purchase order number is backend-generated.
+  - totals/status are backend-calculated from items/payments.
+  - status shifts automatically when supplier payments are added.
 
 ## 11) Frontend Safety Recommendations
 

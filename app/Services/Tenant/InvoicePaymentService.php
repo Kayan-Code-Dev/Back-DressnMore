@@ -14,9 +14,7 @@ class InvoicePaymentService
     public function __construct(
         private readonly InvoiceService $invoiceService,
         private readonly CashMovementService $cashMovementService
-    )
-    {
-    }
+    ) {}
 
     public function addPayment(Invoice $invoice, array $data, ?int $actorId = null): Invoice
     {

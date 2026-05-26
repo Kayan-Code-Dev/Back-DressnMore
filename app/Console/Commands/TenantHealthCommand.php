@@ -30,6 +30,7 @@ class TenantHealthCommand extends Command
         $tenant = Tenant::query()->where('slug', $slug)->first();
         if (! $tenant) {
             $this->line('FAIL: Tenant not found');
+
             return self::FAILURE;
         }
         $this->line('PASS: Tenant found');
@@ -53,6 +54,7 @@ class TenantHealthCommand extends Command
             $this->line('PASS: Tenant database connection is healthy');
         } catch (Throwable $exception) {
             $this->line('FAIL: Tenant database connection failed');
+
             return self::FAILURE;
         }
 

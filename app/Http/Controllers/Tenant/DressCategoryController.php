@@ -13,9 +13,7 @@ use Illuminate\Http\Request;
 
 class DressCategoryController extends Controller
 {
-    public function __construct(private readonly DressCategoryService $dressCategoryService)
-    {
-    }
+    public function __construct(private readonly DressCategoryService $dressCategoryService) {}
 
     public function index(Request $request): JsonResponse
     {

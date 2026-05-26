@@ -206,6 +206,120 @@ Permissions:
 
 ---
 
+## Suppliers
+
+Base: `/api/tenant/suppliers`
+
+Permissions:
+- index/show: `suppliers.view`
+- store: `suppliers.create`
+- update: `suppliers.update`
+- delete: `suppliers.delete`
+
+### GET `/`
+- Query:
+  - `search` (name/phone/whatsapp/email)
+  - `status` (`active|inactive`)
+  - `per_page`
+- Response: paginated `Supplier[]`
+
+### POST `/`
+- Body:
+  - `name` required
+  - `phone`, `whatsapp`, `email`, `address`, `tax_number`, `notes` optional
+  - `opening_balance` optional decimal
+  - `status` optional (`active|inactive`)
+- Response includes:
+  - `opening_balance`
+  - `current_balance`
+  - `total_purchase_orders`
+  - `total_paid`
+  - `total_remaining`
+
+### GET `/{supplier}`
+### PUT `/{supplier}`
+### DELETE `/{supplier}`
+- Soft delete.
+
+---
+
+## Purchase Orders
+
+Base: `/api/tenant/purchase-orders`
+
+Permissions:
+- index/show: `purchase_orders.view`
+- store: `purchase_orders.create`
+- update: `purchase_orders.update`
+- delete: `purchase_orders.delete`
+
+### GET `/`
+- Query:
+  - `search` (purchase_order_number/supplier name)
+  - `supplier_id`
+  - `status` (`draft|confirmed|partially_paid|paid|cancelled`)
+  - `date_from`
+  - `date_to`
+  - `per_page`
+- Response: paginated `PurchaseOrder[]`
+
+### POST `/`
+- Body:
+  - `supplier_id` required
+  - `status` optional
+  - `discount`, `tax` optional
+  - `order_date`, `notes` optional
+  - `items` required array:
+    - `item_name` required
+    - `description` optional
+    - `quantity` optional > 0 (default 1)
+    - `unit_price` optional >= 0
+- Backend behavior:
+  - auto `purchase_order_number` as `PO-YYYYMMDD-####`
+  - calculates `subtotal`, `total`, `paid_amount`, `remaining_amount`
+  - updates status according to payment state
+  - updates supplier `current_balance`
+
+### GET `/{purchaseOrder}`
+### PUT `/{purchaseOrder}`
+### DELETE `/{purchaseOrder}`
+- Delete uses soft delete.
+
+---
+
+## Supplier Payments
+
+Permissions:
+- list: `supplier_payments.view`
+- create: `supplier_payments.create`
+
+### GET `/api/tenant/suppliers/{supplier}/payments`
+- Query: `per_page`
+- Response: paginated `SupplierPayment[]`
+
+### POST `/api/tenant/suppliers/{supplier}/payments`
+- Body:
+  - `purchase_order_id` optional (must belong to supplier if provided)
+  - `amount` required > 0
+  - `method` optional (`cash|instapay|vodafone_cash|bank_transfer`)
+  - `reference`, `paid_at`, `notes` optional
+- Backend behavior:
+  - creates supplier payment record
+  - updates purchase order financials and status if linked
+  - updates supplier `current_balance`
+  - creates cash movement:
+    - `type=supplier_payment`
+    - `direction=out`
+    - `reference_type=supplier_payment`
+    - `reference_id=supplier_payment.id`
+    - `movement_date=paid_at or now`
+
+### GET `/api/tenant/purchase-orders/{purchaseOrder}/payments` (optional foundation route)
+- Query: `per_page`
+- Response: paginated `SupplierPayment[]`
+
+---
+
 ## Expense Categories
 
 Base: `/api/tenant/expense-categories`
@@ -487,6 +601,8 @@ Permissions:
   - `dress_statuses`
   - `category_statuses`
   - `expense_statuses`
+  - `supplier_statuses`
+  - `purchase_order_statuses`
   - `invoice_types`
   - `invoice_statuses`
   - `payment_methods`
@@ -508,6 +624,13 @@ Permissions:
   - `reference_type=security_deposit_transaction`
   - `reference_id=security_deposit_transaction.id`
   - `movement_date=now`
+
+- `POST /api/tenant/suppliers/{supplier}/payments` additionally creates cash movement:
+  - `type=supplier_payment`
+  - `direction=out`
+  - `reference_type=supplier_payment`
+  - `reference_id=supplier_payment.id`
+  - `movement_date=paid_at or now`
 
 ---
 

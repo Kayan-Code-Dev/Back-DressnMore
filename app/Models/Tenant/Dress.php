@@ -12,9 +12,13 @@ class Dress extends BaseTenantModel
     use SoftDeletes;
 
     public const STATUS_AVAILABLE = DressStatus::AVAILABLE->value;
+
     public const STATUS_RENTED = DressStatus::RENTED->value;
+
     public const STATUS_SOLD = DressStatus::SOLD->value;
+
     public const STATUS_MAINTENANCE = DressStatus::MAINTENANCE->value;
+
     public const STATUS_UNAVAILABLE = DressStatus::UNAVAILABLE->value;
 
     protected $connection = 'tenant';

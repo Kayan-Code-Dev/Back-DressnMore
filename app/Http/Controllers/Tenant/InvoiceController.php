@@ -19,8 +19,7 @@ class InvoiceController extends Controller
     public function __construct(
         private readonly InvoiceService $invoiceService,
         private readonly InvoicePaymentService $invoicePaymentService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {

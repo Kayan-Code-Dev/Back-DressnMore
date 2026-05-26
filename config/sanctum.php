@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Central\PersonalAccessToken;
+
 return [
-    'personal_access_token_model' => App\Models\Central\PersonalAccessToken::class,
+    'personal_access_token_model' => PersonalAccessToken::class,
 ];

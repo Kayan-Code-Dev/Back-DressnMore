@@ -13,9 +13,7 @@ use Illuminate\Http\Request;
 
 class ExpenseController extends Controller
 {
-    public function __construct(private readonly ExpenseService $expenseService)
-    {
-    }
+    public function __construct(private readonly ExpenseService $expenseService) {}
 
     public function index(Request $request): JsonResponse
     {

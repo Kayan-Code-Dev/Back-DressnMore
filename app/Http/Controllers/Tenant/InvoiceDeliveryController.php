@@ -22,8 +22,7 @@ class InvoiceDeliveryController extends Controller
         private readonly InvoiceService $invoiceService,
         private readonly InvoiceDeliveryService $invoiceDeliveryService,
         private readonly SecurityDepositService $securityDepositService
-    ) {
-    }
+    ) {}
 
     public function deliver(DeliverInvoiceRequest $request, int $invoice): JsonResponse
     {

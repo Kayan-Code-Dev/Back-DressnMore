@@ -8,12 +8,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class InventoryMovement extends BaseTenantModel
 {
     public const TYPE_CREATED = InventoryMovementType::CREATED->value;
+
     public const TYPE_STATUS_CHANGED = InventoryMovementType::STATUS_CHANGED->value;
+
     public const TYPE_MAINTENANCE = InventoryMovementType::MAINTENANCE->value;
+
     public const TYPE_SOLD = InventoryMovementType::SOLD->value;
+
     public const TYPE_RENTED = InventoryMovementType::RENTED->value;
+
     public const TYPE_RETURNED = InventoryMovementType::RETURNED->value;
+
     public const TYPE_MANUAL_ADJUSTMENT = InventoryMovementType::MANUAL_ADJUSTMENT->value;
+
     public const TYPE_BRANCH_TRANSFER = InventoryMovementType::BRANCH_TRANSFER->value;
 
     protected $connection = 'tenant';

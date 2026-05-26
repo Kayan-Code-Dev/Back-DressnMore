@@ -6,6 +6,7 @@ use App\Models\Tenant\CashMovement;
 use App\Models\Tenant\Expense;
 use App\Models\Tenant\InvoicePayment;
 use App\Models\Tenant\SecurityDepositTransaction;
+use App\Models\Tenant\SupplierPayment;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -141,6 +142,23 @@ class CashMovementService
             'description' => 'Security deposit deduction',
             'notes' => $transaction->notes,
             'created_by' => $actorId ?? $transaction->created_by,
+        ]);
+    }
+
+    public function recordSupplierPayment(SupplierPayment $payment, ?int $actorId = null): CashMovement
+    {
+        return CashMovement::query()->create([
+            'type' => CashMovement::TYPE_SUPPLIER_PAYMENT,
+            'direction' => CashMovement::DIRECTION_OUT,
+            'amount' => round((float) $payment->amount, 2),
+            'method' => $payment->method,
+            'reference_type' => CashMovement::REFERENCE_SUPPLIER_PAYMENT,
+            'reference_id' => $payment->id,
+            'reference' => $payment->reference,
+            'movement_date' => $payment->paid_at ?? Carbon::now(),
+            'description' => 'Supplier payment',
+            'notes' => $payment->notes,
+            'created_by' => $actorId ?? $payment->created_by,
         ]);
     }
 

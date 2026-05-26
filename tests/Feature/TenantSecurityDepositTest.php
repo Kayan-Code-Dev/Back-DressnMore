@@ -241,7 +241,7 @@ class TenantSecurityDepositTest extends TestCase
     }
 
     /**
-     * @param list<string> $permissionKeys
+     * @param  list<string>  $permissionKeys
      */
     private function createTenantUserWithPermissions(array $permissionKeys): User
     {

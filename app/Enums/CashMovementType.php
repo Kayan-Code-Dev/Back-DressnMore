@@ -9,6 +9,7 @@ enum CashMovementType: string
     case INVOICE_PAYMENT = 'invoice_payment';
     case SECURITY_DEPOSIT_DEDUCTION = 'security_deposit_deduction';
     case MANUAL_ADJUSTMENT = 'manual_adjustment';
+    case SUPPLIER_PAYMENT = 'supplier_payment';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum CashMovementType: string
             self::INVOICE_PAYMENT => 'Invoice Payment',
             self::SECURITY_DEPOSIT_DEDUCTION => 'Security Deposit Deduction',
             self::MANUAL_ADJUSTMENT => 'Manual Adjustment',
+            self::SUPPLIER_PAYMENT => 'Supplier Payment',
         };
     }
 

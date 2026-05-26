@@ -12,9 +12,7 @@ use Illuminate\Http\Request;
 
 class CashMovementController extends Controller
 {
-    public function __construct(private readonly CashMovementService $cashMovementService)
-    {
-    }
+    public function __construct(private readonly CashMovementService $cashMovementService) {}
 
     public function index(Request $request): JsonResponse
     {

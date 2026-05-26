@@ -18,8 +18,7 @@ class DressController extends Controller
     public function __construct(
         private readonly DressService $dressService,
         private readonly InventoryService $inventoryService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {

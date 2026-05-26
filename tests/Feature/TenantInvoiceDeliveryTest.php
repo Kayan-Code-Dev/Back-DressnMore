@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\DeliveryRecord;
 use App\Models\Tenant\Dress;
-use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InventoryMovement;
+use App\Models\Tenant\Invoice;
 use App\Models\Tenant\Permission;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
@@ -375,7 +375,7 @@ class TenantInvoiceDeliveryTest extends TestCase
     }
 
     /**
-     * @param list<string> $permissionKeys
+     * @param  list<string>  $permissionKeys
      */
     private function createTenantUserWithPermissions(array $permissionKeys): User
     {

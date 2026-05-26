@@ -14,15 +14,23 @@ class Invoice extends BaseTenantModel
     use SoftDeletes;
 
     public const TYPE_RENT = InvoiceType::RENT->value;
+
     public const TYPE_SELL = InvoiceType::SELL->value;
+
     public const TYPE_TAILORING = InvoiceType::TAILORING->value;
 
     public const STATUS_DRAFT = InvoiceStatus::DRAFT->value;
+
     public const STATUS_CONFIRMED = InvoiceStatus::CONFIRMED->value;
+
     public const STATUS_PARTIALLY_PAID = InvoiceStatus::PARTIALLY_PAID->value;
+
     public const STATUS_PAID = InvoiceStatus::PAID->value;
+
     public const STATUS_DELIVERED = InvoiceStatus::DELIVERED->value;
+
     public const STATUS_RETURNED = InvoiceStatus::RETURNED->value;
+
     public const STATUS_CANCELLED = InvoiceStatus::CANCELLED->value;
 
     protected $connection = 'tenant';

@@ -11,9 +11,7 @@ use Throwable;
 
 class HealthController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenantContext)
-    {
-    }
+    public function __construct(private readonly TenantContext $tenantContext) {}
 
     public function index(): JsonResponse
     {

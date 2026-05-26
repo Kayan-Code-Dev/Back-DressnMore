@@ -11,6 +11,7 @@ class ExpenseCategory extends BaseTenantModel
     use SoftDeletes;
 
     public const STATUS_ACTIVE = ExpenseStatus::ACTIVE->value;
+
     public const STATUS_INACTIVE = ExpenseStatus::INACTIVE->value;
 
     protected $connection = 'tenant';

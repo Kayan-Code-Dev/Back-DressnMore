@@ -16,8 +16,7 @@ class SetTenantDatabase
     public function __construct(
         private readonly TenantContext $tenantContext,
         private readonly TenantDatabaseManager $tenantDatabaseManager
-    ) {
-    }
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {

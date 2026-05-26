@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class DeliveryRecord extends BaseTenantModel
 {
     public const TYPE_DELIVERED = DeliveryRecordType::DELIVERED->value;
+
     public const TYPE_RETURNED = DeliveryRecordType::RETURNED->value;
+
     public const TYPE_CANCELLED_DELIVERY = DeliveryRecordType::CANCELLED_DELIVERY->value;
 
     protected $connection = 'tenant';
