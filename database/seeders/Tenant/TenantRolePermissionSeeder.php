@@ -34,6 +34,12 @@ class TenantRolePermissionSeeder extends Seeder
             ['name' => 'Dresses Delete', 'key' => 'dresses.delete'],
             ['name' => 'Inventory View', 'key' => 'inventory.view'],
             ['name' => 'Inventory Manage', 'key' => 'inventory.manage'],
+            ['name' => 'Invoices View', 'key' => 'invoices.view'],
+            ['name' => 'Invoices Create', 'key' => 'invoices.create'],
+            ['name' => 'Invoices Update', 'key' => 'invoices.update'],
+            ['name' => 'Invoices Delete', 'key' => 'invoices.delete'],
+            ['name' => 'Invoice Payments View', 'key' => 'invoice_payments.view'],
+            ['name' => 'Invoice Payments Create', 'key' => 'invoice_payments.create'],
         ];
 
         $permissionIds = [];

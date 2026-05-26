@@ -5,6 +5,7 @@ use App\Http\Controllers\Tenant\CustomerController;
 use App\Http\Controllers\Tenant\DressCategoryController;
 use App\Http\Controllers\Tenant\DressController;
 use App\Http\Controllers\Tenant\HealthController;
+use App\Http\Controllers\Tenant\InvoiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('tenant')->group(function (): void {
@@ -72,6 +73,29 @@ Route::prefix('tenant')->group(function (): void {
             Route::get('/{dress}/inventory-movements', [DressController::class, 'inventoryMovements'])
                 ->whereNumber('dress')
                 ->middleware('tenant.permission:inventory.view');
+        });
+
+        Route::prefix('/invoices')->group(function (): void {
+            Route::get('/', [InvoiceController::class, 'index'])
+                ->middleware('tenant.permission:invoices.view');
+            Route::post('/', [InvoiceController::class, 'store'])
+                ->middleware('tenant.permission:invoices.create');
+            Route::get('/{invoice}', [InvoiceController::class, 'show'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.view');
+            Route::put('/{invoice}', [InvoiceController::class, 'update'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.update');
+            Route::delete('/{invoice}', [InvoiceController::class, 'destroy'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.delete');
+
+            Route::get('/{invoice}/payments', [InvoiceController::class, 'payments'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoice_payments.view');
+            Route::post('/{invoice}/payments', [InvoiceController::class, 'addPayment'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoice_payments.create');
         });
     });
 });
