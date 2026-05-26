@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\Tenant\TenantContext;
 use App\Console\Commands\TenantHealthCommand;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Sanctum::usePersonalAccessTokenModel(\App\Models\Central\PersonalAccessToken::class);
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 TenantHealthCommand::class,
