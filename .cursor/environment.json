@@ -1,0 +1,9 @@
+{
+  "$schema": "https://cursor.com/schemas/environment.schema.json",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "install": "composer install --no-interaction --prefer-dist --optimize-autoloader && php -r \"file_exists('.env') || copy('.env.example', '.env');\" && php artisan key:generate --ansi --force",
+  "start": "php -v && composer --version && php artisan --version"
+}
