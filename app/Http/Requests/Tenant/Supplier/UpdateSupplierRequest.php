@@ -15,7 +15,15 @@ class UpdateSupplierRequest extends FormRequest
 
     public function rules(): array
     {
+        $supplierId = (int) $this->route('supplier');
+
         return [
+            'code' => [
+                'nullable',
+                'string',
+                'max:100',
+                Rule::unique('tenant.suppliers', 'code')->ignore($supplierId)->whereNull('deleted_at'),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'whatsapp' => ['nullable', 'string', 'max:50'],

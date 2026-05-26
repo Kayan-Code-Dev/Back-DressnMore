@@ -38,10 +38,13 @@ class Invoice extends BaseTenantModel
     protected $fillable = [
         'invoice_number',
         'customer_id',
+        'branch_id',
         'type',
         'status',
         'subtotal',
         'discount',
+        'discount_type',
+        'discount_value',
         'tax',
         'total',
         'paid_amount',
@@ -53,8 +56,12 @@ class Invoice extends BaseTenantModel
         'security_deposit',
         'security_deposit_status',
         'tailoring_due_date',
+        'visit_datetime',
+        'occasion_datetime',
+        'days_of_rent',
         'tailoring_notes',
         'notes',
+        'order_notes',
         'created_by',
     ];
 
@@ -63,6 +70,7 @@ class Invoice extends BaseTenantModel
         return [
             'subtotal' => 'decimal:2',
             'discount' => 'decimal:2',
+            'discount_value' => 'decimal:2',
             'tax' => 'decimal:2',
             'total' => 'decimal:2',
             'paid_amount' => 'decimal:2',
@@ -73,12 +81,20 @@ class Invoice extends BaseTenantModel
             'delivery_date' => 'date',
             'return_date' => 'date',
             'tailoring_due_date' => 'date',
+            'visit_datetime' => 'datetime',
+            'occasion_datetime' => 'datetime',
+            'days_of_rent' => 'integer',
         ];
     }
 
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function items(): HasMany

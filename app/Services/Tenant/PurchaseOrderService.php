@@ -15,7 +15,7 @@ class PurchaseOrderService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = PurchaseOrder::query()
-            ->with(['supplier', 'items'])
+            ->with(['supplier', 'items', 'branch', 'category', 'subcategory'])
             ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -30,7 +30,14 @@ class PurchaseOrderService
         }
 
         $this->applyExactFilter($query, 'supplier_id', $filters['supplier_id'] ?? null);
+        $this->applyExactFilter($query, 'branch_id', $filters['branch_id'] ?? null);
+        $this->applyExactFilter($query, 'category_id', $filters['category_id'] ?? null);
+        $this->applyExactFilter($query, 'subcategory_id', $filters['subcategory_id'] ?? null);
+        $this->applyExactFilter($query, 'type', $filters['type'] ?? null);
         $this->applyExactFilter($query, 'status', $filters['status'] ?? null);
+        if (($filters['is_returned'] ?? null) !== null && trim((string) $filters['is_returned']) !== '') {
+            $query->where('is_returned', filter_var($filters['is_returned'], FILTER_VALIDATE_BOOLEAN));
+        }
 
         $dateFrom = trim((string) ($filters['date_from'] ?? ''));
         if ($dateFrom !== '') {
@@ -58,8 +65,12 @@ class PurchaseOrderService
         $purchaseOrder = DB::connection('tenant')->transaction(function () use ($data, $items, $summary, $actorId): PurchaseOrder {
             $purchaseOrder = PurchaseOrder::query()->create([
                 'supplier_id' => $data['supplier_id'],
+                'branch_id' => $data['branch_id'] ?? null,
+                'category_id' => $data['category_id'] ?? null,
+                'subcategory_id' => $data['subcategory_id'] ?? null,
                 'purchase_order_number' => $this->generatePurchaseOrderNumber(),
                 'status' => $data['status'] ?? PurchaseOrder::STATUS_DRAFT,
+                'type' => $data['type'] ?? null,
                 'subtotal' => $summary['subtotal'],
                 'discount' => $summary['discount'],
                 'tax' => $summary['tax'],
@@ -84,7 +95,7 @@ class PurchaseOrderService
     public function findOrFail(int $purchaseOrderId): PurchaseOrder
     {
         return PurchaseOrder::query()
-            ->with(['supplier', 'items'])
+            ->with(['supplier', 'items', 'branch', 'category', 'subcategory'])
             ->findOrFail($purchaseOrderId);
     }
 
@@ -102,7 +113,11 @@ class PurchaseOrderService
         $updated = DB::connection('tenant')->transaction(function () use ($purchaseOrder, $data, $items, $summary, $actorId): PurchaseOrder {
             $purchaseOrder->fill([
                 'supplier_id' => $data['supplier_id'],
+                'branch_id' => $data['branch_id'] ?? null,
+                'category_id' => $data['category_id'] ?? null,
+                'subcategory_id' => $data['subcategory_id'] ?? null,
                 'status' => $data['status'] ?? $purchaseOrder->status,
+                'type' => $data['type'] ?? $purchaseOrder->type,
                 'subtotal' => $summary['subtotal'],
                 'discount' => $summary['discount'],
                 'tax' => $summary['tax'],
@@ -139,6 +154,25 @@ class PurchaseOrderService
         }
     }
 
+    public function returnOrder(PurchaseOrder $purchaseOrder, array $data): PurchaseOrder
+    {
+        if ($purchaseOrder->is_returned) {
+            return $purchaseOrder->refresh();
+        }
+
+        $purchaseOrder->is_returned = true;
+        $purchaseOrder->returned_at = $data['returned_at'] ?? now();
+        $purchaseOrder->return_notes = $data['return_notes'] ?? null;
+        if ($purchaseOrder->status !== PurchaseOrder::STATUS_PAID) {
+            $purchaseOrder->status = PurchaseOrder::STATUS_CANCELLED;
+        }
+        $purchaseOrder->save();
+
+        $this->supplierService->recalculateCurrentBalance($purchaseOrder->supplier()->firstOrFail());
+
+        return $purchaseOrder->refresh()->load(['supplier', 'items', 'branch', 'category', 'subcategory']);
+    }
+
     public function syncFinancials(PurchaseOrder $purchaseOrder, ?string $preferredStatus = null): PurchaseOrder
     {
         $paidAmount = $this->money((float) SupplierPayment::query()
@@ -161,6 +195,29 @@ class PurchaseOrderService
         $purchaseOrder->save();
 
         return $purchaseOrder->refresh();
+    }
+
+    /**
+     * @return list<array<int|string,mixed>>
+     */
+    public function exportRows(array $filters): array
+    {
+        $rows = $this->paginate($filters, 1000)->items();
+
+        return array_map(static function (PurchaseOrder $purchaseOrder): array {
+            return [
+                $purchaseOrder->id,
+                $purchaseOrder->purchase_order_number,
+                $purchaseOrder->supplier_id,
+                $purchaseOrder->branch_id,
+                $purchaseOrder->status,
+                $purchaseOrder->is_returned ? 'yes' : 'no',
+                $purchaseOrder->total,
+                $purchaseOrder->paid_amount,
+                $purchaseOrder->remaining_amount,
+                $purchaseOrder->order_date?->toDateString(),
+            ];
+        }, $rows);
     }
 
     /**

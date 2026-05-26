@@ -30,6 +30,7 @@ class StoreCashMovementRequest extends FormRequest
             'direction' => ['required', 'string', Rule::in(CashMovementDirection::values())],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'string', Rule::in(PaymentMethod::values())],
+            'cashbox_id' => ['nullable', 'integer', Rule::exists('tenant.cashboxes', 'id')->whereNull('deleted_at')],
             'reference_type' => ['nullable', 'string', 'max:100'],
             'reference_id' => ['nullable', 'integer'],
             'reference' => ['nullable', 'string', 'max:255'],

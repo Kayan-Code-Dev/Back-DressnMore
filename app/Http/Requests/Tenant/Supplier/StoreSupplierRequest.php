@@ -16,6 +16,7 @@ class StoreSupplierRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'code' => ['nullable', 'string', 'max:100', Rule::unique('tenant.suppliers', 'code')->whereNull('deleted_at')],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'whatsapp' => ['nullable', 'string', 'max:50'],

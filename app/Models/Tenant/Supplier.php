@@ -17,6 +17,7 @@ class Supplier extends BaseTenantModel
     protected $connection = 'tenant';
 
     protected $fillable = [
+        'code',
         'name',
         'phone',
         'whatsapp',

@@ -634,6 +634,141 @@ Permissions:
 
 ---
 
+## UI Contract Gap Review Round 1 Additions
+
+### Customers (UI additions)
+
+- New/verified fields:
+  - `date_of_birth`, `phone2`, `city_id`, `source`
+- New filters:
+  - `id`, `source`, `date_of_birth_from`, `date_of_birth_to`
+- New endpoint:
+  - `GET /api/tenant/customers/export` (permission: `customers.export`)
+  - CSV attachment with `Content-Disposition`.
+
+### Branches (full tenant CRUD)
+
+Base: `/api/tenant/branches`
+
+- Permissions:
+  - `branches.view`, `branches.create`, `branches.update`, `branches.delete`, `branches.export`
+- Fields:
+  - `branch_code`, `name`, `phone`, `vat_enabled`, `vat_type`, `vat_value`, `currency`, `currency_id`,
+    `street`, `building`, `city_id`, `address`, `notes`, `inventory_name`, `image`, `status`
+- Endpoints:
+  - `GET /`, `POST /`, `GET /{branch}`, `PUT /{branch}`, `DELETE /{branch}`
+  - `GET /export` (CSV)
+- Filters:
+  - `search` (name/code/phone/address), `status`, `city_id`, `currency_id`
+
+### Dresses (availability + exports)
+
+- New/verified fields:
+  - `entity_type`, `entity_id`, `breast_size`, `waist_size`, `sleeve_size`, `measurements`,
+    `delivery_date`, `days_of_rent`, `occasion_datetime`, `visit_datetime`
+- Expanded filters:
+  - `id`, `search`, `name`, `code`, `branch_id`, `entity_type`, `entity_id`,
+    `category_id`, `subcat_id`, `status`, `created_from`, `created_to`,
+    `delivery_date`, `days_of_rent`, `occasion_datetime`, `visit_datetime`
+- New endpoints:
+  - `GET /api/tenant/dresses/{dress}/order-history`
+  - `GET /api/tenant/dresses/available-for-date`
+  - `GET /api/tenant/dresses/{dress}/unavailable-days`
+  - `GET /api/tenant/dresses/export` (permission: `dresses.export`)
+
+### Invoices (actions + export)
+
+- New endpoints:
+  - `POST /api/tenant/invoices/{invoice}/cancel` (permission: `invoices.cancel`)
+  - `GET /api/tenant/invoices/export` (permission: `invoices.export`)
+- Expanded filters:
+  - `search`, `status`, `customer_id`/`client_id`, `branch_id`, `date_from`, `date_to`, `type`
+- New/verified fields:
+  - `branch_id`, `visit_datetime`, `occasion_datetime`, `days_of_rent`,
+    `discount_type`, `discount_value`, `order_notes`
+
+### Payments (standalone foundation)
+
+Base: `/api/tenant/payments`
+
+- Permissions:
+  - `payments.view`, `payments.pay`, `payments.cancel`, `payments.export`
+- Endpoints:
+  - `GET /`
+  - `GET /{payment}`
+  - `POST /{payment}/pay`
+  - `POST /{payment}/cancel`
+  - `GET /export` (CSV)
+- Supported filters:
+  - `search`, `status`, `payment_type`, `branch_id`,
+    `customer_id`/`client_id`, `invoice_id`/`order_id`,
+    `date_from`, `date_to`, `amount_min`, `amount_max`
+
+### Expenses (workflow actions)
+
+- New/verified fields:
+  - `branch_id`, `cashbox_id`, `vendor`, `reference_number`, `status`,
+    `approved_by`, `paid_at`, `cancelled_at`, `transaction_id`
+- Status values:
+  - `pending`, `approved`, `paid`, `cancelled`
+- New endpoints:
+  - `POST /api/tenant/expenses/{expense}/approve`
+  - `POST /api/tenant/expenses/{expense}/cancel`
+  - `POST /api/tenant/expenses/{expense}/pay`
+  - `GET /api/tenant/expenses/summary`
+  - `GET /api/tenant/expenses/export`
+
+### Cashboxes (new minimal module)
+
+Base: `/api/tenant/cashboxes`
+
+- Permissions:
+  - `cashboxes.view`, `cashboxes.create`, `cashboxes.update`, `cashboxes.delete`,
+    `cashboxes.recalculate`, `cashboxes.export`
+- Endpoints:
+  - `GET /`, `POST /`, `GET /{cashbox}`, `PUT /{cashbox}`, `DELETE /{cashbox}`
+  - `GET /{cashbox}/transactions`
+  - `POST /{cashbox}/recalculate`
+  - `GET /export`
+  - `GET /daily-summary`
+- Cash movement additions:
+  - `cashbox_id`, `balance_after`, `is_reversed`
+
+### Suppliers / Purchase Orders (UI additions)
+
+- Supplier field added:
+  - `code` (nullable unique)
+- New endpoints:
+  - `GET /api/tenant/suppliers/export`
+  - `GET /api/tenant/purchase-orders/export`
+  - `POST /api/tenant/purchase-orders/{purchaseOrder}/return`
+- Purchase order additions:
+  - `branch_id`, `category_id`, `subcategory_id`, `type`, `is_returned`, `returned_at`, `return_notes`
+  - aliases in response: `payment_amount`, `remaining_payment`
+
+### Lookups expanded keys
+
+`GET /api/tenant/lookups` now includes:
+
+- `branch_statuses`
+- `vat_types`
+- `customer_sources`
+- `invoice_types`
+- `invoice_statuses`
+- `payment_statuses`
+- `payment_types`
+- `expense_statuses`
+- `cashbox_statuses`
+- `supplier_statuses`
+- `purchase_order_statuses`
+- `report_periods`
+- `dress_statuses`
+- `dress_status_after_return`
+- `cash_movement_types`
+- `cash_movement_directions`
+
+---
+
 ## Validation / Error Notes
 
 - Validation errors return `422` with:

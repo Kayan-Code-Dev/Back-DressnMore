@@ -17,7 +17,7 @@ class InvoiceService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = Invoice::query()
-            ->with(['items.dress.category', 'items.dress.subcategory'])
+            ->with(['branch', 'items.dress.category', 'items.dress.subcategory'])
             ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -25,7 +25,8 @@ class InvoiceService
             $query->whereRaw('LOWER(invoice_number) LIKE ?', ['%'.mb_strtolower($search).'%']);
         }
 
-        $this->applyExactFilter($query, 'customer_id', $filters['customer_id'] ?? null);
+        $this->applyExactFilter($query, 'customer_id', $filters['customer_id'] ?? ($filters['client_id'] ?? null));
+        $this->applyExactFilter($query, 'branch_id', $filters['branch_id'] ?? null);
         $this->applyExactFilter($query, 'type', $filters['type'] ?? null);
         $this->applyExactFilter($query, 'status', $filters['status'] ?? null);
 
@@ -48,6 +49,8 @@ class InvoiceService
         $summary = $this->calculateSummary(
             items: $items,
             discount: (float) ($data['discount'] ?? 0),
+            discountType: (string) ($data['discount_type'] ?? 'fixed'),
+            discountValue: $data['discount_value'] ?? null,
             tax: (float) ($data['tax'] ?? 0),
         );
 
@@ -68,10 +71,13 @@ class InvoiceService
             $invoice = Invoice::query()->create([
                 'invoice_number' => $this->generateInvoiceNumber(),
                 'customer_id' => $data['customer_id'] ?? null,
+                'branch_id' => $data['branch_id'] ?? null,
                 'type' => $data['type'],
                 'status' => $status,
                 'subtotal' => $summary['subtotal'],
                 'discount' => $summary['discount'],
+                'discount_type' => $summary['discount_type'],
+                'discount_value' => $summary['discount_value'],
                 'tax' => $summary['tax'],
                 'total' => $summary['total'],
                 'paid_amount' => 0,
@@ -84,8 +90,12 @@ class InvoiceService
                 'security_deposit_status' => $data['security_deposit_status']
                     ?? ((float) ($data['security_deposit'] ?? 0) > 0 ? SecurityDepositStatus::NONE->value : null),
                 'tailoring_due_date' => $data['tailoring_due_date'] ?? null,
+                'visit_datetime' => $data['visit_datetime'] ?? null,
+                'occasion_datetime' => $data['occasion_datetime'] ?? null,
+                'days_of_rent' => $data['days_of_rent'] ?? null,
                 'tailoring_notes' => $data['tailoring_notes'] ?? null,
                 'notes' => $data['notes'] ?? null,
+                'order_notes' => $data['order_notes'] ?? null,
                 'created_by' => $actorId,
             ]);
 
@@ -107,13 +117,13 @@ class InvoiceService
             return $this->refreshFinancials($invoice, $status);
         });
 
-        return $invoice->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
+        return $invoice->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function findOrFail(int $invoiceId): Invoice
     {
         return Invoice::query()
-            ->with(['items.dress.category', 'items.dress.subcategory', 'payments'])
+            ->with(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments'])
             ->findOrFail($invoiceId);
     }
 
@@ -152,6 +162,8 @@ class InvoiceService
         $summary = $this->calculateSummary(
             items: $newItems,
             discount: (float) ($data['discount'] ?? $invoice->discount),
+            discountType: (string) ($data['discount_type'] ?? ($invoice->discount_type ?? 'fixed')),
+            discountValue: $data['discount_value'] ?? $invoice->discount_value,
             tax: (float) ($data['tax'] ?? $invoice->tax),
         );
 
@@ -159,10 +171,13 @@ class InvoiceService
         $updatedInvoice = DB::connection('tenant')->transaction(function () use ($invoice, $data, $newItems, $summary, $newStatus, $newType, $actorId): Invoice {
             $invoice->fill([
                 'customer_id' => $data['customer_id'] ?? $invoice->customer_id,
+                'branch_id' => $data['branch_id'] ?? $invoice->branch_id,
                 'type' => $newType,
                 'status' => $newStatus,
                 'subtotal' => $summary['subtotal'],
                 'discount' => $summary['discount'],
+                'discount_type' => $summary['discount_type'],
+                'discount_value' => $summary['discount_value'],
                 'tax' => $summary['tax'],
                 'total' => $summary['total'],
                 'rent_start_date' => $data['rent_start_date'] ?? $invoice->rent_start_date,
@@ -175,8 +190,12 @@ class InvoiceService
                         ? ($invoice->security_deposit_status ?: SecurityDepositStatus::NONE->value)
                         : null),
                 'tailoring_due_date' => $data['tailoring_due_date'] ?? $invoice->tailoring_due_date,
+                'visit_datetime' => $data['visit_datetime'] ?? $invoice->visit_datetime,
+                'occasion_datetime' => $data['occasion_datetime'] ?? $invoice->occasion_datetime,
+                'days_of_rent' => $data['days_of_rent'] ?? $invoice->days_of_rent,
                 'tailoring_notes' => $data['tailoring_notes'] ?? $invoice->tailoring_notes,
                 'notes' => $data['notes'] ?? $invoice->notes,
+                'order_notes' => $data['order_notes'] ?? $invoice->order_notes,
                 'created_by' => $invoice->created_by ?? $actorId,
             ]);
             $invoice->save();
@@ -188,7 +207,7 @@ class InvoiceService
             return $this->refreshFinancials($invoice, $newStatus);
         });
 
-        return $updatedInvoice->refresh()->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
+        return $updatedInvoice->refresh()->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function delete(Invoice $invoice): void
@@ -196,9 +215,35 @@ class InvoiceService
         $invoice->delete();
     }
 
+    public function cancel(Invoice $invoice): Invoice
+    {
+        if ($invoice->status === Invoice::STATUS_CANCELLED) {
+            throw ValidationException::withMessages([
+                'invoice' => ['Invoice already cancelled'],
+            ]);
+        }
+
+        if (in_array($invoice->status, [Invoice::STATUS_DELIVERED, Invoice::STATUS_RETURNED], true)) {
+            throw ValidationException::withMessages([
+                'invoice' => ['Delivered or returned invoices cannot be cancelled'],
+            ]);
+        }
+
+        $invoice->status = Invoice::STATUS_CANCELLED;
+        $invoice->save();
+
+        return $this->refreshFinancials($invoice->refresh(), Invoice::STATUS_CANCELLED)
+            ->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
+    }
+
     public function refreshFinancials(Invoice $invoice, ?string $preferredStatus = null): Invoice
     {
-        $paidAmount = $this->money((float) $invoice->payments()->sum('amount'));
+        $paidAmount = $this->money((float) $invoice->payments()
+            ->where(function (Builder $builder): void {
+                $builder->where('status', InvoicePayment::STATUS_PAID)
+                    ->orWhereNull('status');
+            })
+            ->sum('amount'));
         $total = $this->money((float) $invoice->total);
         $remainingAmount = $this->money(max(0, $total - $paidAmount));
 
@@ -217,6 +262,30 @@ class InvoiceService
         $invoice->save();
 
         return $invoice;
+    }
+
+    /**
+     * @return list<array<int|string,mixed>>
+     */
+    public function exportRows(array $filters): array
+    {
+        $rows = $this->paginate($filters, 1000)->items();
+
+        return array_map(static function (Invoice $invoice): array {
+            return [
+                $invoice->id,
+                $invoice->invoice_number,
+                $invoice->customer_id,
+                $invoice->branch_id,
+                $invoice->type,
+                $invoice->status,
+                $invoice->total,
+                $invoice->paid_amount,
+                $invoice->remaining_amount,
+                $invoice->delivery_date?->toDateString(),
+                $invoice->created_at?->toDateTimeString(),
+            ];
+        }, $rows);
     }
 
     private function assertRentAvailability(
@@ -297,18 +366,29 @@ class InvoiceService
 
     /**
      * @param  list<array<string,mixed>>  $items
-     * @return array{subtotal:float,discount:float,tax:float,total:float}
+     * @return array{subtotal:float,discount:float,discount_type:string,discount_value:float,tax:float,total:float}
      */
-    private function calculateSummary(array $items, float $discount, float $tax): array
-    {
+    private function calculateSummary(
+        array $items,
+        float $discount,
+        string $discountType,
+        mixed $discountValue,
+        float $tax
+    ): array {
         $subtotal = $this->money((float) collect($items)->sum(fn (array $item): float => (float) $item['total']));
-        $normalizedDiscount = $this->money(max(0, $discount));
+        $normalizedDiscountType = in_array($discountType, ['fixed', 'percentage'], true) ? $discountType : 'fixed';
+        $normalizedDiscountValue = $this->money(max(0, (float) ($discountValue ?? $discount)));
+        $normalizedDiscount = $normalizedDiscountType === 'percentage'
+            ? $this->money(($subtotal * $normalizedDiscountValue) / 100)
+            : $normalizedDiscountValue;
         $normalizedTax = $this->money(max(0, $tax));
         $total = $this->money(max(0, $subtotal - $normalizedDiscount + $normalizedTax));
 
         return [
             'subtotal' => $subtotal,
             'discount' => $normalizedDiscount,
+            'discount_type' => $normalizedDiscountType,
+            'discount_value' => $normalizedDiscountValue,
             'tax' => $normalizedTax,
             'total' => $total,
         ];

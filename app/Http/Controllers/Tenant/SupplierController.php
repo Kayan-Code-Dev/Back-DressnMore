@@ -8,8 +8,10 @@ use App\Http\Requests\Tenant\Supplier\UpdateSupplierRequest;
 use App\Http\Resources\Tenant\SupplierResource;
 use App\Services\Tenant\SupplierService;
 use App\Support\ApiResponse;
+use App\Support\CsvExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupplierController extends Controller
 {
@@ -54,5 +56,19 @@ class SupplierController extends Controller
         $this->supplierService->delete($supplierModel);
 
         return ApiResponse::success(null, 'Supplier deleted');
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $rows = $this->supplierService->exportRows([
+            'search' => $request->query('search'),
+            'status' => $request->query('status'),
+        ]);
+
+        return CsvExporter::download(
+            filename: 'suppliers.csv',
+            headers: ['ID', 'Code', 'Name', 'Phone', 'Address', 'Status', 'Current Balance', 'Remaining'],
+            rows: $rows
+        );
     }
 }

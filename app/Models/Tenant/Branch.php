@@ -3,6 +3,7 @@
 namespace App\Models\Tenant;
 
 use App\Enums\CustomerStatus;
+use App\Enums\VatType;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -10,15 +11,39 @@ class Branch extends BaseTenantModel
 {
     use SoftDeletes;
 
+    public const STATUS_ACTIVE = CustomerStatus::ACTIVE->value;
+
+    public const STATUS_INACTIVE = CustomerStatus::INACTIVE->value;
+
     protected $connection = 'tenant';
 
     protected $fillable = [
         'name',
         'code',
+        'branch_code',
         'address',
         'phone',
+        'vat_enabled',
+        'vat_type',
+        'vat_value',
+        'currency',
+        'currency_id',
+        'street',
+        'building',
+        'city_id',
+        'notes',
+        'inventory_name',
+        'image',
         'status',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'vat_enabled' => 'boolean',
+            'vat_value' => 'decimal:2',
+        ];
+    }
 
     public function dresses(): HasMany
     {
@@ -35,11 +60,29 @@ class Branch extends BaseTenantModel
         return $this->hasMany(InventoryMovement::class, 'to_branch_id');
     }
 
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function cashboxes(): HasMany
+    {
+        return $this->hasMany(Cashbox::class);
+    }
+
     /**
      * @return list<string>
      */
     public static function statuses(): array
     {
         return CustomerStatus::values();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function vatTypes(): array
+    {
+        return VatType::values();
     }
 }

@@ -3,13 +3,18 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\Expense\ApproveExpenseRequest;
+use App\Http\Requests\Tenant\Expense\CancelExpenseRequest;
+use App\Http\Requests\Tenant\Expense\PayExpenseRequest;
 use App\Http\Requests\Tenant\Expense\StoreExpenseRequest;
 use App\Http\Requests\Tenant\Expense\UpdateExpenseRequest;
 use App\Http\Resources\Tenant\ExpenseResource;
 use App\Services\Tenant\ExpenseService;
 use App\Support\ApiResponse;
+use App\Support\CsvExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExpenseController extends Controller
 {
@@ -21,6 +26,9 @@ class ExpenseController extends Controller
         $expenses = $this->expenseService->paginate([
             'search' => $request->query('search'),
             'expense_category_id' => $request->query('expense_category_id'),
+            'branch_id' => $request->query('branch_id'),
+            'cashbox_id' => $request->query('cashbox_id'),
+            'status' => $request->query('status'),
             'method' => $request->query('method'),
             'date_from' => $request->query('date_from'),
             'date_to' => $request->query('date_to'),
@@ -57,5 +65,64 @@ class ExpenseController extends Controller
         $this->expenseService->delete($expenseModel);
 
         return ApiResponse::success(null, 'Expense deleted');
+    }
+
+    public function approve(ApproveExpenseRequest $request, int $expense): JsonResponse
+    {
+        $expenseModel = $this->expenseService->findOrFail($expense);
+        $expenseModel = $this->expenseService->approve($expenseModel, $request->user()?->id);
+
+        return ApiResponse::success(new ExpenseResource($expenseModel), 'Expense approved');
+    }
+
+    public function cancel(CancelExpenseRequest $request, int $expense): JsonResponse
+    {
+        $expenseModel = $this->expenseService->findOrFail($expense);
+        $expenseModel = $this->expenseService->cancel($expenseModel, $request->validated('notes'));
+
+        return ApiResponse::success(new ExpenseResource($expenseModel), 'Expense cancelled');
+    }
+
+    public function pay(PayExpenseRequest $request, int $expense): JsonResponse
+    {
+        $expenseModel = $this->expenseService->findOrFail($expense);
+        $expenseModel = $this->expenseService->pay(
+            expense: $expenseModel,
+            data: $request->validated(),
+            actorId: $request->user()?->id,
+        );
+
+        return ApiResponse::success(new ExpenseResource($expenseModel), 'Expense paid');
+    }
+
+    public function summary(Request $request): JsonResponse
+    {
+        $summary = $this->expenseService->summary([
+            'expense_category_id' => $request->query('expense_category_id'),
+            'date_from' => $request->query('date_from'),
+            'date_to' => $request->query('date_to'),
+        ]);
+
+        return ApiResponse::success($summary);
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $rows = $this->expenseService->exportRows([
+            'search' => $request->query('search'),
+            'expense_category_id' => $request->query('expense_category_id'),
+            'branch_id' => $request->query('branch_id'),
+            'cashbox_id' => $request->query('cashbox_id'),
+            'status' => $request->query('status'),
+            'method' => $request->query('method'),
+            'date_from' => $request->query('date_from'),
+            'date_to' => $request->query('date_to'),
+        ]);
+
+        return CsvExporter::download(
+            filename: 'expenses.csv',
+            headers: ['ID', 'Category', 'Branch', 'Cashbox', 'Status', 'Amount', 'Method', 'Vendor', 'Reference Number', 'Expense Date', 'Transaction ID'],
+            rows: $rows
+        );
     }
 }

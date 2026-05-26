@@ -11,8 +11,10 @@ use App\Http\Resources\Tenant\InvoiceResource;
 use App\Services\Tenant\InvoicePaymentService;
 use App\Services\Tenant\InvoiceService;
 use App\Support\ApiResponse;
+use App\Support\CsvExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends Controller
 {
@@ -27,6 +29,8 @@ class InvoiceController extends Controller
         $invoices = $this->invoiceService->paginate([
             'search' => $request->query('search'),
             'customer_id' => $request->query('customer_id'),
+            'client_id' => $request->query('client_id'),
+            'branch_id' => $request->query('branch_id'),
             'type' => $request->query('type'),
             'status' => $request->query('status'),
             'date_from' => $request->query('date_from'),
@@ -92,5 +96,33 @@ class InvoiceController extends Controller
         );
 
         return ApiResponse::success(new InvoiceResource($invoiceModel), 'Payment added');
+    }
+
+    public function cancel(int $invoice): JsonResponse
+    {
+        $invoiceModel = $this->invoiceService->findOrFail($invoice);
+        $invoiceModel = $this->invoiceService->cancel($invoiceModel);
+
+        return ApiResponse::success(new InvoiceResource($invoiceModel), 'Invoice cancelled');
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $rows = $this->invoiceService->exportRows([
+            'search' => $request->query('search'),
+            'customer_id' => $request->query('customer_id'),
+            'client_id' => $request->query('client_id'),
+            'branch_id' => $request->query('branch_id'),
+            'type' => $request->query('type'),
+            'status' => $request->query('status'),
+            'date_from' => $request->query('date_from'),
+            'date_to' => $request->query('date_to'),
+        ]);
+
+        return CsvExporter::download(
+            filename: 'invoices.csv',
+            headers: ['ID', 'Invoice Number', 'Customer ID', 'Branch ID', 'Type', 'Status', 'Total', 'Paid', 'Remaining', 'Delivery Date', 'Created At'],
+            rows: $rows
+        );
     }
 }

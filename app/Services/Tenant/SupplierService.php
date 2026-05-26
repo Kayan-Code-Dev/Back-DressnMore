@@ -18,7 +18,8 @@ class SupplierService
         if ($search !== '') {
             $wildcard = '%'.mb_strtolower($search).'%';
             $query->where(function (Builder $builder) use ($wildcard): void {
-                $builder->whereRaw('LOWER(name) LIKE ?', [$wildcard])
+                $builder->whereRaw('LOWER(code) LIKE ?', [$wildcard])
+                    ->orWhereRaw('LOWER(name) LIKE ?', [$wildcard])
                     ->orWhereRaw('LOWER(phone) LIKE ?', [$wildcard])
                     ->orWhereRaw('LOWER(whatsapp) LIKE ?', [$wildcard])
                     ->orWhereRaw('LOWER(email) LIKE ?', [$wildcard]);
@@ -41,6 +42,7 @@ class SupplierService
     public function create(array $data): Supplier
     {
         $supplier = Supplier::query()->create([
+            'code' => $data['code'] ?? null,
             'name' => $data['name'],
             'phone' => $data['phone'] ?? null,
             'whatsapp' => $data['whatsapp'] ?? null,
@@ -66,6 +68,7 @@ class SupplierService
         $this->stripSummaryAttributes($supplier);
 
         $supplier->fill([
+            'code' => $data['code'] ?? null,
             'name' => $data['name'],
             'phone' => $data['phone'] ?? null,
             'whatsapp' => $data['whatsapp'] ?? null,
@@ -101,6 +104,29 @@ class SupplierService
         $supplier->save();
 
         return $this->withSummary($supplier->refresh());
+    }
+
+    /**
+     * @return list<array<int|string,mixed>>
+     */
+    public function exportRows(array $filters): array
+    {
+        $rows = $this->paginate($filters, 1000)->items();
+
+        return array_map(function (Supplier $supplier): array {
+            $supplier = $this->withSummary($supplier);
+
+            return [
+                $supplier->id,
+                $supplier->code,
+                $supplier->name,
+                $supplier->phone,
+                $supplier->address,
+                $supplier->status,
+                $supplier->current_balance,
+                $supplier->total_remaining,
+            ];
+        }, $rows);
     }
 
     public function withSummary(Supplier $supplier): Supplier

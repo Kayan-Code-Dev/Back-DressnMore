@@ -4,6 +4,7 @@ namespace App\Models\Tenant;
 
 use App\Enums\CashMovementDirection;
 use App\Enums\CashMovementType;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CashMovement extends BaseTenantModel
@@ -39,14 +40,17 @@ class CashMovement extends BaseTenantModel
     protected $fillable = [
         'type',
         'amount',
+        'balance_after',
         'method',
         'direction',
+        'cashbox_id',
         'reference_type',
         'reference_id',
         'reference',
         'movement_date',
         'description',
         'notes',
+        'is_reversed',
         'created_by',
     ];
 
@@ -54,7 +58,9 @@ class CashMovement extends BaseTenantModel
     {
         return [
             'amount' => 'decimal:2',
+            'balance_after' => 'decimal:2',
             'movement_date' => 'datetime',
+            'is_reversed' => 'boolean',
         ];
     }
 
@@ -72,5 +78,10 @@ class CashMovement extends BaseTenantModel
     public static function directions(): array
     {
         return CashMovementDirection::values();
+    }
+
+    public function cashbox(): BelongsTo
+    {
+        return $this->belongsTo(Cashbox::class);
     }
 }

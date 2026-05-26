@@ -8,8 +8,10 @@ use App\Http\Requests\Tenant\Customer\UpdateCustomerRequest;
 use App\Http\Resources\Tenant\CustomerResource;
 use App\Services\Tenant\CustomerService;
 use App\Support\ApiResponse;
+use App\Support\CsvExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerController extends Controller
 {
@@ -18,10 +20,14 @@ class CustomerController extends Controller
     public function index(Request $request): JsonResponse
     {
         $perPage = max(1, min(100, $request->integer('per_page', 15)));
-        $customers = $this->customerService->paginate(
-            search: $request->query('search'),
-            perPage: $perPage,
-        );
+        $customers = $this->customerService->paginate([
+            'search' => $request->query('search'),
+            'id' => $request->query('id'),
+            'source' => $request->query('source'),
+            'status' => $request->query('status'),
+            'date_of_birth_from' => $request->query('date_of_birth_from'),
+            'date_of_birth_to' => $request->query('date_of_birth_to'),
+        ], $perPage);
 
         return ApiResponse::paginated($customers, CustomerResource::collection($customers->items())->resolve());
     }
@@ -54,5 +60,23 @@ class CustomerController extends Controller
         $this->customerService->delete($customerModel);
 
         return ApiResponse::success(null, 'Customer deleted');
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $rows = $this->customerService->exportRows([
+            'search' => $request->query('search'),
+            'id' => $request->query('id'),
+            'source' => $request->query('source'),
+            'status' => $request->query('status'),
+            'date_of_birth_from' => $request->query('date_of_birth_from'),
+            'date_of_birth_to' => $request->query('date_of_birth_to'),
+        ]);
+
+        return CsvExporter::download(
+            filename: 'customers.csv',
+            headers: ['ID', 'Name', 'Date Of Birth', 'Source', 'Phone', 'Phone 2', 'WhatsApp', 'Address', 'City ID', 'Status'],
+            rows: $rows,
+        );
     }
 }
