@@ -3,8 +3,11 @@
 namespace App\Services\Tenant;
 
 use App\Enums\CustomerStatus;
+use App\Enums\CashMovementDirection;
+use App\Enums\CashMovementType;
 use App\Enums\DeliveryRecordType;
 use App\Enums\DressStatus;
+use App\Enums\ExpenseStatus;
 use App\Enums\InventoryMovementType;
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
@@ -30,6 +33,9 @@ class LookupService
             'inventory_movement_types' => InventoryMovementType::options(),
             'delivery_record_types' => DeliveryRecordType::options(),
             'security_deposit_transaction_types' => SecurityDepositTransactionType::options(),
+            'expense_statuses' => ExpenseStatus::options(),
+            'cash_movement_types' => CashMovementType::options(),
+            'cash_movement_directions' => CashMovementDirection::options(),
             'dress_status_after_return' => [
                 ['value' => DressStatus::AVAILABLE->value, 'label' => DressStatus::AVAILABLE->label()],
                 ['value' => DressStatus::MAINTENANCE->value, 'label' => DressStatus::MAINTENANCE->label()],

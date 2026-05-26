@@ -88,9 +88,12 @@ Frontend recommendation:
 - Use once on app boot and cache in memory (or query cache).
 - Provides option arrays for:
   - statuses
+  - expense statuses
   - invoice types/statuses
   - payment methods
   - inventory movement types
+  - cash movement types/directions
+  - delivery/security deposit workflow values
 
 Use this endpoint as single source for dropdowns/radio/select options to avoid hardcoded frontend strings.
 
@@ -102,12 +105,16 @@ src/services/auth.service.ts
 src/services/customers.service.ts
 src/services/dresses.service.ts
 src/services/invoices.service.ts
+src/services/expenses.service.ts
+src/services/cash-movements.service.ts
 src/services/lookups.service.ts
 
 src/types/api.ts
 src/types/customer.ts
 src/types/dress.ts
 src/types/invoice.ts
+src/types/expense.ts
+src/types/cash-movement.ts
 src/types/lookups.ts
 ```
 
@@ -138,6 +145,14 @@ src/types/lookups.ts
 - `lookups.service.ts`
   - fetch and cache lookups
 
+- `expenses.service.ts`
+  - expense categories CRUD
+  - expenses CRUD
+
+- `cash-movements.service.ts`
+  - list cash movements
+  - create manual cash movement
+
 ## 9) Suggested Type Shapes
 
 - `customer.ts`
@@ -150,6 +165,10 @@ src/types/lookups.ts
   - `InvoiceItem` should display:
     - `dress_display_name`
     - `dress_code`, `dress_category`, `dress_subcategory`
+- `expense.ts`
+  - `ExpenseCategory`, `Expense`
+- `cash-movement.ts`
+  - `CashMovement`
 - `lookups.ts`
   - `LookupOption { value: string; label: string }`
   - `LookupsResponse`
@@ -173,6 +192,19 @@ src/types/lookups.ts
 - Invoices:
   - totals are backend-calculated; frontend should not override.
   - rent overlap validation can return 422 with `rent_period` error key.
+  - adding invoice payment also writes an `invoice_payment` cash movement.
+
+- Expense Categories:
+  - supports search by `name` and status filter.
+
+- Expenses:
+  - create/update/delete keeps linked `expense` cash movement in sync.
+  - filters supported: category, method, date range, search fields.
+
+- Cash Movements:
+  - manual entries support `manual_adjustment`, `income`, `expense`.
+  - for `income`, direction must be `in`; for `expense`, direction must be `out`.
+  - security deposit deductions write `security_deposit_deduction` cash movements automatically.
 
 ## 11) Frontend Safety Recommendations
 

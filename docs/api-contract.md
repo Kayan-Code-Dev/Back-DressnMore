@@ -167,6 +167,115 @@ Permissions:
 
 ---
 
+## Expense Categories
+
+Base: `/api/tenant/expense-categories`
+
+Permissions:
+- index/show: `expense_categories.view`
+- store: `expense_categories.create`
+- update: `expense_categories.update`
+- delete: `expense_categories.delete`
+
+### GET `/`
+- Query:
+  - `search` (name)
+  - `status` (`active|inactive`)
+  - `per_page`
+- Response: paginated `ExpenseCategory[]`
+
+### POST `/`
+- Body:
+  - `name` required
+  - `slug` optional unique
+  - `description` optional
+  - `status` optional (`active|inactive`)
+
+### GET `/{expenseCategory}`
+### PUT `/{expenseCategory}`
+### DELETE `/{expenseCategory}`
+- Soft delete.
+
+---
+
+## Expenses
+
+Base: `/api/tenant/expenses`
+
+Permissions:
+- index/show: `expenses.view`
+- store: `expenses.create`
+- update: `expenses.update`
+- delete: `expenses.delete`
+
+### GET `/`
+- Query:
+  - `search` (description/reference/notes)
+  - `expense_category_id`
+  - `method`
+  - `date_from`
+  - `date_to`
+  - `per_page`
+- Response: paginated `Expense[]`
+
+### POST `/`
+- Body:
+  - `expense_category_id` optional
+  - `amount` required > 0
+  - `method` optional (same values as payment methods)
+  - `reference` optional
+  - `expense_date` required date
+  - `description`, `notes` optional
+- Backend behavior:
+  - creates expense record
+  - creates cash movement:
+    - `type=expense`
+    - `direction=out`
+    - `reference_type=expense`
+    - `reference_id=expense.id`
+    - `movement_date=expense_date`
+
+### GET `/{expense}`
+### PUT `/{expense}`
+- Backend behavior:
+  - updates expense record
+  - updates linked expense cash movement (same reference pair)
+
+### DELETE `/{expense}`
+- Soft delete expense and linked cash movement.
+
+---
+
+## Cash Movements
+
+Base: `/api/tenant/cash-movements`
+
+Permissions:
+- index: `cash_movements.view`
+- store: `cash_movements.create`
+
+### GET `/`
+- Query:
+  - `search` (reference/description/notes)
+  - `type`
+  - `direction`
+  - `method`
+  - `date_from`
+  - `date_to`
+  - `per_page`
+- Response: paginated `CashMovement[]`
+
+### POST `/`
+- Body:
+  - `type` required (`manual_adjustment|income|expense`)
+  - `direction` required (`in|out`)
+  - `amount` required > 0
+  - `method`, `reference_type`, `reference_id`, `reference`, `movement_date`, `description`, `notes` optional
+- Backend behavior:
+  - creates manual cash movement foundation entry
+
+---
+
 ## Dress Categories
 
 Base: `/api/tenant/dress-categories`
@@ -319,6 +428,12 @@ Permissions:
   - `reference`, `paid_at`, `notes` optional
 - Backend behavior:
   - add payment record
+  - create cash movement:
+    - `type=invoice_payment`
+    - `direction=in`
+    - `reference_type=invoice_payment`
+    - `reference_id=payment.id`
+    - `movement_date=paid_at or now`
   - update invoice `paid_amount` and `remaining_amount`
   - status becomes `partially_paid` or `paid`
 
@@ -332,11 +447,28 @@ Permissions:
   - `customer_statuses`
   - `dress_statuses`
   - `category_statuses`
+  - `expense_statuses`
   - `invoice_types`
   - `invoice_statuses`
   - `payment_methods`
   - `security_deposit_statuses`
   - `inventory_movement_types`
+  - `cash_movement_types`
+  - `cash_movement_directions`
+  - `delivery_record_types`
+  - `security_deposit_transaction_types`
+  - `dress_status_after_return`
+
+---
+
+## Delivery / Return and Security Deposit Cash Integration
+
+- `POST /api/tenant/invoices/{invoice}/security-deposit/deductions` additionally creates cash movement:
+  - `type=security_deposit_deduction`
+  - `direction=in`
+  - `reference_type=security_deposit_transaction`
+  - `reference_id=security_deposit_transaction.id`
+  - `movement_date=now`
 
 ---
 

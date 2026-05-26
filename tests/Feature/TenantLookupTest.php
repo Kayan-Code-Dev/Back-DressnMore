@@ -49,6 +49,9 @@ class TenantLookupTest extends TestCase
             ->assertJsonPath('data.inventory_movement_types.0.value', 'created')
             ->assertJsonPath('data.delivery_record_types.0.value', 'delivered')
             ->assertJsonPath('data.security_deposit_transaction_types.0.value', 'collected')
+            ->assertJsonPath('data.expense_statuses.0.value', 'active')
+            ->assertJsonPath('data.cash_movement_types.0.value', 'income')
+            ->assertJsonPath('data.cash_movement_directions.0.value', 'in')
             ->assertJsonPath('data.dress_status_after_return.0.value', 'available');
     }
 

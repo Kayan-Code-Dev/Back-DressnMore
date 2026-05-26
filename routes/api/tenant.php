@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Controllers\Tenant\AuthController;
+use App\Http\Controllers\Tenant\CashMovementController;
 use App\Http\Controllers\Tenant\CustomerController;
 use App\Http\Controllers\Tenant\DressCategoryController;
 use App\Http\Controllers\Tenant\DressController;
+use App\Http\Controllers\Tenant\ExpenseCategoryController;
+use App\Http\Controllers\Tenant\ExpenseController;
 use App\Http\Controllers\Tenant\HealthController;
 use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Tenant\InvoiceDeliveryController;
@@ -41,6 +44,45 @@ Route::prefix('tenant')->group(function (): void {
             Route::delete('/{customer}', [CustomerController::class, 'destroy'])
                 ->whereNumber('customer')
                 ->middleware('tenant.permission:customers.delete');
+        });
+
+        Route::prefix('/expense-categories')->group(function (): void {
+            Route::get('/', [ExpenseCategoryController::class, 'index'])
+                ->middleware('tenant.permission:expense_categories.view');
+            Route::post('/', [ExpenseCategoryController::class, 'store'])
+                ->middleware('tenant.permission:expense_categories.create');
+            Route::get('/{expenseCategory}', [ExpenseCategoryController::class, 'show'])
+                ->whereNumber('expenseCategory')
+                ->middleware('tenant.permission:expense_categories.view');
+            Route::put('/{expenseCategory}', [ExpenseCategoryController::class, 'update'])
+                ->whereNumber('expenseCategory')
+                ->middleware('tenant.permission:expense_categories.update');
+            Route::delete('/{expenseCategory}', [ExpenseCategoryController::class, 'destroy'])
+                ->whereNumber('expenseCategory')
+                ->middleware('tenant.permission:expense_categories.delete');
+        });
+
+        Route::prefix('/expenses')->group(function (): void {
+            Route::get('/', [ExpenseController::class, 'index'])
+                ->middleware('tenant.permission:expenses.view');
+            Route::post('/', [ExpenseController::class, 'store'])
+                ->middleware('tenant.permission:expenses.create');
+            Route::get('/{expense}', [ExpenseController::class, 'show'])
+                ->whereNumber('expense')
+                ->middleware('tenant.permission:expenses.view');
+            Route::put('/{expense}', [ExpenseController::class, 'update'])
+                ->whereNumber('expense')
+                ->middleware('tenant.permission:expenses.update');
+            Route::delete('/{expense}', [ExpenseController::class, 'destroy'])
+                ->whereNumber('expense')
+                ->middleware('tenant.permission:expenses.delete');
+        });
+
+        Route::prefix('/cash-movements')->group(function (): void {
+            Route::get('/', [CashMovementController::class, 'index'])
+                ->middleware('tenant.permission:cash_movements.view');
+            Route::post('/', [CashMovementController::class, 'store'])
+                ->middleware('tenant.permission:cash_movements.create');
         });
 
         Route::prefix('/dress-categories')->group(function (): void {

@@ -13,8 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 class SecurityDepositService
 {
-    public function __construct(private readonly InventoryService $inventoryService)
-    {
+    public function __construct(
+        private readonly InventoryService $inventoryService,
+        private readonly CashMovementService $cashMovementService
+    ) {
     }
 
     public function addDeduction(Invoice $invoice, array $data, ?int $actorId = null): Invoice
@@ -32,7 +34,7 @@ class SecurityDepositService
 
         /** @var Invoice $updated */
         $updated = DB::connection('tenant')->transaction(function () use ($invoice, $data, $amount, $actorId): Invoice {
-            SecurityDepositTransaction::query()->create([
+            $transaction = SecurityDepositTransaction::query()->create([
                 'invoice_id' => $invoice->id,
                 'type' => SecurityDepositTransaction::TYPE_DEDUCTED,
                 'amount' => $amount,
@@ -40,6 +42,8 @@ class SecurityDepositService
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $actorId,
             ]);
+
+            $this->cashMovementService->recordSecurityDepositDeduction($transaction, $actorId);
 
             $remainingBalance = $this->remainingBalance($invoice->refresh());
 

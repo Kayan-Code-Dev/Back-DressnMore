@@ -11,7 +11,10 @@ use Illuminate\Validation\ValidationException;
 
 class InvoicePaymentService
 {
-    public function __construct(private readonly InvoiceService $invoiceService)
+    public function __construct(
+        private readonly InvoiceService $invoiceService,
+        private readonly CashMovementService $cashMovementService
+    )
     {
     }
 
@@ -25,7 +28,7 @@ class InvoicePaymentService
 
         /** @var Invoice $updatedInvoice */
         $updatedInvoice = DB::connection('tenant')->transaction(function () use ($invoice, $data, $actorId): Invoice {
-            InvoicePayment::query()->create([
+            $payment = InvoicePayment::query()->create([
                 'invoice_id' => $invoice->id,
                 'amount' => round((float) $data['amount'], 2),
                 'method' => $data['method'] ?? null,
@@ -34,6 +37,8 @@ class InvoicePaymentService
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $actorId,
             ]);
+
+            $this->cashMovementService->recordInvoicePayment($payment, $actorId);
 
             return $this->invoiceService->refreshFinancials($invoice->refresh());
         });
