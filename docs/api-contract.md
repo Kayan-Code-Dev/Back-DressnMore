@@ -125,10 +125,49 @@ This document freezes the current API contract for frontend integration.
 
 ## Tenant Provisioning
 
-Current state:
-- Central provisioning tables exist (`tenants`, `tenant_provisioning_logs`).
-- Operational provisioning endpoint is intentionally not exposed in current route contract.
-- Frontend should not call a provisioning API yet.
+Base: `/api/platform/tenants`
+
+Permission:
+- authenticated platform admin (`auth:sanctum` + platform admin middleware)
+
+### GET `/api/platform/tenants`
+- Query:
+  - `search` (name/slug/database_name)
+  - `status`
+  - `plan_id`
+  - `per_page`
+- Response: paginated `Tenant[]`
+
+### POST `/api/platform/tenants`
+- Body:
+  - `name` required
+  - `slug` optional
+  - `database_name` optional
+  - `plan_id` optional
+  - `subscription_starts_at` optional
+  - `subscription_ends_at` optional
+  - `metadata` optional object
+- Backend behavior:
+  - create central tenant row in `provisioning`
+  - create tenant database if missing
+  - connect and run tenant migrations
+  - run tenant seeders (roles/permissions + settings)
+  - set tenant status to `active` or `provisioning_failed`
+  - write provisioning logs to `tenant_provisioning_logs`
+
+### POST `/api/platform/tenants/{tenant}/suspend`
+- Sets tenant status to `suspended`.
+
+### POST `/api/platform/tenants/{tenant}/activate`
+- Sets tenant status to `active`.
+
+### POST `/api/platform/tenants/{tenant}/renew`
+- Body (optional):
+  - `days` integer (default 30)
+  - `subscription_ends_at` explicit date
+- Backend behavior:
+  - extends (or sets) `subscription_ends_at`
+  - enforces `active` status
 
 ---
 

@@ -29,6 +29,12 @@ Authorization: Bearer <token>
   - `POST /api/tenant/login` with `workspace`
 - Save token in secure storage (memory + refresh-safe storage if needed).
 - Inject token in API client interceptor.
+- Platform tenant provisioning APIs are available for admin panel:
+  - `GET /api/platform/tenants`
+  - `POST /api/platform/tenants`
+  - `POST /api/platform/tenants/{tenant}/suspend`
+  - `POST /api/platform/tenants/{tenant}/activate`
+  - `POST /api/platform/tenants/{tenant}/renew`
 
 ## 3) X-Tenant Usage
 

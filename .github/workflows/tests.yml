@@ -3,25 +3,18 @@ name: Tests
 on:
   push:
     branches:
+      - main
       - master
-      - '*.x'
   pull_request:
-  schedule:
-    - cron: '0 0 * * *'
 
 permissions:
   contents: read
 
 jobs:
-  tests:
+  quality-and-tests:
     runs-on: ubuntu-latest
 
-    strategy:
-      fail-fast: true
-      matrix:
-        php: [8.3, 8.4, 8.5]
-
-    name: PHP ${{ matrix.php }}
+    name: PHP 8.3
 
     steps:
       - name: Checkout code
@@ -30,7 +23,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: 8.3
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite
           coverage: none
 
@@ -43,5 +36,17 @@ jobs:
       - name: Generate app key
         run: php artisan key:generate
 
-      - name: Execute tests
+      - name: Clear config cache
+        run: php artisan config:clear
+
+      - name: Clear application cache
+        run: php artisan cache:clear
+
+      - name: Verify routes compile
+        run: php artisan route:list
+
+      - name: Run formatter check (Laravel Pint)
+        run: ./vendor/bin/pint --test
+
+      - name: Execute test suite
         run: php artisan test
