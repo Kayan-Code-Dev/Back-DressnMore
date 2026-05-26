@@ -20,6 +20,10 @@ class TenantRolePermissionSeeder extends Seeder
             ['name' => 'Users Manage', 'key' => 'users.manage'],
             ['name' => 'Roles Manage', 'key' => 'roles.manage'],
             ['name' => 'Settings Manage', 'key' => 'settings.manage'],
+            ['name' => 'Customers View', 'key' => 'customers.view'],
+            ['name' => 'Customers Create', 'key' => 'customers.create'],
+            ['name' => 'Customers Update', 'key' => 'customers.update'],
+            ['name' => 'Customers Delete', 'key' => 'customers.delete'],
         ];
 
         $permissionIds = [];
