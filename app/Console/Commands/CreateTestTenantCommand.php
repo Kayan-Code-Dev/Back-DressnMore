@@ -46,7 +46,9 @@ class CreateTestTenantCommand extends Command
             return self::FAILURE;
         }
 
-        $databaseName = (string) config('tenancy.provisioning.database_prefix', 'tenant_').$slug;
+        $prefix = (string) config('tenancy.provisioning.database_prefix', 'tenant_');
+        $suffix = (string) config('tenancy.provisioning.database_suffix', '');
+        $databaseName = preg_replace('/[^A-Za-z0-9_]/', '_', $prefix.$slug.$suffix) ?: 'tenant_db';
 
         $tenantCreated = false;
         $databaseCreated = false;
