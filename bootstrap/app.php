@@ -9,6 +9,7 @@ use App\Http\Middleware\SetTenantDatabase;
 use App\Support\ApiResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -33,6 +34,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.permission' => CheckTenantPermission::class,
             'plan.feature' => CheckPlanFeature::class,
         ]);
+
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, SetTenantDatabase::class);
+        $middleware->prependToPriorityList(SetTenantDatabase::class, CheckTenantSubscription::class);
+        $middleware->prependToPriorityList(CheckTenantSubscription::class, IdentifyTenant::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $exception, Request $request) {
