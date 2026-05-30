@@ -51,20 +51,38 @@ class PlatformTenantProvisioningTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('message', 'Tenant provisioned')
+            ->assertJsonPath('message', 'Tenant created')
             ->assertJsonPath('data.slug', 'atelier-cairo')
-            ->assertJsonPath('data.status', 'active');
+            ->assertJsonPath('data.status', 'provisioning');
 
         $tenantId = (int) $response->json('data.id');
 
         $this->assertDatabaseHas('tenants', [
             'id' => $tenantId,
-            'status' => 'active',
+            'status' => 'provisioning',
             'database_name' => $tenantDatabasePath,
         ], 'central');
         $this->assertDatabaseHas('tenant_provisioning_logs', [
             'tenant_id' => $tenantId,
-            'step' => 'provisioning_completed',
+            'step' => 'tenant_created',
+            'status' => 'success',
+        ], 'central');
+
+        $migrateResponse = $this->postJson("/api/platform/tenants/{$tenantId}/migrate", [], [
+            'Accept' => 'application/json',
+        ]);
+
+        $migrateResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'active');
+
+        $this->assertDatabaseHas('tenants', [
+            'id' => $tenantId,
+            'status' => 'active',
+        ], 'central');
+        $this->assertDatabaseHas('tenant_provisioning_logs', [
+            'tenant_id' => $tenantId,
+            'step' => 'migration_completed',
             'status' => 'success',
         ], 'central');
 

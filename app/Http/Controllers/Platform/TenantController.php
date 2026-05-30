@@ -3,14 +3,21 @@
 namespace App\Http\Controllers\Platform;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Platform\Tenant\AddDomainRequest;
 use App\Http\Requests\Platform\Tenant\RenewTenantRequest;
+use App\Http\Requests\Platform\Tenant\SeedTenantRequest;
 use App\Http\Requests\Platform\Tenant\StoreTenantRequest;
+use App\Http\Requests\Platform\Tenant\UpdateTenantRequest;
+use App\Http\Resources\Platform\TenantDomainResource;
 use App\Http\Resources\Platform\TenantResource;
 use App\Models\Central\Tenant;
+use App\Models\Central\TenantDomain;
 use App\Services\Platform\TenantProvisioningService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
+use Throwable;
 
 class TenantController extends Controller
 {
@@ -28,11 +35,77 @@ class TenantController extends Controller
         return ApiResponse::paginated($tenants, TenantResource::collection($tenants->items())->resolve());
     }
 
+    public function show(Tenant $tenant): JsonResponse
+    {
+        $tenant->load(['plan', 'domains']);
+
+        return ApiResponse::success(new TenantResource($tenant));
+    }
+
     public function store(StoreTenantRequest $request): JsonResponse
     {
-        $tenant = $this->tenantProvisioningService->provision($request->validated());
+        $tenant = $this->tenantProvisioningService->create($request->validated());
 
-        return ApiResponse::success(new TenantResource($tenant), 'Tenant provisioned', 201);
+        return ApiResponse::success(new TenantResource($tenant), 'Tenant created', 201);
+    }
+
+    public function update(UpdateTenantRequest $request, Tenant $tenant): JsonResponse
+    {
+        $tenant = $this->tenantProvisioningService->update($tenant, $request->validated());
+
+        return ApiResponse::success(new TenantResource($tenant), 'Tenant updated');
+    }
+
+    public function destroy(Tenant $tenant): JsonResponse
+    {
+        $this->tenantProvisioningService->destroy($tenant);
+
+        return ApiResponse::success(null, 'Tenant deleted');
+    }
+
+    public function migrate(Tenant $tenant): JsonResponse
+    {
+        try {
+            $tenant = $this->tenantProvisioningService->migrate($tenant);
+        } catch (RuntimeException $exception) {
+            return ApiResponse::serverError($exception->getMessage());
+        }
+
+        return ApiResponse::success(new TenantResource($tenant), 'Tenant migrated');
+    }
+
+    public function seed(SeedTenantRequest $request, Tenant $tenant): JsonResponse
+    {
+        try {
+            $credentials = $this->tenantProvisioningService->seedAdmin($tenant, $request->validated());
+        } catch (Throwable $exception) {
+            return ApiResponse::serverError('Tenant seed failed: '.$exception->getMessage());
+        }
+
+        $tenant->refresh()->load(['plan', 'domains']);
+
+        return ApiResponse::success([
+            ...$credentials,
+            'tenant' => (new TenantResource($tenant))->resolve(),
+        ], 'Tenant admin seeded');
+    }
+
+    public function addDomain(AddDomainRequest $request, Tenant $tenant): JsonResponse
+    {
+        $domain = $this->tenantProvisioningService->addDomain($tenant, (string) $request->validated('domain'));
+
+        return ApiResponse::success(new TenantDomainResource($domain), 'Domain added', 201);
+    }
+
+    public function deleteDomain(Tenant $tenant, TenantDomain $domain): JsonResponse
+    {
+        try {
+            $this->tenantProvisioningService->deleteDomain($tenant, $domain);
+        } catch (RuntimeException $exception) {
+            return ApiResponse::error($exception->getMessage(), 404);
+        }
+
+        return ApiResponse::success(null, 'Domain deleted');
     }
 
     public function suspend(Tenant $tenant): JsonResponse

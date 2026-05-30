@@ -9,6 +9,7 @@ use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
 use App\Services\Tenant\TenantDatabaseManager;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -18,6 +19,9 @@ class CreateTestTenantCommand extends Command
         {--slug=smoke-test : Workspace slug}
         {--name=Smoke Test Atelier : Tenant display name}
         {--email=smoke@test.local : Admin user email}
+        {--admin-name=Smoke Test Admin : Admin user display name}
+        {--password= : Admin password (min 8 chars); random if omitted for new users}
+        {--reset-password : Reset admin password when the user already exists}
         {--plan=basic : Plan slug to assign}';
 
     protected $description = 'Create a test tenant and admin user for frontend smoke testing (local/staging only)';
@@ -38,10 +42,26 @@ class CreateTestTenantCommand extends Command
         $slug = Str::slug(trim((string) $this->option('slug')));
         $name = trim((string) $this->option('name'));
         $email = strtolower(trim((string) $this->option('email')));
+        $adminName = trim((string) $this->option('admin-name'));
+        $providedPassword = $this->option('password');
+        $providedPassword = is_string($providedPassword) ? trim($providedPassword) : '';
+        $resetPassword = (bool) $this->option('reset-password');
         $planSlug = trim((string) $this->option('plan'));
 
-        if ($slug === '' || $name === '' || $email === '') {
-            $this->error('Slug, name, and email are required.');
+        if ($slug === '' || $name === '' || $email === '' || $adminName === '') {
+            $this->error('Slug, name, admin name, and email are required.');
+
+            return self::FAILURE;
+        }
+
+        if ($providedPassword !== '' && strlen($providedPassword) < 8) {
+            $this->error('Password must be at least 8 characters.');
+
+            return self::FAILURE;
+        }
+
+        if ($resetPassword && $providedPassword === '') {
+            $this->error('The --reset-password option requires --password.');
 
             return self::FAILURE;
         }
@@ -55,6 +75,7 @@ class CreateTestTenantCommand extends Command
         $migrated = false;
         $seeded = false;
         $userCreated = false;
+        $passwordReset = false;
         $password = null;
 
         $tenant = Tenant::query()->where('slug', $slug)->first();
@@ -132,11 +153,24 @@ class CreateTestTenantCommand extends Command
             if ($ownerRole) {
                 $existingUser->roles()->syncWithoutDetaching([$ownerRole->id]);
             }
+
+            if ($resetPassword) {
+                $password = $providedPassword;
+                $existingUser->forceFill([
+                    'name' => $adminName,
+                    'password' => Hash::make($password),
+                    'status' => 'active',
+                ])->save();
+
+                $passwordReset = true;
+                $this->log($tenant, 'admin_password_reset', 'success', 'Test admin password reset');
+                $this->info("Admin user [{$email}] password reset.");
+            }
         } else {
-            $password = Str::random(16);
+            $password = $providedPassword !== '' ? $providedPassword : Str::random(16);
 
             $newUser = User::query()->create([
-                'name' => 'Smoke Test Admin',
+                'name' => $adminName,
                 'email' => $email,
                 'password' => $password,
                 'phone' => null,
@@ -169,19 +203,19 @@ class CreateTestTenantCommand extends Command
                 ['Migrations', $migrated ? 'Applied' : 'Skipped'],
                 ['Seeders', $seeded ? 'Applied' : 'Skipped'],
                 ['Admin email', $email],
-                ['Admin user', $userCreated ? 'Created' : 'Reused (already existed)'],
+                ['Admin user', $userCreated ? 'Created' : ($passwordReset ? 'Reused (password reset)' : 'Reused (already existed)')],
                 ['Admin password', $password !== null ? $password : '(unchanged — user already existed)'],
             ]
         );
 
-        if ($password !== null) {
+        if ($password !== null && $providedPassword === '') {
             $this->newLine();
             $this->warn('Save the password above — it will not be shown again.');
         }
 
         $this->newLine();
         $this->info('Login:');
-        $this->line('  POST /api/tenant/auth/login');
+        $this->line('  POST /api/tenant/login');
         $this->line("  Header: X-Tenant: {$slug}");
         $this->line("  Body:   {\"email\":\"{$email}\",\"password\":\"<password>\"}");
         $this->newLine();

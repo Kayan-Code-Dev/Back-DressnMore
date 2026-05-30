@@ -3,12 +3,16 @@
 namespace App\Services\Platform;
 
 use App\Models\Central\Tenant;
+use App\Models\Central\TenantDomain;
 use App\Models\Central\TenantProvisioningLog;
+use App\Models\Tenant\Role;
+use App\Models\Tenant\User;
 use App\Services\Tenant\TenantDatabaseManager;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -20,7 +24,7 @@ class TenantProvisioningService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = Tenant::query()
-            ->with('plan')
+            ->with(['plan', 'domains'])
             ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -46,7 +50,7 @@ class TenantProvisioningService
         return $query->paginate($perPage)->withQueryString();
     }
 
-    public function provision(array $data): Tenant
+    public function create(array $data): Tenant
     {
         $name = trim((string) $data['name']);
         $slug = $this->resolveSlug($data['slug'] ?? $name);
@@ -62,11 +66,25 @@ class TenantProvisioningService
             'status' => 'provisioning',
             'plan_id' => $data['plan_id'] ?? null,
             'subscription_starts_at' => $data['subscription_starts_at'] ?? CarbonImmutable::now(),
-            'subscription_ends_at' => $data['subscription_ends_at'] ?? null,
+            'subscription_ends_at' => $data['subscription_ends_at'] ?? CarbonImmutable::now()->addYear(),
             'metadata' => $data['metadata'] ?? null,
         ]);
 
         $this->log($tenant, 'tenant_created', 'success', 'Tenant record created');
+
+        return $tenant->refresh()->load(['plan', 'domains']);
+    }
+
+    public function provision(array $data): Tenant
+    {
+        $tenant = $this->create($data);
+
+        return $this->migrate($tenant);
+    }
+
+    public function migrate(Tenant $tenant): Tenant
+    {
+        $databaseName = (string) $tenant->database_name;
 
         try {
             if (! $this->tenantDatabaseManager->databaseExists($databaseName)) {
@@ -88,19 +106,139 @@ class TenantProvisioningService
             $tenant->status = 'active';
             $tenant->save();
 
-            $this->log($tenant, 'provisioning_completed', 'success', 'Tenant provisioning completed');
+            $this->log($tenant, 'migration_completed', 'success', 'Tenant migration completed');
 
-            return $tenant->refresh()->load('plan');
+            return $tenant->refresh()->load(['plan', 'domains']);
         } catch (Throwable $exception) {
             $tenant->status = 'provisioning_failed';
             $tenant->save();
 
-            $this->log($tenant, 'provisioning_failed', 'failed', $exception->getMessage(), [
+            $this->log($tenant, 'migration_failed', 'failed', $exception->getMessage(), [
                 'database_name' => $databaseName,
             ]);
 
-            throw new RuntimeException('Tenant provisioning failed.', 0, $exception);
+            throw new RuntimeException('Tenant migration failed.', 0, $exception);
         }
+    }
+
+    /**
+     * @return array{email: string, password: string, username: ?string, admin: array{email: string, password: string, username: ?string}}
+     */
+    public function seedAdmin(Tenant $tenant, array $data): array
+    {
+        $email = strtolower(trim((string) ($data['admin_email'] ?? $data['email'] ?? '')));
+        if ($email === '') {
+            $email = 'admin@'.$tenant->slug.'.local';
+        }
+
+        $password = trim((string) ($data['admin_password'] ?? $data['password'] ?? ''));
+        if ($password === '') {
+            $password = Str::random(16);
+        }
+
+        $adminName = trim((string) ($data['admin_name'] ?? $data['username'] ?? $data['admin_username'] ?? ''));
+        if ($adminName === '') {
+            $adminName = $tenant->name.' Admin';
+        }
+
+        $phone = trim((string) ($data['phone'] ?? ''));
+
+        $this->tenantDatabaseManager->connect($tenant);
+
+        $existingUser = User::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->first();
+
+        if ($existingUser instanceof User) {
+            $existingUser->forceFill([
+                'name' => $adminName,
+                'password' => Hash::make($password),
+                'phone' => $phone !== '' ? $phone : $existingUser->phone,
+                'status' => 'active',
+            ])->save();
+
+            $this->log($tenant, 'admin_password_reset', 'success', 'Tenant admin password reset');
+        } else {
+            $existingUser = User::query()->create([
+                'name' => $adminName,
+                'email' => $email,
+                'password' => $password,
+                'phone' => $phone !== '' ? $phone : null,
+                'status' => 'active',
+            ]);
+
+            $this->log($tenant, 'admin_user_created', 'success', 'Tenant admin user created');
+        }
+
+        $ownerRole = Role::query()->where('slug', 'owner')->first();
+        if ($ownerRole) {
+            $existingUser->roles()->syncWithoutDetaching([$ownerRole->id]);
+        }
+
+        $metadata = is_array($tenant->metadata) ? $tenant->metadata : [];
+        $metadata['admin_email'] = $email;
+        $metadata['admin_name'] = $adminName;
+        if ($phone !== '') {
+            $metadata['phone'] = $phone;
+        }
+
+        $tenant->metadata = $metadata;
+        $tenant->save();
+
+        $username = trim((string) ($data['admin_username'] ?? $data['username'] ?? ''));
+
+        return [
+            'email' => $email,
+            'password' => $password,
+            'username' => $username !== '' ? $username : null,
+            'admin' => [
+                'email' => $email,
+                'password' => $password,
+                'username' => $username !== '' ? $username : null,
+            ],
+        ];
+    }
+
+    public function update(Tenant $tenant, array $data): Tenant
+    {
+        $tenant->name = trim((string) $data['name']);
+        $tenant->save();
+
+        return $tenant->refresh()->load(['plan', 'domains']);
+    }
+
+    public function destroy(Tenant $tenant): void
+    {
+        $databaseName = (string) $tenant->database_name;
+
+        $tenant->domains()->delete();
+        $tenant->provisioningLogs()->delete();
+        $tenant->delete();
+
+        if ($databaseName !== '' && $this->tenantDatabaseManager->databaseExists($databaseName)) {
+            $this->tenantDatabaseManager->dropDatabase($databaseName);
+        }
+    }
+
+    public function addDomain(Tenant $tenant, string $domain): TenantDomain
+    {
+        $normalizedDomain = strtolower(trim($domain));
+
+        return TenantDomain::query()->create([
+            'tenant_id' => $tenant->id,
+            'domain' => $normalizedDomain,
+            'is_primary' => $tenant->domains()->count() === 0,
+            'status' => 'active',
+        ]);
+    }
+
+    public function deleteDomain(Tenant $tenant, TenantDomain $domain): void
+    {
+        if ((int) $domain->tenant_id !== (int) $tenant->id) {
+            throw new RuntimeException('Domain does not belong to tenant.');
+        }
+
+        $domain->delete();
     }
 
     public function suspend(Tenant $tenant): Tenant
@@ -108,7 +246,7 @@ class TenantProvisioningService
         $tenant->status = 'suspended';
         $tenant->save();
 
-        return $tenant->refresh()->load('plan');
+        return $tenant->refresh()->load(['plan', 'domains']);
     }
 
     public function activate(Tenant $tenant): Tenant
@@ -116,7 +254,7 @@ class TenantProvisioningService
         $tenant->status = 'active';
         $tenant->save();
 
-        return $tenant->refresh()->load('plan');
+        return $tenant->refresh()->load(['plan', 'domains']);
     }
 
     public function renew(Tenant $tenant, array $data): Tenant
@@ -149,7 +287,7 @@ class TenantProvisioningService
             'subscription_ends_at' => $subscriptionEndsAt->toISOString(),
         ]);
 
-        return $tenant->refresh()->load('plan');
+        return $tenant->refresh()->load(['plan', 'domains']);
     }
 
     private function resolveSlug(mixed $slugInput): string
