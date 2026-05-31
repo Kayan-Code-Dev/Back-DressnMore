@@ -25,7 +25,7 @@ class TailoringOrderService
 
     /**
      * @param  array<string, mixed>  $filters
-     * @return array<string, float|int>
+     * @return array<string, float|int|array<string, int>>
      */
     public function stats(array $filters = []): array
     {
@@ -33,10 +33,22 @@ class TailoringOrderService
         $active = 0;
         $overdue = 0;
         $ready = 0;
+        $completed = 0;
+        $inProgress = 0;
+        $vipCount = 0;
         $revenue = 0.0;
+        $collected = 0.0;
+        $remaining = 0.0;
+        $unpaidCount = 0;
+        /** @var array<string, int> $stageDistribution */
+        $stageDistribution = [];
 
         foreach ($invoices as $invoice) {
             $status = TailoringOrderPresenter::mapStatus($invoice);
+            $stage = TailoringOrderPresenter::mapStage($invoice);
+            $priority = TailoringOrderPresenter::mapPriority($invoice, $status);
+            $paymentStatus = TailoringOrderPresenter::mapPaymentStatus($invoice);
+
             if ($status === 'active') {
                 $active++;
             }
@@ -44,20 +56,43 @@ class TailoringOrderService
                 $overdue++;
             }
             if ($status === 'completed') {
+                $completed++;
+            }
+            if ($stage === 'ready_for_delivery') {
                 $ready++;
             }
+            if ($status === 'active' && ! in_array($stage, ['ready_for_delivery', 'delivered'], true)) {
+                $inProgress++;
+            }
+            if ($priority === 'VIP') {
+                $vipCount++;
+            }
+            if ($paymentStatus === 'unpaid') {
+                $unpaidCount++;
+            }
+
+            $stageDistribution[$stage] = ($stageDistribution[$stage] ?? 0) + 1;
 
             if ($invoice->status !== Invoice::STATUS_CANCELLED) {
                 $revenue += (float) $invoice->total;
+                $collected += (float) $invoice->paid_amount;
+                $remaining += (float) $invoice->remaining_amount;
             }
         }
 
         return [
-            'total' => $invoices->count(),
+            'total' => $invoices->where('status', '!=', Invoice::STATUS_CANCELLED)->count(),
             'active' => $active,
+            'in_progress' => $inProgress,
             'overdue' => $overdue,
             'ready' => $ready,
+            'completed' => $completed,
+            'vip_count' => $vipCount,
             'revenue' => round($revenue, 2),
+            'collected' => round($collected, 2),
+            'remaining' => round($remaining, 2),
+            'unpaid_count' => $unpaidCount,
+            'stage_distribution' => $stageDistribution,
         ];
     }
 
@@ -108,7 +143,7 @@ class TailoringOrderService
     private function baseQuery(array $filters): Builder
     {
         $query = Invoice::query()
-            ->with(['customer', 'items.dress', 'payments'])
+            ->with(['customer', 'items.dress', 'payments', 'branch', 'createdBy'])
             ->where('type', Invoice::TYPE_TAILORING);
 
         $search = trim((string) ($filters['search'] ?? ''));
