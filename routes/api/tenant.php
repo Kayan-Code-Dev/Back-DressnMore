@@ -177,6 +177,8 @@ Route::prefix('tenant')->group(function (): void {
         Route::prefix('/customers')->middleware('plan.feature:customers.enabled')->group(function (): void {
             Route::get('/export', [CustomerController::class, 'export'])
                 ->middleware('tenant.permission:customers.export');
+            Route::get('/stats', [CustomerController::class, 'stats'])
+                ->middleware('tenant.permission:customers.view');
             Route::get('/', [CustomerController::class, 'index'])
                 ->middleware('tenant.permission:customers.view');
             Route::post('/', [CustomerController::class, 'store'])

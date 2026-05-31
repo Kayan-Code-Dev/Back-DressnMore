@@ -32,6 +32,11 @@ class CustomerController extends Controller
         return ApiResponse::paginated($customers, CustomerResource::collection($customers->items())->resolve());
     }
 
+    public function stats(): JsonResponse
+    {
+        return ApiResponse::success($this->customerService->stats());
+    }
+
     public function store(StoreCustomerRequest $request): JsonResponse
     {
         $customer = $this->customerService->create($request->validated());

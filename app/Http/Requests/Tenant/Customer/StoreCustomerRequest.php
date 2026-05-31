@@ -19,6 +19,7 @@ class StoreCustomerRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'date_of_birth' => ['nullable', 'date'],
+            'visit_date' => ['nullable', 'date'],
             'phone' => ['nullable', 'string', 'max:30'],
             'phone2' => ['nullable', 'string', 'max:30'],
             'whatsapp' => ['nullable', 'string', 'max:30'],

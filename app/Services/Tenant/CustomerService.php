@@ -3,6 +3,7 @@
 namespace App\Services\Tenant;
 
 use App\Models\Tenant\Customer;
+use App\Models\Tenant\Invoice;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -10,7 +11,10 @@ class CustomerService
 {
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $query = Customer::query()->latest('id');
+        $query = Customer::query()
+            ->withCount(['invoices as orders_count'])
+            ->withSum('invoices as total_spent', 'total')
+            ->latest('id');
 
         $term = trim((string) ($filters['search'] ?? ''));
         if ($term !== '') {
@@ -40,6 +44,29 @@ class CustomerService
         }
 
         return $query->paginate($perPage)->withQueryString();
+    }
+
+    /**
+     * @return array<string, int|float>
+     */
+    public function stats(): array
+    {
+        $total = Customer::query()->count();
+        $vip = Customer::query()->where('notes', 'like', '%[VIP]%')->count();
+        $newThisMonth = Customer::query()
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+        $totalSales = (float) Invoice::query()
+            ->whereNotNull('customer_id')
+            ->sum('total');
+
+        return [
+            'total' => $total,
+            'vip' => $vip,
+            'new_this_month' => $newThisMonth,
+            'total_sales' => round($totalSales, 2),
+        ];
     }
 
     public function create(array $data): Customer

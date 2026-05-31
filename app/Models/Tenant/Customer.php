@@ -4,6 +4,7 @@ namespace App\Models\Tenant;
 
 use App\Enums\CustomerStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends BaseTenantModel
@@ -15,6 +16,7 @@ class Customer extends BaseTenantModel
     protected $fillable = [
         'name',
         'date_of_birth',
+        'visit_date',
         'phone',
         'phone2',
         'whatsapp',
@@ -31,6 +33,7 @@ class Customer extends BaseTenantModel
     {
         return [
             'date_of_birth' => 'date',
+            'visit_date' => 'date',
         ];
     }
 
@@ -48,5 +51,10 @@ class Customer extends BaseTenantModel
             get: fn (?string $value): ?string => $value,
             set: fn (?string $value): ?string => $value !== null ? trim($value) : null,
         );
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 }
