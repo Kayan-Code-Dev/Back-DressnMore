@@ -14,15 +14,18 @@ class TenantSubscriptionPresenter
      *     lifecycle_status: string,
      *     plan_code: string,
      *     plan_name: string,
+     *     plan_id: int|null,
      *     starts_at: string,
      *     expires_at: string|null,
      *     can_renew: bool,
-     *     days_remaining: int|null
+     *     days_remaining: int|null,
+     *     features: array<string, string>,
+     *     enabled_modules: list<string>
      * }
      */
     public function forTenant(Tenant $tenant): array
     {
-        $tenant->loadMissing('plan');
+        $tenant->loadMissing(['plan.features']);
 
         /** @var Plan|null $plan */
         $plan = $tenant->plan;
@@ -47,15 +50,28 @@ class TenantSubscriptionPresenter
             $lifecycleStatus = 'expired';
         }
 
+        $features = [];
+        $enabledModules = [];
+        foreach ($plan?->features ?? [] as $feature) {
+            $features[$feature->feature_key] = (string) $feature->feature_value;
+            if (str_ends_with($feature->feature_key, '.enabled')
+                && PlanFeatureCatalog::isEnabledValue($feature->feature_value)) {
+                $enabledModules[] = str_replace('.enabled', '', $feature->feature_key);
+            }
+        }
+
         return [
             'account_type' => $isPaid ? 'paid' : 'free',
             'lifecycle_status' => $lifecycleStatus,
+            'plan_id' => $plan?->id,
             'plan_code' => $plan?->slug ?? 'free',
             'plan_name' => $plan?->name ?? 'مجاني',
             'starts_at' => $startsAt->toDateString(),
             'expires_at' => $expiresAt?->toDateString(),
             'can_renew' => true,
             'days_remaining' => $daysRemaining,
+            'features' => $features,
+            'enabled_modules' => $enabledModules,
         ];
     }
 }

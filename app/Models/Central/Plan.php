@@ -14,6 +14,8 @@ class Plan extends Model
         'slug',
         'price',
         'billing_cycle',
+        'duration_days',
+        'sort_order',
         'status',
         'description',
     ];
@@ -22,6 +24,8 @@ class Plan extends Model
     {
         return [
             'price' => 'decimal:2',
+            'duration_days' => 'integer',
+            'sort_order' => 'integer',
         ];
     }
 

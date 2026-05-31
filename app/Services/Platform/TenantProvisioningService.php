@@ -2,6 +2,7 @@
 
 namespace App\Services\Platform;
 
+use App\Models\Central\Plan;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantDomain;
 use App\Models\Central\TenantProvisioningLog;
@@ -68,9 +69,11 @@ class TenantProvisioningService
             'slug' => $slug,
             'database_name' => $databaseName,
             'status' => 'provisioning',
-            'plan_id' => $data['plan_id'] ?? null,
+            'plan_id' => (int) $data['plan_id'],
             'subscription_starts_at' => $data['subscription_starts_at'] ?? CarbonImmutable::now(),
-            'subscription_ends_at' => $data['subscription_ends_at'] ?? CarbonImmutable::now()->addYear(),
+            'subscription_ends_at' => $data['subscription_ends_at'] ?? CarbonImmutable::now()->addDays(
+                $this->resolveDurationDays((int) $data['plan_id'])
+            ),
             'metadata' => $data['metadata'] ?? null,
         ]);
 
@@ -208,6 +211,19 @@ class TenantProvisioningService
     public function update(Tenant $tenant, array $data): Tenant
     {
         $tenant->name = trim((string) $data['name']);
+
+        if (array_key_exists('plan_id', $data) && $data['plan_id'] !== null) {
+            $tenant->plan_id = (int) $data['plan_id'];
+        }
+
+        if (array_key_exists('subscription_starts_at', $data)) {
+            $tenant->subscription_starts_at = $data['subscription_starts_at'];
+        }
+
+        if (array_key_exists('subscription_ends_at', $data)) {
+            $tenant->subscription_ends_at = $data['subscription_ends_at'];
+        }
+
         $tenant->save();
 
         return $tenant->refresh()->load(['plan', 'domains']);
@@ -295,6 +311,13 @@ class TenantProvisioningService
         ]);
 
         return $tenant->refresh()->load(['plan', 'domains']);
+    }
+
+    private function resolveDurationDays(int $planId): int
+    {
+        $plan = Plan::query()->find($planId);
+
+        return max(1, (int) ($plan?->duration_days ?? 365));
     }
 
     private function resolveSlug(mixed $slugInput): string

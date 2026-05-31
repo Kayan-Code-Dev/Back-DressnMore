@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Platform\AuthController;
 use App\Http\Controllers\Platform\HealthController;
+use App\Http\Controllers\Platform\PlanController;
 use App\Http\Controllers\Platform\TenantController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,17 @@ Route::prefix('platform')->group(function (): void {
     Route::middleware(['auth:sanctum', 'platform.admin'])->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+
+        Route::get('/plans/feature-catalog', [PlanController::class, 'featureCatalog']);
+        Route::get('/plans', [PlanController::class, 'index']);
+        Route::post('/plans', [PlanController::class, 'store']);
+        Route::get('/plans/{plan}', [PlanController::class, 'show'])
+            ->whereNumber('plan');
+        Route::put('/plans/{plan}', [PlanController::class, 'update'])
+            ->whereNumber('plan');
+        Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])
+            ->whereNumber('plan');
+
         Route::get('/tenants', [TenantController::class, 'index']);
         Route::post('/tenants', [TenantController::class, 'store']);
         Route::get('/tenants/{tenant}', [TenantController::class, 'show'])
