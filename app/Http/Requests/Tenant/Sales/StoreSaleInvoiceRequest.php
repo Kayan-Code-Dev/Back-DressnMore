@@ -17,9 +17,11 @@ class StoreSaleInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_id' => ['nullable', 'integer'],
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'branch_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string'],
+            'order_notes' => ['nullable', 'string'],
+            'tax' => ['nullable', 'numeric', 'min:0'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.dress_id' => ['nullable', 'integer'],

@@ -247,7 +247,9 @@ class SalesService
             'customer_id' => $data['customer_id'] ?? null,
             'branch_id' => $data['branch_id'] ?? null,
             'notes' => $data['notes'] ?? null,
+            'order_notes' => $data['order_notes'] ?? null,
             'discount' => $data['discount'] ?? 0,
+            'tax' => $data['tax'] ?? 0,
             'items' => $data['items'] ?? [],
             'initial_payment' => $data['initial_payment'] ?? null,
         ], $actorId);
