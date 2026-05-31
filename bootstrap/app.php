@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckDressCategoryPlanFeature;
 use App\Http\Middleware\CheckPlanFeature;
 use App\Http\Middleware\CheckTenantPermission;
 use App\Http\Middleware\CheckTenantSubscription;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'set.tenant.database' => SetTenantDatabase::class,
             'tenant.permission' => CheckTenantPermission::class,
             'plan.feature' => CheckPlanFeature::class,
+            'plan.dress_category' => CheckDressCategoryPlanFeature::class,
         ]);
 
         $middleware->prependToPriorityList(AuthenticatesRequests::class, SetTenantDatabase::class);

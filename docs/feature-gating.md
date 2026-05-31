@@ -1,33 +1,15 @@
-# Feature Gating Plan (Deferred Modules)
+# Feature Gating
 
-## Current status
+## Status
 
-- `CheckPlanFeature` middleware is implemented and registered as `plan.feature`.
-- It is intentionally **not applied** to currently completed modules (core tenancy, customers, dresses, invoices, delivery/return, expenses/cash movements).
-- This avoids accidental behavior changes before product-level plan rules are finalized.
+- `CheckPlanFeature` middleware (`plan.feature:<key>`) is applied on tenant API route groups.
+- Dress categories use `plan.dress_category` middleware (`categories.enabled` / `subcategories.enabled`).
+- Tenant `/me` and login return `subscription.enabled_modules` for frontend UI gating.
 
-## Recommended future usage
+## Feature keys
 
-Apply `plan.feature:<feature_key>` when the corresponding module/limit is implemented:
+See `App\Support\PlanFeatureCatalog` for the canonical list (e.g. `customers.enabled`, `categories.enabled`, `reports.enabled`).
 
-- `accounting.enabled`
-  - Future accounting ledger and journal endpoints.
-- `suppliers.enabled`
-  - Future supplier CRUD and purchase flows.
-- `payroll.enabled`
-  - Future employee payroll endpoints.
-- `advanced_reports.enabled`
-  - Future analytics and reporting endpoints.
-- `branches.max`
-  - Branch creation/update flows; enforce numeric max branches per tenant.
-- `employees.max`
-  - Employee creation/update flows; enforce numeric max employees per tenant.
-- `invoices.monthly_limit`
-  - Invoice creation flow; enforce per-month cap.
+## Error contract
 
-## Rollout guidance
-
-1. Add required plan features to central `plan_features`.
-2. Add module-level tests for feature enabled/disabled and limit boundaries.
-3. Apply middleware only on relevant endpoints, not globally.
-4. Keep a fallback error contract: `403 Feature is not available`.
+Disabled features return `403` with message `Feature is not available`.

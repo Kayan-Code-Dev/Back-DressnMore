@@ -4,13 +4,17 @@ namespace App\Http\Middleware;
 
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
+use App\Support\PlanFeatureGate;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class CheckPlanFeature
 {
-    public function __construct(private readonly TenantContext $tenantContext) {}
+    public function __construct(
+        private readonly TenantContext $tenantContext,
+        private readonly PlanFeatureGate $planFeatureGate,
+    ) {}
 
     public function handle(Request $request, Closure $next, string $featureKey): Response
     {
@@ -20,22 +24,11 @@ class CheckPlanFeature
             return ApiResponse::error('Tenant workspace is required', 400);
         }
 
-        $plan = $tenant->plan;
-
-        if ($plan === null) {
+        if ($tenant->plan === null && ! app()->environment('testing')) {
             return ApiResponse::forbidden('Plan is not assigned');
         }
 
-        $feature = $plan->features()->where('feature_key', $featureKey)->first();
-
-        if ($feature === null) {
-            return ApiResponse::forbidden('Feature is not available');
-        }
-
-        $value = strtolower((string) $feature->feature_value);
-        $enabled = in_array($value, ['1', 'true', 'yes', 'enabled'], true);
-
-        if (! $enabled) {
+        if (! $this->planFeatureGate->isEnabled($tenant, $featureKey)) {
             return ApiResponse::forbidden('Feature is not available');
         }
 

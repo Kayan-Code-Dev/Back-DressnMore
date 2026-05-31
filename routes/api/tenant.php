@@ -38,12 +38,12 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);
         Route::get('/lookups', [LookupController::class, 'index']);
 
-        Route::prefix('/dashboard')->group(function (): void {
+        Route::prefix('/dashboard')->middleware('plan.feature:dashboard.enabled')->group(function (): void {
             Route::get('/overview', [DashboardController::class, 'overview'])
                 ->middleware('tenant.permission:dashboard.view');
         });
 
-        Route::prefix('/reports')->group(function (): void {
+        Route::prefix('/reports')->middleware('plan.feature:reports.enabled')->group(function (): void {
             Route::get('/overview', [ReportController::class, 'overview'])
                 ->middleware('tenant.permission:reports.view');
             Route::get('/sales', [ReportController::class, 'sales'])
@@ -52,14 +52,14 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:reports.tailoring');
         });
 
-        Route::prefix('/accounting')->group(function (): void {
+        Route::prefix('/accounting')->middleware('plan.feature:accounting.enabled')->group(function (): void {
             Route::get('/summary', [AccountingController::class, 'summary'])
                 ->middleware('tenant.permission:accounting.view');
             Route::get('/ledger', [AccountingController::class, 'ledger'])
                 ->middleware('tenant.permission:accounting.view');
         });
 
-        Route::prefix('/customers')->group(function (): void {
+        Route::prefix('/customers')->middleware('plan.feature:customers.enabled')->group(function (): void {
             Route::get('/export', [CustomerController::class, 'export'])
                 ->middleware('tenant.permission:customers.export');
             Route::get('/', [CustomerController::class, 'index'])
@@ -77,7 +77,7 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:customers.delete');
         });
 
-        Route::prefix('/branches')->group(function (): void {
+        Route::prefix('/branches')->middleware('plan.feature:branches.enabled')->group(function (): void {
             Route::get('/export', [BranchController::class, 'export'])
                 ->middleware('tenant.permission:branches.export');
             Route::get('/', [BranchController::class, 'index'])
@@ -95,7 +95,7 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:branches.delete');
         });
 
-        Route::prefix('/suppliers')->group(function (): void {
+        Route::prefix('/suppliers')->middleware('plan.feature:suppliers.enabled')->group(function (): void {
             Route::get('/export', [SupplierController::class, 'export'])
                 ->middleware('tenant.permission:suppliers.export');
             Route::get('/', [SupplierController::class, 'index'])
@@ -113,13 +113,13 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:suppliers.delete');
             Route::get('/{supplier}/payments', [SupplierPaymentController::class, 'indexForSupplier'])
                 ->whereNumber('supplier')
-                ->middleware('tenant.permission:supplier_payments.view');
+                ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);
             Route::post('/{supplier}/payments', [SupplierPaymentController::class, 'storeForSupplier'])
                 ->whereNumber('supplier')
-                ->middleware('tenant.permission:supplier_payments.create');
+                ->middleware(['tenant.permission:supplier_payments.create', 'plan.feature:supplier_payments.enabled']);
         });
 
-        Route::prefix('/purchase-orders')->group(function (): void {
+        Route::prefix('/purchase-orders')->middleware('plan.feature:purchase_orders.enabled')->group(function (): void {
             Route::get('/export', [PurchaseOrderController::class, 'export'])
                 ->middleware('tenant.permission:purchase_orders.export');
             Route::get('/', [PurchaseOrderController::class, 'index'])
@@ -140,10 +140,10 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:purchase_orders.delete');
             Route::get('/{purchaseOrder}/payments', [SupplierPaymentController::class, 'indexForPurchaseOrder'])
                 ->whereNumber('purchaseOrder')
-                ->middleware('tenant.permission:supplier_payments.view');
+                ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);
         });
 
-        Route::prefix('/expense-categories')->group(function (): void {
+        Route::prefix('/expense-categories')->middleware('plan.feature:expenses.enabled')->group(function (): void {
             Route::get('/', [ExpenseCategoryController::class, 'index'])
                 ->middleware('tenant.permission:expense_categories.view');
             Route::post('/', [ExpenseCategoryController::class, 'store'])
@@ -159,7 +159,7 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:expense_categories.delete');
         });
 
-        Route::prefix('/expenses')->group(function (): void {
+        Route::prefix('/expenses')->middleware('plan.feature:expenses.enabled')->group(function (): void {
             Route::get('/summary', [ExpenseController::class, 'summary'])
                 ->middleware('tenant.permission:expenses.summary');
             Route::get('/export', [ExpenseController::class, 'export'])
@@ -188,14 +188,14 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:expenses.delete');
         });
 
-        Route::prefix('/cash-movements')->group(function (): void {
+        Route::prefix('/cash-movements')->middleware('plan.feature:cash_movements.enabled')->group(function (): void {
             Route::get('/', [CashMovementController::class, 'index'])
                 ->middleware('tenant.permission:cash_movements.view');
             Route::post('/', [CashMovementController::class, 'store'])
                 ->middleware('tenant.permission:cash_movements.create');
         });
 
-        Route::prefix('/cashboxes')->group(function (): void {
+        Route::prefix('/cashboxes')->middleware('plan.feature:cashboxes.enabled')->group(function (): void {
             Route::get('/export', [CashboxController::class, 'export'])
                 ->middleware('tenant.permission:cashboxes.export');
             Route::get('/daily-summary', [CashboxController::class, 'dailySummary'])
@@ -221,7 +221,7 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:cashboxes.recalculate');
         });
 
-        Route::prefix('/payments')->group(function (): void {
+        Route::prefix('/payments')->middleware('plan.feature:payments.enabled')->group(function (): void {
             Route::get('/export', [PaymentController::class, 'export'])
                 ->middleware('tenant.permission:payments.export');
             Route::get('/', [PaymentController::class, 'index'])
@@ -237,7 +237,7 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:payments.cancel');
         });
 
-        Route::prefix('/dress-categories')->group(function (): void {
+        Route::prefix('/dress-categories')->middleware('plan.dress_category')->group(function (): void {
             Route::get('/', [DressCategoryController::class, 'index'])
                 ->middleware('tenant.permission:dress_categories.view');
             Route::post('/', [DressCategoryController::class, 'store'])
@@ -253,7 +253,7 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:dress_categories.delete');
         });
 
-        Route::prefix('/dresses')->group(function (): void {
+        Route::prefix('/dresses')->middleware('plan.feature:dresses.enabled')->group(function (): void {
             Route::get('/export', [DressController::class, 'export'])
                 ->middleware('tenant.permission:dresses.export');
             Route::get('/available-for-date', [DressController::class, 'availableForDate'])
@@ -279,10 +279,10 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:dresses.delete');
             Route::get('/{dress}/inventory-movements', [DressController::class, 'inventoryMovements'])
                 ->whereNumber('dress')
-                ->middleware('tenant.permission:inventory.view');
+                ->middleware(['tenant.permission:inventory.view', 'plan.feature:inventory.enabled']);
         });
 
-        Route::prefix('/invoices')->group(function (): void {
+        Route::prefix('/invoices')->middleware('plan.feature:invoices.enabled')->group(function (): void {
             Route::get('/export', [InvoiceController::class, 'export'])
                 ->middleware('tenant.permission:invoices.export');
             Route::get('/', [InvoiceController::class, 'index'])
@@ -311,13 +311,13 @@ Route::prefix('tenant')->group(function (): void {
 
             Route::post('/{invoice}/deliver', [InvoiceDeliveryController::class, 'deliver'])
                 ->whereNumber('invoice')
-                ->middleware('tenant.permission:invoice_delivery.deliver');
+                ->middleware(['tenant.permission:invoice_delivery.deliver', 'plan.feature:deliveries.enabled']);
             Route::post('/{invoice}/return', [InvoiceDeliveryController::class, 'returnInvoice'])
                 ->whereNumber('invoice')
-                ->middleware('tenant.permission:invoice_delivery.return');
+                ->middleware(['tenant.permission:invoice_delivery.return', 'plan.feature:returns.enabled']);
             Route::get('/{invoice}/delivery-records', [InvoiceDeliveryController::class, 'deliveryRecords'])
                 ->whereNumber('invoice')
-                ->middleware('tenant.permission:invoice_delivery.view');
+                ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:deliveries.enabled']);
 
             Route::post('/{invoice}/security-deposit/deductions', [InvoiceDeliveryController::class, 'addSecurityDepositDeduction'])
                 ->whereNumber('invoice')
