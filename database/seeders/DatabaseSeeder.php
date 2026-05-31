@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\Central\PaymentGatewaySeeder;
+use Database\Seeders\Central\PlanFeatureSeeder;
 use Database\Seeders\Central\PlanSeeder;
 use Database\Seeders\Central\SuperAdminSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -20,6 +22,7 @@ class DatabaseSeeder extends Seeder
             SuperAdminSeeder::class,
             PlanSeeder::class,
             PlanFeatureSeeder::class,
+            PaymentGatewaySeeder::class,
         ]);
     }
 }

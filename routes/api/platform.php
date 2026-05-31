@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Platform\AuthController;
 use App\Http\Controllers\Platform\HealthController;
+use App\Http\Controllers\Platform\PaymentGatewayController;
 use App\Http\Controllers\Platform\PlanController;
 use App\Http\Controllers\Platform\TenantController;
 use Illuminate\Support\Facades\Route;
@@ -46,5 +47,14 @@ Route::prefix('platform')->group(function (): void {
             ->whereNumber('tenant');
         Route::post('/tenants/{tenant}/renew', [TenantController::class, 'renew'])
             ->whereNumber('tenant');
+
+        Route::get('/payment-gateways', [PaymentGatewayController::class, 'index']);
+        Route::post('/payment-gateways', [PaymentGatewayController::class, 'store']);
+        Route::get('/payment-gateways/{paymentGateway}', [PaymentGatewayController::class, 'show'])
+            ->whereNumber('paymentGateway');
+        Route::put('/payment-gateways/{paymentGateway}', [PaymentGatewayController::class, 'update'])
+            ->whereNumber('paymentGateway');
+        Route::delete('/payment-gateways/{paymentGateway}', [PaymentGatewayController::class, 'destroy'])
+            ->whereNumber('paymentGateway');
     });
 });

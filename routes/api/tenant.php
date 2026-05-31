@@ -10,21 +10,26 @@ use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DeliveryWorkflowController;
 use App\Http\Controllers\Tenant\DressCategoryController;
 use App\Http\Controllers\Tenant\DressController;
+use App\Http\Controllers\Tenant\EmployeeController;
 use App\Http\Controllers\Tenant\ExpenseCategoryController;
 use App\Http\Controllers\Tenant\ExpenseController;
+use App\Http\Controllers\Tenant\FactoryController;
 use App\Http\Controllers\Tenant\HealthController;
 use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Tenant\InvoiceDeliveryController;
 use App\Http\Controllers\Tenant\LookupController;
+use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\PaymentController;
 use App\Http\Controllers\Tenant\PurchaseOrderController;
 use App\Http\Controllers\Tenant\RentalOrderController;
 use App\Http\Controllers\Tenant\ReportController;
 use App\Http\Controllers\Tenant\SalesController;
 use App\Http\Controllers\Tenant\SettingsController;
+use App\Http\Controllers\Tenant\SubscriptionController;
 use App\Http\Controllers\Tenant\SupplierController;
 use App\Http\Controllers\Tenant\SupplierPaymentController;
 use App\Http\Controllers\Tenant\TailoringOrderController;
+use App\Http\Controllers\Tenant\WorkshopController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('tenant')->group(function (): void {
@@ -32,6 +37,19 @@ Route::prefix('tenant')->group(function (): void {
         ->middleware(['identify.tenant', 'check.tenant.subscription', 'set.tenant.database']);
 
     Route::post('/login', [AuthController::class, 'login']);
+
+    Route::middleware([
+        'identify.tenant',
+        'set.tenant.database',
+        'auth:sanctum',
+    ])->group(function (): void {
+        Route::get('/subscription/overview', [SubscriptionController::class, 'overview']);
+        Route::get('/subscription/payment-gateways', [SubscriptionController::class, 'paymentGateways']);
+        Route::post('/subscription/renew', [SubscriptionController::class, 'renew']);
+        Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade']);
+        Route::put('/settings/password', [SettingsController::class, 'updatePassword']);
+        Route::delete('/settings/account', [SettingsController::class, 'deleteAccount']);
+    });
 
     Route::middleware([
         'identify.tenant',
@@ -86,6 +104,48 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:settings.profile');
             Route::put('/profile', [SettingsController::class, 'updateProfile'])
                 ->middleware('tenant.permission:settings.profile');
+        });
+
+        Route::prefix('/employees')->group(function (): void {
+            Route::get('/', [EmployeeController::class, 'index'])
+                ->middleware('tenant.permission:users.manage');
+            Route::get('/custodies', [EmployeeController::class, 'custodies'])
+                ->middleware('tenant.permission:users.manage');
+            Route::get('/salaries', [EmployeeController::class, 'salaries'])
+                ->middleware('tenant.permission:users.manage');
+            Route::get('/{employee}', [EmployeeController::class, 'show'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:users.manage');
+        });
+
+        Route::prefix('/workshops')->group(function (): void {
+            Route::get('/', [WorkshopController::class, 'index'])
+                ->middleware('tenant.permission:settings.manage');
+            Route::get('/{workshop}/transfers', [WorkshopController::class, 'transfers'])
+                ->whereNumber('workshop')
+                ->middleware('tenant.permission:settings.manage');
+            Route::get('/{workshop}/cloths', [WorkshopController::class, 'cloths'])
+                ->whereNumber('workshop')
+                ->middleware('tenant.permission:settings.manage');
+            Route::get('/{workshop}', [WorkshopController::class, 'show'])
+                ->whereNumber('workshop')
+                ->middleware('tenant.permission:settings.manage');
+        });
+
+        Route::get('/factories', [FactoryController::class, 'index'])
+            ->middleware('tenant.permission:settings.manage');
+
+        Route::prefix('/notifications')->group(function (): void {
+            Route::get('/', [NotificationController::class, 'index'])
+                ->middleware('tenant.permission:settings.view');
+            Route::post('/read-all', [NotificationController::class, 'markAllRead'])
+                ->middleware('tenant.permission:settings.view');
+            Route::patch('/{notification}/read', [NotificationController::class, 'markRead'])
+                ->whereNumber('notification')
+                ->middleware('tenant.permission:settings.view');
+            Route::delete('/{notification}', [NotificationController::class, 'destroy'])
+                ->whereNumber('notification')
+                ->middleware('tenant.permission:settings.view');
         });
 
         Route::prefix('/dashboard')->middleware('plan.feature:dashboard.enabled')->group(function (): void {

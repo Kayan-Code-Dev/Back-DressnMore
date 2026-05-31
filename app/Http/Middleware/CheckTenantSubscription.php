@@ -15,6 +15,10 @@ class CheckTenantSubscription
 
     public function handle(Request $request, Closure $next): Response
     {
+        if ($this->isExempt($request)) {
+            return $next($request);
+        }
+
         $tenant = $this->tenantContext->tenant();
 
         if ($tenant === null) {
@@ -42,5 +46,15 @@ class CheckTenantSubscription
         }
 
         return $next($request);
+    }
+
+    private function isExempt(Request $request): bool
+    {
+        return $request->is('tenant/me')
+            || $request->is('tenant/subscription')
+            || $request->is('tenant/subscription/*')
+            || $request->is('tenant/settings/password')
+            || $request->is('tenant/settings/account')
+            || $request->is('tenant/logout');
     }
 }

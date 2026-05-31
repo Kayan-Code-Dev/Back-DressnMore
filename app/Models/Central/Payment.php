@@ -11,6 +11,9 @@ class Payment extends Model
 
     protected $fillable = [
         'tenant_id',
+        'plan_id',
+        'payment_gateway_id',
+        'purpose',
         'amount',
         'method',
         'reference',
@@ -30,5 +33,15 @@ class Payment extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    public function paymentGateway(): BelongsTo
+    {
+        return $this->belongsTo(PaymentGateway::class);
     }
 }
