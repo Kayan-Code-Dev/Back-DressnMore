@@ -17,6 +17,11 @@ class CashMovementResource extends JsonResource
             'method' => $this->method,
             'direction' => $this->direction,
             'cashbox_id' => $this->cashbox_id,
+            'branch_id' => $this->whenLoaded('cashbox', fn () => $this->cashbox?->branch_id),
+            'branch_name' => $this->whenLoaded('cashbox', fn () => $this->cashbox?->branch?->name),
+            'category' => $this->resolveCategoryLabel(),
+            'party' => $this->notes ?: null,
+            'status' => $this->is_reversed ? 'cancelled' : 'completed',
             'reference_type' => $this->reference_type,
             'reference_id' => $this->reference_id,
             'reference' => $this->reference,
@@ -29,5 +34,18 @@ class CashMovementResource extends JsonResource
             'updated_at' => $this->updated_at?->toISOString(),
             'deleted_at' => $this->deleted_at?->toISOString(),
         ];
+    }
+
+    private function resolveCategoryLabel(): string
+    {
+        return match ($this->type) {
+            'invoice_payment' => 'مدفوعات عملاء',
+            'expense' => 'مصاريف',
+            'income' => 'إيرادات',
+            'supplier_payment' => 'مدفوعات موردين',
+            'manual_adjustment' => 'تسوية يدوية',
+            'security_deposit_deduction' => 'خصم تأمين',
+            default => (string) $this->type,
+        };
     }
 }

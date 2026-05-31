@@ -17,7 +17,9 @@ class CashMovementService
 {
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $query = CashMovement::query()->latest('id');
+        $query = CashMovement::query()
+            ->with(['cashbox.branch'])
+            ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
@@ -33,6 +35,11 @@ class CashMovementService
         $this->applyExactFilter($query, 'direction', $filters['direction'] ?? null);
         $this->applyExactFilter($query, 'method', $filters['method'] ?? null);
         $this->applyExactFilter($query, 'cashbox_id', $filters['cashbox_id'] ?? null);
+
+        if (($filters['branch_id'] ?? null) !== null && trim((string) $filters['branch_id']) !== '') {
+            $branchId = (int) $filters['branch_id'];
+            $query->whereHas('cashbox', fn (Builder $builder) => $builder->where('branch_id', $branchId));
+        }
 
         $dateFrom = trim((string) ($filters['date_from'] ?? ''));
         if ($dateFrom !== '') {

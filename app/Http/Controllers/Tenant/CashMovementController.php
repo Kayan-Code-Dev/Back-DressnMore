@@ -23,6 +23,7 @@ class CashMovementController extends Controller
             'direction' => $request->query('direction'),
             'method' => $request->query('method'),
             'cashbox_id' => $request->query('cashbox_id'),
+            'branch_id' => $request->query('branch_id'),
             'is_reversed' => $request->query('is_reversed'),
             'date_from' => $request->query('date_from'),
             'date_to' => $request->query('date_to'),
