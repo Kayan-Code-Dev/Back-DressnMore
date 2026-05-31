@@ -20,7 +20,11 @@ class JournalEntryService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         return $this->filteredQuery($filters)
-            ->with(['branch:id,name', 'creator:id,name'])
+            ->with([
+                'branch:id,name',
+                'creator:id,name',
+                'lines' => fn ($query) => $query->orderBy('id'),
+            ])
             ->orderByDesc('entry_date')
             ->orderByDesc('id')
             ->paginate($perPage);
@@ -263,6 +267,16 @@ class JournalEntryService
      */
     public function createFromSource(array $header, array $lines, ?int $actorId): JournalEntry
     {
+        $sourceType = (string) ($header['source_type'] ?? JournalEntry::SOURCE_SYSTEM);
+        $sourceId = isset($header['source_id']) ? (int) $header['source_id'] : null;
+
+        if ($sourceId !== null) {
+            $existing = $this->findBySource($sourceType, $sourceId);
+            if ($existing instanceof JournalEntry) {
+                return $this->findOrFail($existing->id);
+            }
+        }
+
         $this->assertLineRules($lines, true);
         $totals = $this->computeTotals($lines);
 
@@ -294,6 +308,29 @@ class JournalEntryService
 
             return $this->findOrFail($entry->id);
         });
+    }
+
+    public function findBySource(string $sourceType, int $sourceId): ?JournalEntry
+    {
+        return JournalEntry::query()
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->where('status', '!=', JournalEntry::STATUS_CANCELLED)
+            ->first();
+    }
+
+    public function cancelBySource(string $sourceType, int $sourceId, ?int $actorId): ?JournalEntry
+    {
+        $entry = $this->findBySource($sourceType, $sourceId);
+        if (! $entry instanceof JournalEntry) {
+            return null;
+        }
+
+        if ($entry->isCancelled()) {
+            return $entry;
+        }
+
+        return $this->cancel($entry, 'Cancelled because source document was reversed or cancelled.', $actorId);
     }
 
     /**

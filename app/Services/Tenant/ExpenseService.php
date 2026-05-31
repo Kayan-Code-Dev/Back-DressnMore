@@ -3,6 +3,7 @@
 namespace App\Services\Tenant;
 
 use App\Models\Tenant\Expense;
+use App\Models\Tenant\JournalEntry;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -11,7 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class ExpenseService
 {
-    public function __construct(private readonly CashMovementService $cashMovementService) {}
+    public function __construct(
+        private readonly CashMovementService $cashMovementService,
+        private readonly JournalEntryPostingService $journalEntryPostingService,
+    ) {}
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
@@ -78,6 +82,10 @@ class ExpenseService
             return $expense;
         });
 
+        if ($expense->status === Expense::STATUS_PAID) {
+            $this->journalEntryPostingService->postFromExpense($expense, $actorId);
+        }
+
         return $expense->load(['category', 'branch', 'cashbox']);
     }
 
@@ -139,6 +147,12 @@ class ExpenseService
 
             return $expense->refresh();
         });
+
+        if ($updatedExpense->status === Expense::STATUS_PAID) {
+            $this->journalEntryPostingService->postFromExpense($updatedExpense, $actorId);
+        } elseif ($updatedExpense->status === Expense::STATUS_CANCELLED) {
+            $this->journalEntryPostingService->cancelBySource(JournalEntry::SOURCE_EXPENSE, (int) $updatedExpense->id, $actorId);
+        }
 
         return $updatedExpense->load(['category', 'branch', 'cashbox']);
     }
@@ -217,6 +231,7 @@ class ExpenseService
         $expense->save();
 
         $this->cashMovementService->syncExpenseMovement($expense, $actorId);
+        $this->journalEntryPostingService->postFromExpense($expense->refresh(), $actorId);
 
         return $expense->refresh()->load(['category', 'branch', 'cashbox']);
     }

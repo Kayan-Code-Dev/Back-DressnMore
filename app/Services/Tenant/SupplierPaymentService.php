@@ -15,7 +15,8 @@ class SupplierPaymentService
     public function __construct(
         private readonly PurchaseOrderService $purchaseOrderService,
         private readonly SupplierService $supplierService,
-        private readonly CashMovementService $cashMovementService
+        private readonly CashMovementService $cashMovementService,
+        private readonly JournalEntryPostingService $journalEntryPostingService,
     ) {}
 
     public function addPayment(Supplier $supplier, array $data, ?int $actorId = null): SupplierPayment
@@ -52,6 +53,8 @@ class SupplierPaymentService
 
             return $payment;
         });
+
+        $this->journalEntryPostingService->postFromSupplierPayment($payment, $actorId);
 
         return $payment->load('purchaseOrder');
     }

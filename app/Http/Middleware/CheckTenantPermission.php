@@ -10,6 +10,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckTenantPermission
 {
+    /**
+     * @var array<string, list<string>>
+     */
+    private const LEGACY_ALIASES = [
+        'accounting.journal_entries.view' => ['accounting.view'],
+        'accounting.journal_entries.export' => ['accounting.view'],
+    ];
+
     public function handle(Request $request, Closure $next, string $permissionKey): Response
     {
         $user = $request->user();
@@ -18,16 +26,25 @@ class CheckTenantPermission
             return ApiResponse::unauthorized();
         }
 
-        $hasPermission = $user->roles()
+        if ($this->userHasPermission($user, $permissionKey)) {
+            return $next($request);
+        }
+
+        foreach (self::LEGACY_ALIASES[$permissionKey] ?? [] as $alias) {
+            if ($this->userHasPermission($user, $alias)) {
+                return $next($request);
+            }
+        }
+
+        return ApiResponse::forbidden();
+    }
+
+    private function userHasPermission(User $user, string $permissionKey): bool
+    {
+        return $user->roles()
             ->whereHas('permissions', function ($query) use ($permissionKey): void {
                 $query->where('key', $permissionKey);
             })
             ->exists();
-
-        if (! $hasPermission) {
-            return ApiResponse::forbidden();
-        }
-
-        return $next($request);
     }
 }

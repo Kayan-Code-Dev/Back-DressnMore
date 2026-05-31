@@ -15,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 class CashMovementService
 {
+    public function __construct(private readonly JournalEntryPostingService $journalEntryPostingService) {}
+
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = CashMovement::query()
@@ -264,6 +266,11 @@ class CashMovementService
             $movement->balance_after = $this->syncCashboxBalance((int) $movement->cashbox_id);
             $movement->save();
         }
+
+        $this->journalEntryPostingService->postFromCashMovement(
+            $movement->refresh(),
+            $payload['created_by'] ?? null,
+        );
 
         return $movement;
     }

@@ -7,6 +7,7 @@ use App\Enums\PaymentType;
 use App\Models\Tenant\CashMovement;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoicePayment;
+use App\Models\Tenant\JournalEntry;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -17,7 +18,8 @@ class InvoicePaymentService
 {
     public function __construct(
         private readonly InvoiceService $invoiceService,
-        private readonly CashMovementService $cashMovementService
+        private readonly CashMovementService $cashMovementService,
+        private readonly JournalEntryPostingService $journalEntryPostingService,
     ) {}
 
     public function addPayment(Invoice $invoice, array $data, ?int $actorId = null): Invoice
@@ -46,6 +48,11 @@ class InvoicePaymentService
 
             return $this->invoiceService->refreshFinancials($invoice->refresh());
         });
+
+        $payment = $updatedInvoice->payments()->latest('id')->first();
+        if ($payment instanceof InvoicePayment) {
+            $this->journalEntryPostingService->postFromInvoicePayment($payment, $actorId);
+        }
 
         return $updatedInvoice->refresh()->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
     }
@@ -147,6 +154,8 @@ class InvoicePaymentService
             return $payment->refresh();
         });
 
+        $this->journalEntryPostingService->postFromInvoicePayment($updatedPayment, $actorId);
+
         return $updatedPayment->load('invoice');
     }
 
@@ -168,6 +177,8 @@ class InvoicePaymentService
                 referenceType: CashMovement::REFERENCE_INVOICE_PAYMENT,
                 referenceId: (int) $payment->id,
             );
+
+            $this->journalEntryPostingService->cancelBySource(JournalEntry::SOURCE_PAYMENT, (int) $payment->id, null);
 
             $this->invoiceService->refreshFinancials($payment->invoice()->firstOrFail()->refresh());
 

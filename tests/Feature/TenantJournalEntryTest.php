@@ -273,6 +273,29 @@ class TenantJournalEntryTest extends TestCase
         return $user;
     }
 
+    public function test_create_from_source_is_idempotent(): void
+    {
+        Sanctum::actingAs($this->user, ['*']);
+
+        $service = app(\App\Services\Tenant\JournalEntryService::class);
+        $header = [
+            'entry_date' => '2026-05-31',
+            'source_type' => JournalEntry::SOURCE_PAYMENT,
+            'source_id' => 999,
+            'reference_number' => 'PAY-999',
+            'description' => 'Test payment posting',
+        ];
+        $lines = [
+            ['account_id' => $this->accountIds[0], 'debit' => 100, 'credit' => 0],
+            ['account_id' => $this->accountIds[1], 'credit' => 100, 'debit' => 0],
+        ];
+
+        $first = $service->createFromSource($header, $lines, $this->user->id);
+        $second = $service->createFromSource($header, $lines, $this->user->id);
+
+        $this->assertSame($first->id, $second->id);
+    }
+
     /**
      * @return array<string,string>
      */

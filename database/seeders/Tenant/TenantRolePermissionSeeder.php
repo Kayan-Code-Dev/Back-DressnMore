@@ -119,6 +119,26 @@ class TenantRolePermissionSeeder extends Seeder
 
         $ownerRole->permissions()->sync($permissionIds);
 
+        $journalPermissionIds = Permission::query()
+            ->whereIn('key', [
+                'accounting.journal_entries.view',
+                'accounting.journal_entries.create',
+                'accounting.journal_entries.update',
+                'accounting.journal_entries.approve',
+                'accounting.journal_entries.cancel',
+                'accounting.journal_entries.reverse',
+                'accounting.journal_entries.export',
+            ])
+            ->pluck('id')
+            ->all();
+
+        Role::query()
+            ->where('slug', '!=', 'owner')
+            ->whereHas('permissions', fn ($query) => $query->where('key', 'accounting.view'))
+            ->each(function (Role $role) use ($journalPermissionIds): void {
+                $role->permissions()->syncWithoutDetaching($journalPermissionIds);
+            });
+
         $this->call(AccountSeeder::class);
     }
 }
