@@ -74,6 +74,8 @@ Route::prefix('tenant')->group(function (): void {
             ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:deliveries.enabled']);
         Route::get('/deliveries', [DeliveryWorkflowController::class, 'deliveries'])
             ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:deliveries.enabled']);
+        Route::get('/returns/stats', [DeliveryWorkflowController::class, 'invoiceReturnStats'])
+            ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:returns.enabled']);
         Route::get('/returns', [DeliveryWorkflowController::class, 'returns'])
             ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:returns.enabled']);
         Route::get('/returns/overdue', [DeliveryWorkflowController::class, 'overdue'])

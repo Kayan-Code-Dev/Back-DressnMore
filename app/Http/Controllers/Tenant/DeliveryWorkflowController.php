@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Services\Tenant\DeliveryWorkflowService;
 use App\Services\Tenant\InvoiceDeliveryListService;
+use App\Services\Tenant\InvoiceReturnListService;
 use App\Support\ApiResponse;
 use App\Support\Tenant\InvoiceDeliveryPresenter;
+use App\Support\Tenant\InvoiceReturnPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,6 +17,7 @@ class DeliveryWorkflowController extends Controller
     public function __construct(
         private readonly DeliveryWorkflowService $deliveryWorkflowService,
         private readonly InvoiceDeliveryListService $invoiceDeliveryListService,
+        private readonly InvoiceReturnListService $invoiceReturnListService,
     ) {}
 
     public function invoiceDeliveries(Request $request): JsonResponse
@@ -58,14 +61,47 @@ class DeliveryWorkflowController extends Controller
         return $this->invoiceDeliveries($request);
     }
 
-    public function returns(Request $request): JsonResponse
+    public function invoiceReturns(Request $request): JsonResponse
     {
         $perPage = max(1, min(100, $request->integer('per_page', 15)));
-        $rows = $this->deliveryWorkflowService->paginateReturns([
+        $orders = $this->invoiceReturnListService->paginate([
             'search' => $request->query('search'),
+            'return_status' => $request->query('return_status'),
+            'return_type' => $request->query('return_type'),
+            'payment_status' => $request->query('payment_status'),
+            'employee_id' => $request->query('employee_id'),
+            'branch_id' => $request->query('branch_id'),
+            'return_date_from' => $request->query('return_date_from'),
+            'return_date_to' => $request->query('return_date_to'),
         ], $perPage);
 
-        return ApiResponse::paginated($rows, $rows->items());
+        $rows = collect($orders->items())
+            ->map(fn ($invoice) => InvoiceReturnPresenter::fromInvoice($invoice))
+            ->values()
+            ->all();
+
+        return ApiResponse::paginated($orders, $rows);
+    }
+
+    public function invoiceReturnStats(Request $request): JsonResponse
+    {
+        $stats = $this->invoiceReturnListService->stats([
+            'search' => $request->query('search'),
+            'return_status' => $request->query('return_status'),
+            'return_type' => $request->query('return_type'),
+            'payment_status' => $request->query('payment_status'),
+            'employee_id' => $request->query('employee_id'),
+            'branch_id' => $request->query('branch_id'),
+            'return_date_from' => $request->query('return_date_from'),
+            'return_date_to' => $request->query('return_date_to'),
+        ]);
+
+        return ApiResponse::success($stats);
+    }
+
+    public function returns(Request $request): JsonResponse
+    {
+        return $this->invoiceReturns($request);
     }
 
     public function overdue(Request $request): JsonResponse
