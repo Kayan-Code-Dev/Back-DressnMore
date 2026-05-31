@@ -8,6 +8,7 @@ use App\Models\Central\TenantProvisioningLog;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
 use App\Services\Tenant\TenantDatabaseManager;
+use App\Services\Tenant\TenantUserDirectoryService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,7 +20,10 @@ use Throwable;
 
 class TenantProvisioningService
 {
-    public function __construct(private readonly TenantDatabaseManager $tenantDatabaseManager) {}
+    public function __construct(
+        private readonly TenantDatabaseManager $tenantDatabaseManager,
+        private readonly TenantUserDirectoryService $tenantUserDirectoryService,
+    ) {}
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
@@ -185,6 +189,8 @@ class TenantProvisioningService
         $tenant->metadata = $metadata;
         $tenant->save();
 
+        $this->tenantUserDirectoryService->register($tenant, $email);
+
         $username = trim((string) ($data['admin_username'] ?? $data['username'] ?? ''));
 
         return [
@@ -212,6 +218,7 @@ class TenantProvisioningService
         $databaseName = (string) $tenant->database_name;
 
         $tenant->domains()->delete();
+        $this->tenantUserDirectoryService->removeForTenant($tenant);
         $tenant->provisioningLogs()->delete();
         $tenant->delete();
 

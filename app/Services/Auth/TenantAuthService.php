@@ -4,22 +4,32 @@ namespace App\Services\Auth;
 
 use App\Models\Tenant\User;
 use App\Services\Tenant\TenantContext;
+use App\Services\Tenant\TenantDatabaseManager;
+use App\Services\Tenant\TenantUserDirectoryService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class TenantAuthService
 {
-    public function __construct(private readonly TenantContext $tenantContext) {}
+    public function __construct(
+        private readonly TenantContext $tenantContext,
+        private readonly TenantUserDirectoryService $tenantUserDirectoryService,
+        private readonly TenantDatabaseManager $tenantDatabaseManager,
+    ) {}
 
     public function login(string $email, string $password): array
     {
-        $tenant = $this->tenantContext->tenant();
+        $tenant = $this->tenantContext->tenant()
+            ?? $this->tenantUserDirectoryService->findTenantByEmail($email);
 
         if ($tenant === null) {
             throw ValidationException::withMessages([
-                'workspace' => ['Tenant workspace is required.'],
+                'email' => ['Invalid credentials.'],
             ]);
         }
+
+        $this->tenantContext->setTenant($tenant);
+        $this->tenantDatabaseManager->connect($tenant);
 
         $user = User::query()
             ->whereRaw('LOWER(email) = ?', [strtolower($email)])
@@ -42,7 +52,7 @@ class TenantAuthService
         return [
             'token' => $user->createToken('tenant-token')->plainTextToken,
             'user' => $user,
-            'tenant' => $tenant,
+            'tenant' => $tenant->loadMissing('plan'),
             'permissions' => $permissions,
             'plan' => $tenant->plan,
         ];

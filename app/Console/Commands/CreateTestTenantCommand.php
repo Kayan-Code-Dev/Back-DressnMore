@@ -8,6 +8,7 @@ use App\Models\Central\TenantProvisioningLog;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
 use App\Services\Tenant\TenantDatabaseManager;
+use App\Services\Tenant\TenantUserDirectoryService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -26,7 +27,10 @@ class CreateTestTenantCommand extends Command
 
     protected $description = 'Create a test tenant and admin user for frontend smoke testing (local/staging only)';
 
-    public function __construct(private readonly TenantDatabaseManager $tenantDatabaseManager)
+    public function __construct(
+        private readonly TenantDatabaseManager $tenantDatabaseManager,
+        private readonly TenantUserDirectoryService $tenantUserDirectoryService,
+    )
     {
         parent::__construct();
     }
@@ -187,6 +191,8 @@ class CreateTestTenantCommand extends Command
             $this->info("Admin user [{$email}] created with Owner role.");
         }
 
+        $this->tenantUserDirectoryService->register($tenant, $email);
+
         $this->log($tenant, 'test_tenant_ready', 'success', 'Test tenant provisioning completed');
 
         $this->newLine();
@@ -216,7 +222,6 @@ class CreateTestTenantCommand extends Command
         $this->newLine();
         $this->info('Login:');
         $this->line('  POST /api/tenant/login');
-        $this->line("  Header: X-Tenant: {$slug}");
         $this->line("  Body:   {\"email\":\"{$email}\",\"password\":\"<password>\"}");
         $this->newLine();
         $this->info('Verify:');

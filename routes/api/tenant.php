@@ -23,8 +23,7 @@ Route::prefix('tenant')->group(function (): void {
     Route::get('/health', [HealthController::class, 'index'])
         ->middleware(['identify.tenant', 'check.tenant.subscription', 'set.tenant.database']);
 
-    Route::post('/login', [AuthController::class, 'login'])
-        ->middleware(['identify.tenant', 'check.tenant.subscription', 'set.tenant.database']);
+    Route::post('/login', [AuthController::class, 'login']);
 
     Route::middleware([
         'identify.tenant',
