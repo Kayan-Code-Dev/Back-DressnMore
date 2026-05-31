@@ -20,8 +20,11 @@ use App\Http\Controllers\Tenant\PaymentController;
 use App\Http\Controllers\Tenant\PurchaseOrderController;
 use App\Http\Controllers\Tenant\RentalOrderController;
 use App\Http\Controllers\Tenant\ReportController;
+use App\Http\Controllers\Tenant\SalesController;
+use App\Http\Controllers\Tenant\SettingsController;
 use App\Http\Controllers\Tenant\SupplierController;
 use App\Http\Controllers\Tenant\SupplierPaymentController;
+use App\Http\Controllers\Tenant\TailoringOrderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('tenant')->group(function (): void {
@@ -58,6 +61,32 @@ Route::prefix('tenant')->group(function (): void {
 
         Route::get('/supplier-payments', [SupplierPaymentController::class, 'index'])
             ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);
+
+        Route::prefix('/tailoring')->middleware('plan.feature:invoices.enabled')->group(function (): void {
+            Route::get('/orders/stats', [TailoringOrderController::class, 'stats']);
+            Route::get('/orders', [TailoringOrderController::class, 'index']);
+            Route::get('/orders/{invoice}', [TailoringOrderController::class, 'show'])
+                ->whereNumber('invoice');
+            Route::put('/orders/{invoice}/measurements', [TailoringOrderController::class, 'updateMeasurements'])
+                ->whereNumber('invoice');
+            Route::get('/deliveries', [TailoringOrderController::class, 'deliveries']);
+        });
+
+        Route::prefix('/sales')->middleware('plan.feature:invoices.enabled')->group(function (): void {
+            Route::get('/reports/summary', [SalesController::class, 'reportSummary']);
+            Route::get('/reports/daily', [SalesController::class, 'reportDaily']);
+            Route::get('/reports/products', [SalesController::class, 'reportProducts']);
+            Route::get('/reports/by-employee', [SalesController::class, 'reportByEmployee']);
+            Route::get('/invoices', [SalesController::class, 'indexInvoices']);
+            Route::post('/invoices', [SalesController::class, 'storeInvoice']);
+        });
+
+        Route::prefix('/settings')->group(function (): void {
+            Route::get('/profile', [SettingsController::class, 'profile'])
+                ->middleware('tenant.permission:settings.profile');
+            Route::put('/profile', [SettingsController::class, 'updateProfile'])
+                ->middleware('tenant.permission:settings.profile');
+        });
 
         Route::prefix('/dashboard')->middleware('plan.feature:dashboard.enabled')->group(function (): void {
             Route::get('/overview', [DashboardController::class, 'overview'])
@@ -123,6 +152,9 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:suppliers.view');
             Route::post('/', [SupplierController::class, 'store'])
                 ->middleware('tenant.permission:suppliers.create');
+            Route::get('/{supplier}/account', [SupplierController::class, 'account'])
+                ->whereNumber('supplier')
+                ->middleware('tenant.permission:suppliers.view');
             Route::get('/{supplier}', [SupplierController::class, 'show'])
                 ->whereNumber('supplier')
                 ->middleware('tenant.permission:suppliers.view');
@@ -295,6 +327,9 @@ Route::prefix('tenant')->group(function (): void {
             Route::put('/{dress}', [DressController::class, 'update'])
                 ->whereNumber('dress')
                 ->middleware('tenant.permission:dresses.update');
+            Route::post('/{dress}/transfer', [DressController::class, 'transfer'])
+                ->whereNumber('dress')
+                ->middleware(['tenant.permission:dresses.update', 'plan.feature:inventory.enabled']);
             Route::delete('/{dress}', [DressController::class, 'destroy'])
                 ->whereNumber('dress')
                 ->middleware('tenant.permission:dresses.delete');

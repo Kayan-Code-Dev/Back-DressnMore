@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Supplier\StoreSupplierRequest;
 use App\Http\Requests\Tenant\Supplier\UpdateSupplierRequest;
 use App\Http\Resources\Tenant\SupplierResource;
+use App\Services\Tenant\SupplierAccountService;
 use App\Services\Tenant\SupplierService;
 use App\Support\ApiResponse;
 use App\Support\CsvExporter;
@@ -15,7 +16,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupplierController extends Controller
 {
-    public function __construct(private readonly SupplierService $supplierService) {}
+    public function __construct(
+        private readonly SupplierService $supplierService,
+        private readonly SupplierAccountService $supplierAccountService,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -40,6 +44,13 @@ class SupplierController extends Controller
         $supplierModel = $this->supplierService->findOrFail($supplier);
 
         return ApiResponse::success(new SupplierResource($supplierModel));
+    }
+
+    public function account(int $supplier): JsonResponse
+    {
+        $supplierModel = $this->supplierAccountService->findSupplierOrFail($supplier);
+
+        return ApiResponse::success($this->supplierAccountService->summary($supplierModel));
     }
 
     public function update(UpdateSupplierRequest $request, int $supplier): JsonResponse

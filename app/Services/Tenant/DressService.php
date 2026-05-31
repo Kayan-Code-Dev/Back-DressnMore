@@ -137,6 +137,34 @@ class DressService
         $dress->delete();
     }
 
+    public function transferToBranch(Dress $dress, int $toBranchId, ?string $notes = null, ?int $actorId = null): Dress
+    {
+        $fromBranchId = $dress->branch_id;
+
+        /** @var Dress $updated */
+        $updated = DB::connection('tenant')->transaction(function () use ($dress, $toBranchId, $fromBranchId, $notes, $actorId): Dress {
+            $dress->branch_id = $toBranchId;
+            $dress->save();
+
+            $this->inventoryService->recordMovement(
+                $dress,
+                InventoryMovement::TYPE_BRANCH_TRANSFER,
+                1,
+                'Branch transfer',
+                null,
+                null,
+                $notes,
+                $actorId,
+                $fromBranchId,
+                $toBranchId,
+            );
+
+            return $dress;
+        });
+
+        return $this->syncDisplayName($updated);
+    }
+
     public function orderHistory(Dress $dress, int $perPage = 15): LengthAwarePaginator
     {
         return InvoiceItem::query()

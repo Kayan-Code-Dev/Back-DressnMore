@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Dress\StoreDressRequest;
+use App\Http\Requests\Tenant\Dress\TransferDressRequest;
 use App\Http\Requests\Tenant\Dress\UpdateDressRequest;
 use App\Http\Resources\Tenant\DressOrderHistoryResource;
 use App\Http\Resources\Tenant\DressResource;
@@ -87,6 +88,19 @@ class DressController extends Controller
         $this->dressService->delete($dressModel);
 
         return ApiResponse::success(null, 'Dress deleted');
+    }
+
+    public function transfer(TransferDressRequest $request, int $dress): JsonResponse
+    {
+        $dressModel = $this->dressService->findOrFail($dress);
+        $dressModel = $this->dressService->transferToBranch(
+            dress: $dressModel,
+            toBranchId: $request->integer('to_branch_id'),
+            notes: $request->string('notes')->toString() ?: null,
+            actorId: $request->user()?->id,
+        );
+
+        return ApiResponse::success(new DressResource($dressModel), 'Dress transferred');
     }
 
     public function inventoryMovements(Request $request, int $dress): JsonResponse
