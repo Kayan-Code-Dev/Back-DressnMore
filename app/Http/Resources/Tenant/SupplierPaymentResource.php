@@ -14,6 +14,7 @@ class SupplierPaymentResource extends JsonResource
             'supplier_id' => $this->supplier_id,
             'purchase_order_id' => $this->purchase_order_id,
             'purchase_order_number' => $this->purchaseOrder?->purchase_order_number,
+            'supplier' => $this->whenLoaded('supplier', fn () => $this->supplier?->name),
             'amount' => $this->amount,
             'method' => $this->method,
             'reference' => $this->reference,

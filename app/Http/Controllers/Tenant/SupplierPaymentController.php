@@ -20,6 +20,16 @@ class SupplierPaymentController extends Controller
         private readonly PurchaseOrderService $purchaseOrderService
     ) {}
 
+    public function index(Request $request): JsonResponse
+    {
+        $perPage = max(1, min(100, $request->integer('per_page', 15)));
+        $payments = $this->supplierPaymentService->paginateAll([
+            'search' => $request->query('search'),
+        ], $perPage);
+
+        return ApiResponse::paginated($payments, SupplierPaymentResource::collection($payments->items())->resolve());
+    }
+
     public function indexForSupplier(Request $request, int $supplier): JsonResponse
     {
         $supplierModel = $this->supplierService->findOrFail($supplier);

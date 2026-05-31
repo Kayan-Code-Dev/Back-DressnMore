@@ -73,4 +73,24 @@ class SupplierPaymentService
             ->paginate($perPage)
             ->withQueryString();
     }
+
+    public function paginateAll(array $filters, int $perPage = 15): LengthAwarePaginator
+    {
+        $query = SupplierPayment::query()
+            ->with(['supplier', 'purchaseOrder'])
+            ->latest('id');
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $needle = '%'.mb_strtolower($search).'%';
+            $query->where(function ($builder) use ($needle): void {
+                $builder
+                    ->whereRaw('LOWER(reference) LIKE ?', [$needle])
+                    ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->whereRaw('LOWER(name) LIKE ?', [$needle]))
+                    ->orWhereHas('purchaseOrder', fn ($poQuery) => $poQuery->whereRaw('LOWER(purchase_order_number) LIKE ?', [$needle]));
+            });
+        }
+
+        return $query->paginate($perPage)->withQueryString();
+    }
 }

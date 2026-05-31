@@ -7,6 +7,7 @@ use App\Http\Controllers\Tenant\CashboxController;
 use App\Http\Controllers\Tenant\CashMovementController;
 use App\Http\Controllers\Tenant\CustomerController;
 use App\Http\Controllers\Tenant\DashboardController;
+use App\Http\Controllers\Tenant\DeliveryWorkflowController;
 use App\Http\Controllers\Tenant\DressCategoryController;
 use App\Http\Controllers\Tenant\DressController;
 use App\Http\Controllers\Tenant\ExpenseCategoryController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Tenant\InvoiceDeliveryController;
 use App\Http\Controllers\Tenant\LookupController;
 use App\Http\Controllers\Tenant\PaymentController;
 use App\Http\Controllers\Tenant\PurchaseOrderController;
+use App\Http\Controllers\Tenant\RentalOrderController;
 use App\Http\Controllers\Tenant\ReportController;
 use App\Http\Controllers\Tenant\SupplierController;
 use App\Http\Controllers\Tenant\SupplierPaymentController;
@@ -37,6 +39,25 @@ Route::prefix('tenant')->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::get('/lookups', [LookupController::class, 'index']);
+
+        Route::prefix('/orders')->middleware('plan.feature:invoices.enabled')->group(function (): void {
+            Route::get('/rental/stats', [RentalOrderController::class, 'stats']);
+            Route::get('/rental', [RentalOrderController::class, 'index']);
+            Route::get('/rental/{invoice}', [RentalOrderController::class, 'show'])
+                ->whereNumber('invoice');
+            Route::get('/delivery-search', [DeliveryWorkflowController::class, 'search'])
+                ->middleware('plan.feature:deliveries.enabled');
+        });
+
+        Route::get('/deliveries', [DeliveryWorkflowController::class, 'deliveries'])
+            ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:deliveries.enabled']);
+        Route::get('/returns', [DeliveryWorkflowController::class, 'returns'])
+            ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:returns.enabled']);
+        Route::get('/returns/overdue', [DeliveryWorkflowController::class, 'overdue'])
+            ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:returns.enabled']);
+
+        Route::get('/supplier-payments', [SupplierPaymentController::class, 'index'])
+            ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);
 
         Route::prefix('/dashboard')->middleware('plan.feature:dashboard.enabled')->group(function (): void {
             Route::get('/overview', [DashboardController::class, 'overview'])
