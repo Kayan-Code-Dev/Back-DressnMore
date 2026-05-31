@@ -17,6 +17,7 @@ use App\Http\Controllers\Tenant\FactoryController;
 use App\Http\Controllers\Tenant\HealthController;
 use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Tenant\InvoiceDeliveryController;
+use App\Http\Controllers\Tenant\JournalEntryController;
 use App\Http\Controllers\Tenant\LookupController;
 use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\PaymentController;
@@ -172,6 +173,34 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:accounting.view');
             Route::get('/ledger', [AccountingController::class, 'ledger'])
                 ->middleware('tenant.permission:accounting.view');
+
+            Route::prefix('/journal-entries')->group(function (): void {
+                Route::get('/export', [JournalEntryController::class, 'export'])
+                    ->middleware('tenant.permission:accounting.journal_entries.export');
+                Route::get('/summary', [JournalEntryController::class, 'summary'])
+                    ->middleware('tenant.permission:accounting.journal_entries.view');
+                Route::get('/accounts', [JournalEntryController::class, 'accounts'])
+                    ->middleware('tenant.permission:accounting.journal_entries.view');
+                Route::get('/', [JournalEntryController::class, 'index'])
+                    ->middleware('tenant.permission:accounting.journal_entries.view');
+                Route::post('/', [JournalEntryController::class, 'store'])
+                    ->middleware('tenant.permission:accounting.journal_entries.create');
+                Route::get('/{journalEntry}', [JournalEntryController::class, 'show'])
+                    ->whereNumber('journalEntry')
+                    ->middleware('tenant.permission:accounting.journal_entries.view');
+                Route::put('/{journalEntry}', [JournalEntryController::class, 'update'])
+                    ->whereNumber('journalEntry')
+                    ->middleware('tenant.permission:accounting.journal_entries.update');
+                Route::post('/{journalEntry}/approve', [JournalEntryController::class, 'approve'])
+                    ->whereNumber('journalEntry')
+                    ->middleware('tenant.permission:accounting.journal_entries.approve');
+                Route::post('/{journalEntry}/cancel', [JournalEntryController::class, 'cancel'])
+                    ->whereNumber('journalEntry')
+                    ->middleware('tenant.permission:accounting.journal_entries.cancel');
+                Route::post('/{journalEntry}/reverse', [JournalEntryController::class, 'reverse'])
+                    ->whereNumber('journalEntry')
+                    ->middleware('tenant.permission:accounting.journal_entries.reverse');
+            });
         });
 
         Route::prefix('/customers')->middleware('plan.feature:customers.enabled')->group(function (): void {

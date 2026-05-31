@@ -97,6 +97,13 @@ class TenantRolePermissionSeeder extends Seeder
             ['name' => 'Reports Sales', 'key' => 'reports.sales'],
             ['name' => 'Reports Tailoring', 'key' => 'reports.tailoring'],
             ['name' => 'Accounting View', 'key' => 'accounting.view'],
+            ['name' => 'Journal Entries View', 'key' => 'accounting.journal_entries.view'],
+            ['name' => 'Journal Entries Create', 'key' => 'accounting.journal_entries.create'],
+            ['name' => 'Journal Entries Update', 'key' => 'accounting.journal_entries.update'],
+            ['name' => 'Journal Entries Approve', 'key' => 'accounting.journal_entries.approve'],
+            ['name' => 'Journal Entries Cancel', 'key' => 'accounting.journal_entries.cancel'],
+            ['name' => 'Journal Entries Reverse', 'key' => 'accounting.journal_entries.reverse'],
+            ['name' => 'Journal Entries Export', 'key' => 'accounting.journal_entries.export'],
             ['name' => 'Settings View', 'key' => 'settings.view'],
             ['name' => 'Settings Profile', 'key' => 'settings.profile'],
         ];
@@ -111,5 +118,7 @@ class TenantRolePermissionSeeder extends Seeder
         }
 
         $ownerRole->permissions()->sync($permissionIds);
+
+        $this->call(AccountSeeder::class);
     }
 }
