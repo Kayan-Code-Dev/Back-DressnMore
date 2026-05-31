@@ -107,6 +107,6 @@ class Dress extends BaseTenantModel
             $subcategoryName,
         ], fn (?string $value): bool => is_string($value) && trim($value) !== ''));
 
-        return implode(' - ', $parts);
+        return implode('-', $parts);
     }
 }

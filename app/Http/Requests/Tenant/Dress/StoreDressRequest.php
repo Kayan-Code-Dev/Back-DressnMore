@@ -3,8 +3,11 @@
 namespace App\Http\Requests\Tenant\Dress;
 
 use App\Models\Tenant\Dress;
+use App\Models\Tenant\DressCategory;
+use App\Support\WesternDigits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreDressRequest extends FormRequest
 {
@@ -13,32 +16,51 @@ class StoreDressRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('code')) {
+            $this->merge([
+                'code' => WesternDigits::normalize($this->input('code')),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         return [
-            'dress_category_id' => ['nullable', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
-            'dress_subcategory_id' => ['nullable', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
-            'branch_id' => ['nullable', 'integer', Rule::exists('tenant.branches', 'id')->whereNull('deleted_at')],
-            'entity_type' => ['nullable', 'string', 'max:100'],
-            'entity_id' => ['nullable', 'integer'],
+            'dress_category_id' => ['required', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
+            'dress_subcategory_id' => ['required', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
             'code' => ['required', 'string', 'max:100', Rule::unique('tenant.dresses', 'code')->whereNull('deleted_at')],
-            'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'size' => ['nullable', 'string', 'max:100'],
-            'breast_size' => ['nullable', 'string', 'max:100'],
-            'waist_size' => ['nullable', 'string', 'max:100'],
-            'sleeve_size' => ['nullable', 'string', 'max:100'],
-            'measurements' => ['nullable', 'array'],
-            'color' => ['nullable', 'string', 'max:100'],
-            'purchase_price' => ['nullable', 'numeric', 'min:0'],
-            'rental_price' => ['nullable', 'numeric', 'min:0'],
-            'sale_price' => ['nullable', 'numeric', 'min:0'],
-            'delivery_date' => ['nullable', 'date'],
-            'days_of_rent' => ['nullable', 'integer', 'min:1'],
-            'occasion_datetime' => ['nullable', 'date'],
-            'visit_datetime' => ['nullable', 'date'],
             'status' => ['nullable', 'string', Rule::in(Dress::statuses())],
-            'notes' => ['nullable', 'string'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $categoryId = (int) $this->input('dress_category_id');
+            $subcategoryId = (int) $this->input('dress_subcategory_id');
+
+            if ($categoryId <= 0 || $subcategoryId <= 0) {
+                return;
+            }
+
+            $category = DressCategory::query()->find($categoryId);
+            if ($category !== null && $category->parent_id !== null) {
+                $validator->errors()->add('dress_category_id', 'The selected category must be a parent category.');
+            }
+
+            $subcategory = DressCategory::query()->find($subcategoryId);
+            if ($subcategory === null) {
+                return;
+            }
+
+            if ($subcategory->parent_id === null) {
+                $validator->errors()->add('dress_subcategory_id', 'The selected subcategory must belong to a parent category.');
+            } elseif ((int) $subcategory->parent_id !== $categoryId) {
+                $validator->errors()->add('dress_subcategory_id', 'The selected subcategory does not belong to the selected category.');
+            }
+        });
     }
 }

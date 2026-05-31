@@ -279,7 +279,7 @@ class TenantInvoiceTest extends TestCase
         $show = $this->getJson("/api/tenant/invoices/{$invoiceId}", $this->tenantHeaders());
 
         $show->assertOk()
-            ->assertJsonPath('data.items.0.dress_display_name', 'DR-ITEM-01 - Bridal - Princess');
+            ->assertJsonPath('data.items.0.dress_display_name', 'DR-ITEM-01-Bridal-Princess');
     }
 
     public function test_invoice_item_returns_dress_code_category_subcategory(): void

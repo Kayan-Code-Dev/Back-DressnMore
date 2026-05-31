@@ -3,6 +3,7 @@
 namespace App\Services\Tenant;
 
 use App\Models\Tenant\Dress;
+use App\Models\Tenant\DressCategory;
 use App\Models\Tenant\InventoryMovement;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoiceItem;
@@ -80,6 +81,8 @@ class DressService
 
     public function create(array $data, ?int $actorId = null): Dress
     {
+        $data = $this->prepareDressInput($data);
+
         /** @var Dress $dress */
         $dress = DB::connection('tenant')->transaction(function () use ($data, $actorId): Dress {
             $dress = Dress::query()->create($data);
@@ -95,7 +98,7 @@ class DressService
             return $dress;
         });
 
-        return $dress->load(['category', 'subcategory', 'branch']);
+        return $this->syncDisplayName($dress);
     }
 
     public function findOrFail(int $dressId): Dress
@@ -110,7 +113,7 @@ class DressService
 
         /** @var Dress $updatedDress */
         $updatedDress = DB::connection('tenant')->transaction(function () use ($dress, $data, $actorId, $originalStatus, $newStatus): Dress {
-            $dress->fill($data);
+            $dress->fill($this->prepareDressInput($data));
             $dress->save();
 
             if ($newStatus !== $originalStatus) {
@@ -126,7 +129,7 @@ class DressService
             return $dress;
         });
 
-        return $updatedDress->refresh()->load(['category', 'subcategory', 'branch']);
+        return $this->syncDisplayName($updatedDress);
     }
 
     public function delete(Dress $dress): void
@@ -280,5 +283,54 @@ class DressService
         }
 
         $query->where($column, $normalized);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function prepareDressInput(array $data): array
+    {
+        $filtered = array_intersect_key($data, array_flip([
+            'code',
+            'dress_category_id',
+            'dress_subcategory_id',
+            'description',
+            'status',
+        ]));
+
+        $filtered['name'] = $this->buildDisplayName($filtered);
+
+        return $filtered;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function buildDisplayName(array $data): string
+    {
+        $code = trim((string) ($data['code'] ?? ''));
+        $category = isset($data['dress_category_id'])
+            ? DressCategory::query()->find((int) $data['dress_category_id'])
+            : null;
+        $subcategory = isset($data['dress_subcategory_id'])
+            ? DressCategory::query()->find((int) $data['dress_subcategory_id'])
+            : null;
+
+        $parts = array_values(array_filter([
+            $code,
+            $category?->name,
+            $subcategory?->name,
+        ], fn (?string $value): bool => is_string($value) && trim($value) !== ''));
+
+        return implode('-', $parts);
+    }
+
+    private function syncDisplayName(Dress $dress): Dress
+    {
+        $dress->load(['category', 'subcategory', 'branch']);
+        $dress->name = $dress->displayName();
+        $dress->save();
+
+        return $dress->refresh()->load(['category', 'subcategory', 'branch']);
     }
 }

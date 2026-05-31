@@ -47,7 +47,7 @@ class DressCategoryService
 
     public function create(array $data): DressCategory
     {
-        $category = DressCategory::query()->create($data);
+        $category = DressCategory::query()->create($this->filterCategoryInput($data));
 
         return $category->load(['parent', 'children']);
     }
@@ -61,10 +61,18 @@ class DressCategoryService
 
     public function update(DressCategory $category, array $data): DressCategory
     {
-        $category->fill($data);
+        $category->fill($this->filterCategoryInput($data));
         $category->save();
 
         return $category->refresh()->load(['parent', 'children']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function filterCategoryInput(array $data): array
+    {
+        return array_intersect_key($data, array_flip(['name', 'parent_id']));
     }
 
     public function delete(DressCategory $category): void

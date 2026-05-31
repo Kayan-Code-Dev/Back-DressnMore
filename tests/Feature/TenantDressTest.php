@@ -78,41 +78,40 @@ class TenantDressTest extends TestCase
     public function test_tenant_user_can_create_dress(): void
     {
         $category = DressCategory::query()->create(['name' => 'Evening', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create(['name' => 'Princess', 'parent_id' => $category->id, 'status' => 'active']);
 
         Sanctum::actingAs($this->ownerUser, ['*']);
 
         $response = $this->postJson('/api/tenant/dresses', [
             'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
             'code' => 'DR-CREATE-01',
-            'name' => 'Create Dress',
             'description' => 'Dress description',
-            'size' => 'L',
-            'color' => 'Blue',
-            'purchase_price' => 100.50,
-            'rental_price' => 40.25,
-            'sale_price' => 180.75,
             'status' => 'available',
-            'notes' => 'created from test',
         ], $this->tenantHeaders());
 
         $response->assertCreated()
             ->assertJsonPath('message', 'Dress created')
             ->assertJsonPath('data.code', 'DR-CREATE-01')
-            ->assertJsonPath('data.display_name', 'DR-CREATE-01 - Evening');
+            ->assertJsonPath('data.display_name', 'DR-CREATE-01-Evening-Princess');
 
         $this->assertDatabaseHas('dresses', [
             'code' => 'DR-CREATE-01',
-            'name' => 'Create Dress',
+            'name' => 'DR-CREATE-01-Evening-Princess',
         ], 'tenant');
     }
 
     public function test_creating_dress_creates_inventory_movement(): void
     {
+        $category = DressCategory::query()->create(['name' => 'Evening', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create(['name' => 'Classic', 'parent_id' => $category->id, 'status' => 'active']);
+
         Sanctum::actingAs($this->ownerUser, ['*']);
 
         $response = $this->postJson('/api/tenant/dresses', [
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
             'code' => 'DR-MOVE-01',
-            'name' => 'Movement Dress',
             'status' => 'available',
         ], $this->tenantHeaders());
 
@@ -127,52 +126,58 @@ class TenantDressTest extends TestCase
 
     public function test_tenant_user_can_update_dress(): void
     {
+        $category = DressCategory::query()->create(['name' => 'Evening', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create(['name' => 'Classic', 'parent_id' => $category->id, 'status' => 'active']);
+
         $dress = Dress::query()->create([
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
             'code' => 'DR-UPDATE-01',
-            'name' => 'Old Dress Name',
+            'name' => 'DR-UPDATE-01-Evening-Classic',
             'status' => 'available',
         ]);
 
         Sanctum::actingAs($this->ownerUser, ['*']);
 
         $response = $this->putJson("/api/tenant/dresses/{$dress->id}", [
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
             'code' => 'DR-UPDATE-01',
-            'name' => 'New Dress Name',
             'description' => 'Updated description',
-            'size' => 'XL',
-            'color' => 'Green',
-            'purchase_price' => 120,
-            'rental_price' => 55,
-            'sale_price' => 210,
             'status' => 'available',
-            'notes' => 'updated note',
         ], $this->tenantHeaders());
 
         $response->assertOk()
             ->assertJsonPath('message', 'Dress updated')
-            ->assertJsonPath('data.name', 'New Dress Name')
-            ->assertJsonPath('data.color', 'Green');
+            ->assertJsonPath('data.name', 'DR-UPDATE-01-Evening-Classic')
+            ->assertJsonPath('data.description', 'Updated description');
 
         $this->assertDatabaseHas('dresses', [
             'id' => $dress->id,
-            'name' => 'New Dress Name',
-            'color' => 'Green',
+            'name' => 'DR-UPDATE-01-Evening-Classic',
+            'description' => 'Updated description',
         ], 'tenant');
     }
 
     public function test_changing_status_creates_inventory_movement(): void
     {
+        $category = DressCategory::query()->create(['name' => 'Evening', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create(['name' => 'Classic', 'parent_id' => $category->id, 'status' => 'active']);
+
         $dress = Dress::query()->create([
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
             'code' => 'DR-STATUS-01',
-            'name' => 'Status Dress',
+            'name' => 'DR-STATUS-01-Evening-Classic',
             'status' => 'available',
         ]);
 
         Sanctum::actingAs($this->ownerUser, ['*']);
 
         $response = $this->putJson("/api/tenant/dresses/{$dress->id}", [
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
             'code' => 'DR-STATUS-01',
-            'name' => 'Status Dress',
             'status' => 'maintenance',
         ], $this->tenantHeaders());
 
@@ -265,7 +270,7 @@ class TenantDressTest extends TestCase
         ], $this->tenantHeaders());
 
         $response->assertCreated()
-            ->assertJsonPath('data.display_name', 'DR-DISPLAY-01 - Bridal - Princess');
+            ->assertJsonPath('data.display_name', 'DR-DISPLAY-01-Bridal-Princess');
     }
 
     public function test_dress_listing_returns_code_category_subcategory_separately(): void
