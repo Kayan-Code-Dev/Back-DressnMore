@@ -62,13 +62,13 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);
         Route::get('/lookups', [LookupController::class, 'index']);
 
-        Route::prefix('/orders')->middleware('plan.feature:invoices.enabled')->group(function (): void {
+        Route::prefix('/orders')->middleware(['plan.feature:invoices.enabled', 'tenant.permission:invoices.view'])->group(function (): void {
             Route::get('/rental/stats', [RentalOrderController::class, 'stats']);
             Route::get('/rental', [RentalOrderController::class, 'index']);
             Route::get('/rental/{invoice}', [RentalOrderController::class, 'show'])
                 ->whereNumber('invoice');
             Route::get('/delivery-search', [DeliveryWorkflowController::class, 'search'])
-                ->middleware('plan.feature:deliveries.enabled');
+                ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:deliveries.enabled']);
         });
 
         Route::get('/deliveries/stats', [DeliveryWorkflowController::class, 'invoiceDeliveryStats'])
@@ -85,24 +85,32 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('/supplier-payments', [SupplierPaymentController::class, 'index'])
             ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);
 
-        Route::prefix('/tailoring')->middleware('plan.feature:invoices.enabled')->group(function (): void {
+        Route::prefix('/tailoring')->middleware(['plan.feature:invoices.enabled', 'tenant.permission:invoices.view'])->group(function (): void {
             Route::get('/orders/stats', [TailoringOrderController::class, 'stats']);
             Route::get('/orders', [TailoringOrderController::class, 'index']);
             Route::get('/orders/{invoice}', [TailoringOrderController::class, 'show'])
                 ->whereNumber('invoice');
             Route::put('/orders/{invoice}/measurements', [TailoringOrderController::class, 'updateMeasurements'])
-                ->whereNumber('invoice');
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.update');
             Route::get('/deliveries', [TailoringOrderController::class, 'deliveries']);
         });
 
         Route::prefix('/sales')->middleware('plan.feature:invoices.enabled')->group(function (): void {
-            Route::get('/reports/summary', [SalesController::class, 'reportSummary']);
-            Route::get('/reports/daily', [SalesController::class, 'reportDaily']);
-            Route::get('/reports/products', [SalesController::class, 'reportProducts']);
-            Route::get('/reports/by-employee', [SalesController::class, 'reportByEmployee']);
-            Route::get('/invoices/stats', [SalesController::class, 'invoiceStats']);
-            Route::get('/invoices', [SalesController::class, 'indexInvoices']);
-            Route::post('/invoices', [SalesController::class, 'storeInvoice']);
+            Route::get('/reports/summary', [SalesController::class, 'reportSummary'])
+                ->middleware('tenant.permission:reports.sales');
+            Route::get('/reports/daily', [SalesController::class, 'reportDaily'])
+                ->middleware('tenant.permission:reports.sales');
+            Route::get('/reports/products', [SalesController::class, 'reportProducts'])
+                ->middleware('tenant.permission:reports.sales');
+            Route::get('/reports/by-employee', [SalesController::class, 'reportByEmployee'])
+                ->middleware('tenant.permission:reports.sales');
+            Route::get('/invoices/stats', [SalesController::class, 'invoiceStats'])
+                ->middleware('tenant.permission:invoices.view');
+            Route::get('/invoices', [SalesController::class, 'indexInvoices'])
+                ->middleware('tenant.permission:invoices.view');
+            Route::post('/invoices', [SalesController::class, 'storeInvoice'])
+                ->middleware('tenant.permission:invoices.create');
         });
 
         Route::prefix('/settings')->group(function (): void {
