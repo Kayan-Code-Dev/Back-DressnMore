@@ -62,7 +62,7 @@ class InvoicePaymentService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = InvoicePayment::query()
-            ->with('invoice')
+            ->with(['invoice.customer', 'invoice.branch'])
             ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -77,6 +77,7 @@ class InvoicePaymentService
 
         $this->applyExactFilter($query, 'status', $filters['status'] ?? null);
         $this->applyExactFilter($query, 'payment_type', $filters['payment_type'] ?? null);
+        $this->applyExactFilter($query, 'method', $filters['method'] ?? null);
         $this->applyExactFilter($query, 'invoice_id', $filters['invoice_id'] ?? ($filters['order_id'] ?? null));
 
         $clientId = $filters['customer_id'] ?? ($filters['client_id'] ?? null);

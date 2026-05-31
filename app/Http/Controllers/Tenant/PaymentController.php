@@ -29,6 +29,7 @@ class PaymentController extends Controller
             'order_id' => $request->query('order_id'),
             'date_from' => $request->query('date_from'),
             'date_to' => $request->query('date_to'),
+            'method' => $request->query('method'),
             'amount_min' => $request->query('amount_min'),
             'amount_max' => $request->query('amount_max'),
         ], $perPage);

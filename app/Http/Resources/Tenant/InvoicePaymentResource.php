@@ -11,10 +11,14 @@ class InvoicePaymentResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'payment_number' => 'PAY-'.str_pad((string) $this->id, 4, '0', STR_PAD_LEFT),
             'invoice_id' => $this->invoice_id,
+            'invoice_number' => $this->invoice?->invoice_number ?? '',
             'customer_id' => $this->invoice?->customer_id,
             'client_id' => $this->invoice?->customer_id,
+            'customer_name' => $this->invoice?->customer?->name ?? '',
             'branch_id' => $this->invoice?->branch_id,
+            'branch_name' => $this->invoice?->branch?->name ?? '',
             'amount' => $this->amount,
             'status' => $this->status,
             'payment_type' => $this->payment_type,
