@@ -45,7 +45,8 @@ class TenantAuthLoginTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.tenant.slug', 'atelier-alpha')
-            ->assertJsonPath('data.user.email', 'owner@atelier.test');
+            ->assertJsonPath('data.user.email', 'owner@atelier.test')
+            ->assertJsonPath('data.subscription.lifecycle_status', 'active');
 
         $this->assertNotEmpty($response->json('data.token'));
     }

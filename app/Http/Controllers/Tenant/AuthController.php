@@ -8,6 +8,7 @@ use App\Http\Resources\Tenant\UserResource;
 use App\Services\Auth\TenantAuthService;
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
+use App\Support\TenantSubscriptionPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,7 +16,8 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly TenantAuthService $tenantAuthService,
-        private readonly TenantContext $tenantContext
+        private readonly TenantContext $tenantContext,
+        private readonly TenantSubscriptionPresenter $tenantSubscriptionPresenter,
     ) {}
 
     public function login(LoginRequest $request): JsonResponse
@@ -34,7 +36,7 @@ class AuthController extends Controller
                 'slug' => $result['tenant']->slug,
             ],
             'permissions' => $result['permissions'],
-            'plan' => $result['plan'],
+            'subscription' => $this->tenantSubscriptionPresenter->forTenant($result['tenant']),
         ], 'Tenant login successful');
     }
 
@@ -48,7 +50,9 @@ class AuthController extends Controller
                 'slug' => $this->tenantContext->slug(),
             ],
             'permissions' => $this->tenantAuthService->permissionsForUser($request->user()),
-            'plan' => $this->tenantContext->tenant()?->plan,
+            'subscription' => $this->tenantSubscriptionPresenter->forTenant(
+                $this->tenantContext->tenant()
+            ),
         ]);
     }
 
