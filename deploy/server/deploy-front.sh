@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="/var/www/tenant-dressnmore-new"
-BRANCH="${1:-feat/tenant-design-migration}"
+BRANCH="${1:-feat/api-integration-phase-1}"
 LOG="/var/log/dressnmore-deploy-front.log"
 
 exec > >(tee -a "$LOG") 2>&1
@@ -12,6 +12,7 @@ cd "$APP_DIR"
 git fetch origin
 git reset --hard "origin/$BRANCH"
 
+rm -rf node_modules
 npm ci
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
 npm run build:staging
