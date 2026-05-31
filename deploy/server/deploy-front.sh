@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="/var/www/tenant-dressnmore-new"
-BRANCH="${1:-feat/api-integration-phase-1}"
+BRANCH="${1:-feat/tenant-design-stable}"
 LOG="/var/log/dressnmore-deploy-front.log"
 
 exec > >(tee -a "$LOG") 2>&1

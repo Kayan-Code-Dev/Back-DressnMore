@@ -32,5 +32,5 @@ sync_repo() {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] auto-sync tick"
   sync_repo "/var/www/back-dressnmore-new" "main" "/opt/dressnmore/deploy/deploy-back.sh"
   sync_repo "/var/www/admin-dressnmore-new" "main" "/opt/dressnmore/deploy/deploy-admin.sh"
-  sync_repo "/var/www/tenant-dressnmore-new" "feat/api-integration-phase-1" "/opt/dressnmore/deploy/deploy-front.sh"
+  sync_repo "/var/www/tenant-dressnmore-new" "feat/tenant-design-stable" "/opt/dressnmore/deploy/deploy-front.sh"
 } >> "$LOG" 2>&1
