@@ -13,6 +13,7 @@ git fetch origin
 git reset --hard "origin/$BRANCH"
 
 npm ci
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
 npm run build
 
 echo "=== Tenant front deploy finished: $(git log -1 --oneline) ==="
