@@ -11,14 +11,24 @@ class CashboxService
 {
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $query = Cashbox::query()->latest('id');
+        $query = Cashbox::query()
+            ->with('branch')
+            ->withSum(['movements as total_in' => fn (Builder $builder) => $builder
+                ->where('direction', CashMovement::DIRECTION_IN)
+                ->where('is_reversed', false)], 'amount')
+            ->withSum(['movements as total_out' => fn (Builder $builder) => $builder
+                ->where('direction', CashMovement::DIRECTION_OUT)
+                ->where('is_reversed', false)], 'amount')
+            ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
             $wildcard = '%'.mb_strtolower($search).'%';
             $query->where(function (Builder $builder) use ($wildcard): void {
                 $builder->whereRaw('LOWER(name) LIKE ?', [$wildcard])
-                    ->orWhereRaw('LOWER(description) LIKE ?', [$wildcard]);
+                    ->orWhereRaw('LOWER(description) LIKE ?', [$wildcard])
+                    ->orWhereHas('branch', fn (Builder $branchQuery) => $branchQuery
+                        ->whereRaw('LOWER(name) LIKE ?', [$wildcard]));
             });
         }
 
