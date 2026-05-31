@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Tenant\Sales;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreSaleInvoiceRequest extends FormRequest
 {
@@ -17,7 +18,7 @@ class StoreSaleInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'customer_id' => ['required', 'integer', Rule::exists('tenant.customers', 'id')->whereNull('deleted_at')],
             'branch_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string'],
             'order_notes' => ['nullable', 'string'],
