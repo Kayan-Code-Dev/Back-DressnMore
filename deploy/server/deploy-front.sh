@@ -14,6 +14,6 @@ git reset --hard "origin/$BRANCH"
 
 npm ci
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
-npm run build
+npm run build:staging
 
 echo "=== Tenant front deploy finished: $(git log -1 --oneline) ==="
