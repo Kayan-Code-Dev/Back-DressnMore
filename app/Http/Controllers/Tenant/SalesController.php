@@ -18,12 +18,28 @@ class SalesController extends Controller
         $perPage = max(1, min(100, $request->integer('per_page', 15)));
         $invoices = $this->salesService->paginateInvoices([
             'search' => $request->query('search'),
+            'payment_status' => $request->query('payment_status'),
+            'invoice_status' => $request->query('invoice_status'),
             'branch_id' => $request->query('branch_id'),
             'date_from' => $request->query('date_from'),
             'date_to' => $request->query('date_to'),
         ], $perPage);
 
         return ApiResponse::paginated($invoices, $invoices->items());
+    }
+
+    public function invoiceStats(Request $request): JsonResponse
+    {
+        $stats = $this->salesService->invoiceStats([
+            'search' => $request->query('search'),
+            'payment_status' => $request->query('payment_status'),
+            'invoice_status' => $request->query('invoice_status'),
+            'branch_id' => $request->query('branch_id'),
+            'date_from' => $request->query('date_from'),
+            'date_to' => $request->query('date_to'),
+        ]);
+
+        return ApiResponse::success($stats);
     }
 
     public function storeInvoice(StoreSaleInvoiceRequest $request): JsonResponse

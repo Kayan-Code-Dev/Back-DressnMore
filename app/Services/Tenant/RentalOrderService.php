@@ -34,6 +34,7 @@ class RentalOrderService
         $invoices = $this->baseQuery($filters)->get();
 
         $active = 0;
+        $returned = 0;
         $overdue = 0;
         $revenue = 0.0;
         $collected = 0.0;
@@ -43,6 +44,9 @@ class RentalOrderService
             $status = RentalOrderPresenter::mapStatus($invoice);
             if ($status === 'active') {
                 $active++;
+            }
+            if ($status === 'returned') {
+                $returned++;
             }
             if ($status === 'overdue') {
                 $overdue++;
@@ -56,6 +60,7 @@ class RentalOrderService
         return [
             'total' => $invoices->count(),
             'active' => $active,
+            'returned' => $returned,
             'overdue' => $overdue,
             'revenue' => round($revenue, 2),
             'collected' => round($collected, 2),
@@ -82,7 +87,9 @@ class RentalOrderService
                     ->orWhereHas('customer', function (Builder $customerQuery) use ($needle): void {
                         $customerQuery
                             ->whereRaw('LOWER(name) LIKE ?', [$needle])
-                            ->orWhereRaw('LOWER(phone) LIKE ?', [$needle]);
+                            ->orWhereRaw('LOWER(phone) LIKE ?', [$needle])
+                            ->orWhereRaw('LOWER(COALESCE(national_id, \'\')) LIKE ?', [$needle])
+                            ->orWhereRaw('LOWER(COALESCE(whatsapp, \'\')) LIKE ?', [$needle]);
                     });
             });
         }

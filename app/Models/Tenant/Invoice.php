@@ -97,6 +97,11 @@ class Invoice extends BaseTenantModel
         return $this->belongsTo(Branch::class);
     }
 
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class);

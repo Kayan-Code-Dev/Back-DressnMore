@@ -70,6 +70,8 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('plan.feature:deliveries.enabled');
         });
 
+        Route::get('/deliveries/stats', [DeliveryWorkflowController::class, 'invoiceDeliveryStats'])
+            ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:deliveries.enabled']);
         Route::get('/deliveries', [DeliveryWorkflowController::class, 'deliveries'])
             ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:deliveries.enabled']);
         Route::get('/returns', [DeliveryWorkflowController::class, 'returns'])
@@ -95,6 +97,7 @@ Route::prefix('tenant')->group(function (): void {
             Route::get('/reports/daily', [SalesController::class, 'reportDaily']);
             Route::get('/reports/products', [SalesController::class, 'reportProducts']);
             Route::get('/reports/by-employee', [SalesController::class, 'reportByEmployee']);
+            Route::get('/invoices/stats', [SalesController::class, 'invoiceStats']);
             Route::get('/invoices', [SalesController::class, 'indexInvoices']);
             Route::post('/invoices', [SalesController::class, 'storeInvoice']);
         });

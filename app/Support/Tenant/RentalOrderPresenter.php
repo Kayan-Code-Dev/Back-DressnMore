@@ -13,21 +13,42 @@ class RentalOrderPresenter
      */
     public static function fromInvoice(Invoice $invoice, bool $includeDetails = false): array
     {
-        $invoice->loadMissing(['customer', 'items.dress']);
+        $invoice->loadMissing(['customer', 'branch', 'createdBy', 'items.dress']);
+
+        $customer = $invoice->customer;
+        $status = self::mapStatus($invoice);
+        $paymentStatus = self::mapPaymentStatus($invoice);
 
         $payload = [
             'id' => $invoice->id,
-            'client_name' => $invoice->customer?->name ?? '',
-            'client_phone' => $invoice->customer?->phone ?? '',
-            'employee_name' => '',
+            'invoice_number' => $invoice->invoice_number ?? '',
+            'client_name' => $customer?->name ?? '',
+            'client_phone' => $customer?->phone ?? '',
+            'customer' => [
+                'name' => $customer?->name ?? '',
+                'national_id' => $customer?->national_id ?? '',
+                'phone' => $customer?->phone ?? '',
+                'whatsapp' => $customer?->whatsapp ?? '',
+                'address' => $customer?->address ?? '',
+            ],
+            'employee_name' => $invoice->createdBy?->name ?? '',
+            'branch_name' => $invoice->branch?->name ?? '',
+            'invoice_date' => $invoice->created_at?->toDateString() ?? '',
             'visit_date' => $invoice->visit_datetime?->toDateString() ?? '',
             'delivery_date' => $invoice->delivery_date?->toDateString() ?? '',
+            'event_date' => $invoice->occasion_datetime?->toDateString() ?? '',
             'return_date' => $invoice->rent_end_date?->toDateString() ?? '',
             'total_price' => (float) $invoice->total,
+            'tax' => (float) $invoice->tax,
             'paid' => (float) $invoice->paid_amount,
             'remaining' => (float) $invoice->remaining_amount,
-            'status' => self::mapStatus($invoice),
+            'status' => $status,
+            'payment_status' => $paymentStatus,
             'items_count' => $invoice->items->count(),
+            'items_preview' => $invoice->items->map(fn (InvoiceItem $item): array => [
+                'id' => $item->id,
+                'name' => $item->dress?->displayName() ?? ($item->description ?? ''),
+            ])->values()->all(),
             'notes' => $invoice->notes,
         ];
 
@@ -84,5 +105,21 @@ class RentalOrderPresenter
         }
 
         return 'pending';
+    }
+
+    public static function mapPaymentStatus(Invoice $invoice): string
+    {
+        $paid = (float) $invoice->paid_amount;
+        $remaining = (float) $invoice->remaining_amount;
+
+        if ($remaining <= 0 && $paid > 0) {
+            return 'paid';
+        }
+
+        if ($paid > 0) {
+            return 'partially_paid';
+        }
+
+        return 'unpaid';
     }
 }

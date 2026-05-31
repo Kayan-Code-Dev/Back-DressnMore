@@ -9,7 +9,7 @@ use App\Models\Tenant\PurchaseOrder;
 use App\Models\Tenant\Supplier;
 use App\Models\Tenant\SupplierPayment;
 use App\Support\ReportDateRange;
-use App\Support\Tenant\RentalOrderPresenter;
+use App\Support\Tenant\SaleInvoicePresenter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -23,10 +23,125 @@ class SalesService
      */
     public function paginateInvoices(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $filters['type'] = Invoice::TYPE_SELL;
+        return $this->saleInvoiceQuery($filters)
+            ->latest('id')
+            ->paginate($perPage)
+            ->through(fn (Invoice $invoice): array => SaleInvoicePresenter::fromInvoice($invoice))
+            ->withQueryString();
+    }
 
-        return $this->invoiceService->paginate($filters, $perPage)
-            ->through(fn (Invoice $invoice): array => $this->presentSaleInvoice($invoice));
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, float|int>
+     */
+    public function invoiceStats(array $filters = []): array
+    {
+        $invoices = $this->saleInvoiceQuery($filters)->get();
+
+        $completed = 0;
+        $inProgress = 0;
+        $revenue = 0.0;
+        $collected = 0.0;
+        $remaining = 0.0;
+
+        foreach ($invoices as $invoice) {
+            $status = SaleInvoicePresenter::mapInvoiceStatus($invoice);
+            if ($status === 'completed') {
+                $completed++;
+            }
+            if ($status === 'in_progress') {
+                $inProgress++;
+            }
+
+            $revenue += (float) $invoice->total;
+            $collected += (float) $invoice->paid_amount;
+            $remaining += (float) $invoice->remaining_amount;
+        }
+
+        return [
+            'total' => $invoices->count(),
+            'completed' => $completed,
+            'in_progress' => $inProgress,
+            'revenue' => round($revenue, 2),
+            'collected' => round($collected, 2),
+            'remaining' => round($remaining, 2),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Invoice>
+     */
+    private function saleInvoiceQuery(array $filters): Builder
+    {
+        $query = Invoice::query()
+            ->with(['customer', 'branch', 'createdBy', 'items.dress', 'payments'])
+            ->where('type', Invoice::TYPE_SELL);
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $needle = '%'.mb_strtolower($search).'%';
+            $query->where(function (Builder $builder) use ($needle): void {
+                $builder
+                    ->whereRaw('LOWER(invoice_number) LIKE ?', [$needle])
+                    ->orWhereHas('customer', function (Builder $customerQuery) use ($needle): void {
+                        $customerQuery
+                            ->whereRaw('LOWER(name) LIKE ?', [$needle])
+                            ->orWhereRaw('LOWER(phone) LIKE ?', [$needle])
+                            ->orWhereRaw('LOWER(COALESCE(national_id, \'\')) LIKE ?', [$needle]);
+                    });
+            });
+        }
+
+        $paymentStatus = trim((string) ($filters['payment_status'] ?? ''));
+        if ($paymentStatus !== '') {
+            $query->where(function (Builder $builder) use ($paymentStatus): void {
+                match ($paymentStatus) {
+                    'paid' => $builder
+                        ->where('remaining_amount', '<=', 0)
+                        ->where('paid_amount', '>', 0),
+                    'partially_paid' => $builder
+                        ->where('paid_amount', '>', 0)
+                        ->where('remaining_amount', '>', 0),
+                    'unpaid' => $builder->where('paid_amount', '<=', 0),
+                    default => null,
+                };
+            });
+        }
+
+        $invoiceStatus = trim((string) ($filters['invoice_status'] ?? ''));
+        if ($invoiceStatus !== '') {
+            $query->where(function (Builder $builder) use ($invoiceStatus): void {
+                match ($invoiceStatus) {
+                    'cancelled' => $builder->where('status', Invoice::STATUS_CANCELLED),
+                    'completed' => $builder->whereIn('status', [Invoice::STATUS_DELIVERED, Invoice::STATUS_RETURNED]),
+                    'pending' => $builder->where('status', Invoice::STATUS_DRAFT),
+                    'in_progress' => $builder->whereIn('status', [
+                        Invoice::STATUS_CONFIRMED,
+                        Invoice::STATUS_PARTIALLY_PAID,
+                        Invoice::STATUS_PAID,
+                    ]),
+                    default => null,
+                };
+            });
+        }
+
+        $branchId = (int) ($filters['branch_id'] ?? 0);
+        if ($branchId > 0) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        if ($dateFrom !== '') {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        if ($dateTo !== '') {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        return $query;
     }
 
     /**
