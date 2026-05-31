@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Tenant\AccountingController;
 use App\Http\Controllers\Tenant\AuthController;
 use App\Http\Controllers\Tenant\BranchController;
 use App\Http\Controllers\Tenant\CashboxController;
 use App\Http\Controllers\Tenant\CashMovementController;
 use App\Http\Controllers\Tenant\CustomerController;
+use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DressCategoryController;
 use App\Http\Controllers\Tenant\DressController;
 use App\Http\Controllers\Tenant\ExpenseCategoryController;
@@ -15,6 +17,7 @@ use App\Http\Controllers\Tenant\InvoiceDeliveryController;
 use App\Http\Controllers\Tenant\LookupController;
 use App\Http\Controllers\Tenant\PaymentController;
 use App\Http\Controllers\Tenant\PurchaseOrderController;
+use App\Http\Controllers\Tenant\ReportController;
 use App\Http\Controllers\Tenant\SupplierController;
 use App\Http\Controllers\Tenant\SupplierPaymentController;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +37,27 @@ Route::prefix('tenant')->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::get('/lookups', [LookupController::class, 'index']);
+
+        Route::prefix('/dashboard')->group(function (): void {
+            Route::get('/overview', [DashboardController::class, 'overview'])
+                ->middleware('tenant.permission:dashboard.view');
+        });
+
+        Route::prefix('/reports')->group(function (): void {
+            Route::get('/overview', [ReportController::class, 'overview'])
+                ->middleware('tenant.permission:reports.view');
+            Route::get('/sales', [ReportController::class, 'sales'])
+                ->middleware('tenant.permission:reports.sales');
+            Route::get('/tailoring', [ReportController::class, 'tailoring'])
+                ->middleware('tenant.permission:reports.tailoring');
+        });
+
+        Route::prefix('/accounting')->group(function (): void {
+            Route::get('/summary', [AccountingController::class, 'summary'])
+                ->middleware('tenant.permission:accounting.view');
+            Route::get('/ledger', [AccountingController::class, 'ledger'])
+                ->middleware('tenant.permission:accounting.view');
+        });
 
         Route::prefix('/customers')->group(function (): void {
             Route::get('/export', [CustomerController::class, 'export'])
