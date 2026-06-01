@@ -322,6 +322,7 @@ class DressService
             'code',
             'dress_category_id',
             'dress_subcategory_id',
+            'branch_id',
             'description',
             'status',
         ]));

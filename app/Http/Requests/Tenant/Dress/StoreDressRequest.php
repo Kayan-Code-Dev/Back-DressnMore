@@ -31,6 +31,7 @@ class StoreDressRequest extends FormRequest
             'dress_category_id' => ['required', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
             'dress_subcategory_id' => ['required', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
             'code' => ['required', 'string', 'max:100', Rule::unique('tenant.dresses', 'code')->whereNull('deleted_at')],
+            'branch_id' => ['nullable', 'integer', Rule::exists('tenant.branches', 'id')->whereNull('deleted_at')],
             'description' => ['nullable', 'string'],
             'status' => ['nullable', 'string', Rule::in(Dress::statuses())],
         ];

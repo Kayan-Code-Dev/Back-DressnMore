@@ -40,6 +40,7 @@ class UpdateDressRequest extends FormRequest
                     ->ignore($dressId)
                     ->whereNull('deleted_at'),
             ],
+            'branch_id' => ['nullable', 'integer', Rule::exists('tenant.branches', 'id')->whereNull('deleted_at')],
             'description' => ['nullable', 'string'],
             'status' => ['nullable', 'string', Rule::in(Dress::statuses())],
         ];
