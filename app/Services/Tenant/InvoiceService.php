@@ -334,7 +334,7 @@ class InvoiceService
 
         if ($exists) {
             throw ValidationException::withMessages([
-                'rent_period' => ['Dress is not available for the selected rent period'],
+                'rent_period' => ['الفستان غير متاح خلال فترة التأجير المحددة.'],
             ]);
         }
     }

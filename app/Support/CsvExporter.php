@@ -27,4 +27,13 @@ class CsvExporter
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
+
+    /**
+     * @param  list<string>  $headers
+     * @param  list<array<int|string,mixed>>  $rows
+     */
+    public static function stream(string $filename, array $headers, array $rows): StreamedResponse
+    {
+        return self::download($filename, $headers, $rows);
+    }
 }

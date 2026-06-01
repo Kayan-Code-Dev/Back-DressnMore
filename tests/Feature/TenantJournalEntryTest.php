@@ -309,16 +309,33 @@ class TenantJournalEntryTest extends TestCase
         Sanctum::actingAs($this->user, ['*']);
         $entryId = $this->createApprovedEntry();
 
+        $otherDatabasePath = storage_path('framework/testing/other-tenant-journal.sqlite');
+        $this->prepareSecondaryTenantDatabase($otherDatabasePath, $this->user);
+
         $otherTenant = Tenant::query()->create([
             'name' => 'Other Tenant',
             'slug' => 'other',
-            'database_name' => storage_path('framework/testing/other-tenant-journal.sqlite'),
+            'database_name' => $otherDatabasePath,
             'status' => 'active',
             'subscription_starts_at' => CarbonImmutable::now()->subDay(),
             'subscription_ends_at' => CarbonImmutable::now()->addDays(10),
         ]);
 
-        touch($otherTenant->database_name);
+        $this->getJson("/api/tenant/accounting/journal-entries/{$entryId}", [
+            'Accept' => 'application/json',
+            'X-Tenant' => $otherTenant->slug,
+        ])->assertNotFound();
+    }
+
+    private function prepareSecondaryTenantDatabase(string $databasePath, User $mirrorUser): void
+    {
+        @unlink($databasePath);
+        touch($databasePath);
+
+        Config::set('database.connections.tenant.database', $databasePath);
+        DB::purge('tenant');
+        DB::reconnect('tenant');
+
         Artisan::call('migrate:fresh', [
             '--database' => 'tenant',
             '--path' => base_path('database/migrations/tenant'),
@@ -326,9 +343,25 @@ class TenantJournalEntryTest extends TestCase
             '--force' => true,
         ]);
 
-        $this->getJson("/api/tenant/accounting/journal-entries/{$entryId}", [
-            'Accept' => 'application/json',
-            'X-Tenant' => $otherTenant->slug,
-        ])->assertNotFound();
+        Artisan::call('db:seed', [
+            '--database' => 'tenant',
+            '--class' => TenantRolePermissionSeeder::class,
+            '--force' => true,
+        ]);
+
+        $ownerRole = Role::query()->where('slug', 'owner')->first();
+        $secondaryUser = User::query()->create([
+            'name' => $mirrorUser->name,
+            'email' => $mirrorUser->email,
+            'password' => $mirrorUser->password,
+            'status' => 'active',
+        ]);
+        if ($ownerRole !== null) {
+            $secondaryUser->roles()->sync([$ownerRole->id]);
+        }
+
+        Config::set('database.connections.tenant.database', $this->tenantDatabasePath);
+        DB::purge('tenant');
+        DB::reconnect('tenant');
     }
 }

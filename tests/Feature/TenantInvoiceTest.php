@@ -394,7 +394,7 @@ class TenantInvoiceTest extends TestCase
         ], $this->tenantHeaders());
 
         $response->assertStatus(422)
-            ->assertJsonPath('errors.rent_period.0', 'Dress is not available for the selected rent period');
+            ->assertJsonPath('errors.rent_period.0', 'الفستان غير متاح خلال فترة التأجير المحددة.');
     }
 
     public function test_can_rent_same_dress_in_non_overlapping_dates(): void
