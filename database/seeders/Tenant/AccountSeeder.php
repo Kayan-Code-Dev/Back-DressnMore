@@ -7,6 +7,9 @@ use Illuminate\Database\Seeder;
 
 class AccountSeeder extends Seeder
 {
+    /** @var list<string> Phase 2 commercial accounting codes (deposit liability + fee revenue). */
+    public const PHASE2_ACCOUNT_CODES = ['2100', '4200', '4210', '4220'];
+
     public function run(): void
     {
         $accounts = [
@@ -25,6 +28,11 @@ class AccountSeeder extends Seeder
             ['code' => '5100', 'name' => 'مصروفات إيجار', 'type' => 'expense'],
             ['code' => '5200', 'name' => 'مصروفات رواتب', 'type' => 'expense'],
         ];
+
+        $codes = array_column($accounts, 'code');
+        if (count($codes) !== count(array_unique($codes))) {
+            throw new \InvalidArgumentException('Duplicate account codes defined in AccountSeeder.');
+        }
 
         foreach ($accounts as $account) {
             Account::query()->updateOrCreate(['code' => $account['code']], $account);
