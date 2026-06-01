@@ -31,6 +31,7 @@ class InvoiceResource extends JsonResource
             'return_date' => $this->return_date?->toDateString(),
             'security_deposit' => $this->security_deposit,
             'security_deposit_status' => $this->security_deposit_status,
+            'deposit_paid_amount' => $this->deposit_paid_amount,
             'tailoring_due_date' => $this->tailoring_due_date?->toDateString(),
             'visit_datetime' => $this->visit_datetime?->toISOString(),
             'occasion_datetime' => $this->occasion_datetime?->toISOString(),

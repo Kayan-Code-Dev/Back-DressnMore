@@ -19,6 +19,8 @@ class CashMovement extends BaseTenantModel
 
     public const TYPE_SECURITY_DEPOSIT_DEDUCTION = CashMovementType::SECURITY_DEPOSIT_DEDUCTION->value;
 
+    public const TYPE_SECURITY_DEPOSIT_COLLECTION = CashMovementType::SECURITY_DEPOSIT_COLLECTION->value;
+
     public const TYPE_MANUAL_ADJUSTMENT = CashMovementType::MANUAL_ADJUSTMENT->value;
 
     public const TYPE_SUPPLIER_PAYMENT = CashMovementType::SUPPLIER_PAYMENT->value;

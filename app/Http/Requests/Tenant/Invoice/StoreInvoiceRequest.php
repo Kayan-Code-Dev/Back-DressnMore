@@ -8,6 +8,7 @@ use App\Enums\VatType;
 use App\Models\Tenant\Invoice;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreInvoiceRequest extends FormRequest
 {
@@ -65,6 +66,70 @@ class StoreInvoiceRequest extends FormRequest
             'initial_payment.reference' => ['nullable', 'string', 'max:255'],
             'initial_payment.paid_at' => ['nullable', 'date'],
             'initial_payment.notes' => ['nullable', 'string'],
+
+            'security_deposit_payment' => ['nullable', 'array'],
+            'security_deposit_payment.amount' => ['required_with:security_deposit_payment', 'numeric', 'gt:0'],
+            'security_deposit_payment.method' => ['nullable', 'string', Rule::in(PaymentMethod::values())],
+            'security_deposit_payment.reference' => ['nullable', 'string', 'max:255'],
+            'security_deposit_payment.paid_at' => ['nullable', 'date'],
+            'security_deposit_payment.notes' => ['nullable', 'string'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            $type = (string) $this->input('type');
+            $total = $this->estimateInvoiceTotal();
+            $initialAmount = round((float) data_get($this->all(), 'initial_payment.amount', 0), 2);
+            $depositExpected = round((float) $this->input('security_deposit', 0), 2);
+            $depositPaymentAmount = round((float) data_get($this->all(), 'security_deposit_payment.amount', 0), 2);
+
+            if ($initialAmount > 0 && $initialAmount > $total + 0.009) {
+                $validator->errors()->add('initial_payment.amount', 'مبلغ الدفعة الأولية يتجاوز إجمالي الفاتورة');
+            }
+
+            if ($depositPaymentAmount > 0 && $type !== Invoice::TYPE_RENT) {
+                $validator->errors()->add('security_deposit_payment', 'تحصيل التأمين مسموح فقط لفواتير الإيجار');
+            }
+
+            if ($depositPaymentAmount > 0 && $depositExpected <= 0) {
+                $validator->errors()->add('security_deposit_payment', 'يجب تحديد مبلغ التأمين قبل تحصيله');
+            }
+
+            if ($depositPaymentAmount > $depositExpected + 0.009) {
+                $validator->errors()->add('security_deposit_payment.amount', 'مبلغ تحصيل التأمين يتجاوز مبلغ التأمين المتوقع');
+            }
+        });
+    }
+
+    private function estimateInvoiceTotal(): float
+    {
+        $items = $this->input('items', []);
+        if (! is_array($items)) {
+            return 0.0;
+        }
+
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $quantity = max(1, (int) ($item['quantity'] ?? 1));
+            $unitPrice = round((float) ($item['unit_price'] ?? 0), 2);
+            $lineTotal = isset($item['total'])
+                ? round((float) $item['total'], 2)
+                : round($quantity * $unitPrice, 2);
+            $subtotal += $lineTotal;
+        }
+
+        $discount = round((float) $this->input('discount', 0), 2);
+        $tax = round((float) $this->input('tax', 0), 2);
+
+        return max(0, round($subtotal - $discount + $tax, 2));
     }
 }

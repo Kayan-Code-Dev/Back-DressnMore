@@ -8,6 +8,7 @@ use App\Models\Tenant\Expense;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoicePayment;
 use App\Models\Tenant\JournalEntry;
+use App\Models\Tenant\SecurityDepositTransaction;
 use App\Models\Tenant\SupplierPayment;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -86,6 +87,7 @@ class JournalEntryPostingService
             CashMovement::REFERENCE_EXPENSE,
             CashMovement::REFERENCE_INVOICE_PAYMENT,
             CashMovement::REFERENCE_SUPPLIER_PAYMENT,
+            CashMovement::REFERENCE_SECURITY_DEPOSIT_TRANSACTION,
         ], true)) {
             return null;
         }
@@ -116,6 +118,35 @@ class JournalEntryPostingService
             'description' => $movement->description ?: 'قيد حركة خزنة',
             'branch_id' => $movement->cashbox?->branch_id,
         ], $lines, $actorId);
+    }
+
+    public function postFromSecurityDepositCollection(
+        SecurityDepositTransaction $transaction,
+        ?int $actorId = null,
+    ): ?JournalEntry {
+        if ($transaction->type !== SecurityDepositTransaction::TYPE_COLLECTED) {
+            return null;
+        }
+
+        $amount = round((float) $transaction->amount, 2);
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $transaction->loadMissing('invoice');
+        $invoice = $transaction->invoice;
+
+        return $this->safePost([
+            'entry_date' => now()->toDateString(),
+            'source_type' => JournalEntry::SOURCE_SECURITY_DEPOSIT_COLLECTION,
+            'source_id' => $transaction->id,
+            'reference_number' => $invoice?->invoice_number,
+            'description' => 'قيد استلام تأمين فاتورة '.($invoice?->invoice_number ?? ''),
+            'branch_id' => $invoice?->branch_id,
+        ], [
+            ['code' => '1000', 'debit' => $amount, 'credit' => 0, 'description' => 'تحصيل تأمين'],
+            ['code' => '2100', 'debit' => 0, 'credit' => $amount, 'description' => 'وديعة تأمين مستحقة'],
+        ], $actorId);
     }
 
     public function postFromSupplierPayment(SupplierPayment $payment, ?int $actorId = null): ?JournalEntry

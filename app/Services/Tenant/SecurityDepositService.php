@@ -15,8 +15,53 @@ class SecurityDepositService
 {
     public function __construct(
         private readonly InventoryService $inventoryService,
-        private readonly CashMovementService $cashMovementService
+        private readonly CashMovementService $cashMovementService,
+        private readonly JournalEntryPostingService $journalEntryPostingService,
     ) {}
+
+    public function recordCollection(Invoice $invoice, array $data, ?int $actorId = null): SecurityDepositTransaction
+    {
+        $this->ensureCollectionAllowed($invoice, $data);
+
+        $amount = round((float) $data['amount'], 2);
+        $expectedDeposit = round((float) ($invoice->security_deposit ?? 0), 2);
+        $alreadyPaid = round((float) ($invoice->deposit_paid_amount ?? 0), 2);
+        $remainingCollectible = max(0, round($expectedDeposit - $alreadyPaid, 2));
+
+        if ($amount > $remainingCollectible) {
+            throw ValidationException::withMessages([
+                'security_deposit_payment.amount' => ['مبلغ تحصيل التأمين يتجاوز المتبقي من التأمين المتوقع'],
+            ]);
+        }
+
+        /** @var SecurityDepositTransaction $transaction */
+        $transaction = DB::connection('tenant')->transaction(function () use ($invoice, $data, $amount, $actorId, $expectedDeposit): SecurityDepositTransaction {
+            $transaction = SecurityDepositTransaction::query()->create([
+                'invoice_id' => $invoice->id,
+                'type' => SecurityDepositTransaction::TYPE_COLLECTED,
+                'amount' => $amount,
+                'reason' => $data['reason'] ?? 'security_deposit_collection',
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $actorId,
+            ]);
+
+            $this->cashMovementService->recordSecurityDepositCollection($transaction, $actorId);
+
+            $invoice->refresh();
+            $paidTotal = round((float) ($invoice->deposit_paid_amount ?? 0) + $amount, 2);
+            $invoice->deposit_paid_amount = $paidTotal;
+            $invoice->security_deposit_status = $paidTotal >= $expectedDeposit && $expectedDeposit > 0
+                ? SecurityDepositStatus::HELD->value
+                : SecurityDepositStatus::PARTIALLY_HELD->value;
+            $invoice->save();
+
+            return $transaction;
+        });
+
+        $this->journalEntryPostingService->postFromSecurityDepositCollection($transaction, $actorId);
+
+        return $transaction;
+    }
 
     public function addDeduction(Invoice $invoice, array $data, ?int $actorId = null): Invoice
     {
@@ -106,6 +151,29 @@ class SecurityDepositService
             ->sum('amount'), 2);
 
         return max(0, round($depositAmount - $deducted - $refunded, 2));
+    }
+
+    private function ensureCollectionAllowed(Invoice $invoice, array $data): void
+    {
+        if ($invoice->type !== Invoice::TYPE_RENT) {
+            throw ValidationException::withMessages([
+                'security_deposit_payment' => ['تحصيل التأمين مسموح فقط لفواتير الإيجار'],
+            ]);
+        }
+
+        $expectedDeposit = round((float) ($invoice->security_deposit ?? 0), 2);
+        if ($expectedDeposit <= 0) {
+            throw ValidationException::withMessages([
+                'security_deposit' => ['لا يوجد تأمين متوقع على هذه الفاتورة'],
+            ]);
+        }
+
+        $amount = round((float) ($data['amount'] ?? 0), 2);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'security_deposit_payment.amount' => ['مبلغ تحصيل التأمين يجب أن يكون أكبر من صفر'],
+            ]);
+        }
     }
 
     private function ensureDeductionAllowed(Invoice $invoice): void

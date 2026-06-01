@@ -87,6 +87,7 @@ class InvoiceService
                 'delivery_date' => $data['delivery_date'] ?? null,
                 'return_date' => $data['return_date'] ?? null,
                 'security_deposit' => $data['security_deposit'] ?? null,
+                'deposit_paid_amount' => 0,
                 'security_deposit_status' => $data['security_deposit_status']
                     ?? ((float) ($data['security_deposit'] ?? 0) > 0 ? SecurityDepositStatus::NONE->value : null),
                 'tailoring_due_date' => $data['tailoring_due_date'] ?? null,
@@ -101,23 +102,34 @@ class InvoiceService
 
             $this->replaceItems($invoice, $items);
 
-            if (isset($data['initial_payment']) && is_array($data['initial_payment'])) {
-                $initialPayment = $data['initial_payment'];
-                InvoicePayment::query()->create([
-                    'invoice_id' => $invoice->id,
-                    'amount' => $this->money((float) ($initialPayment['amount'] ?? 0)),
-                    'method' => $initialPayment['method'] ?? null,
-                    'reference' => $initialPayment['reference'] ?? null,
-                    'paid_at' => $initialPayment['paid_at'] ?? Carbon::now(),
-                    'notes' => $initialPayment['notes'] ?? null,
-                    'created_by' => $actorId,
-                ]);
-            }
+            $invoice = $this->refreshFinancials($invoice, $status);
 
-            return $this->refreshFinancials($invoice, $status);
+            return $invoice;
         });
 
-        return $invoice->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
+        if (isset($data['initial_payment']) && is_array($data['initial_payment'])) {
+            $initialAmount = round((float) ($data['initial_payment']['amount'] ?? 0), 2);
+            if ($initialAmount > 0) {
+                app(InvoicePaymentService::class)->recordPaidPayment(
+                    $invoice,
+                    $data['initial_payment'],
+                    $actorId,
+                );
+            }
+        }
+
+        if (isset($data['security_deposit_payment']) && is_array($data['security_deposit_payment'])) {
+            $depositAmount = round((float) ($data['security_deposit_payment']['amount'] ?? 0), 2);
+            if ($depositAmount > 0) {
+                app(SecurityDepositService::class)->recordCollection(
+                    $invoice->refresh(),
+                    $data['security_deposit_payment'],
+                    $actorId,
+                );
+            }
+        }
+
+        return $invoice->refresh()->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function findOrFail(int $invoiceId): Invoice

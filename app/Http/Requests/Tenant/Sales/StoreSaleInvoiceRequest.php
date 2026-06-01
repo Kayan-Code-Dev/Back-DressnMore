@@ -30,7 +30,7 @@ class StoreSaleInvoiceRequest extends FormRequest
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'initial_payment' => ['nullable', 'array'],
-            'initial_payment.amount' => ['nullable', 'numeric', 'min:0'],
+            'initial_payment.amount' => ['nullable', 'numeric', 'gt:0'],
             'initial_payment.method' => ['nullable', 'string', 'max:50'],
         ];
     }

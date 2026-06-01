@@ -30,31 +30,57 @@ class InvoicePaymentService
             ]);
         }
 
-        /** @var Invoice $updatedInvoice */
-        $updatedInvoice = DB::connection('tenant')->transaction(function () use ($invoice, $data, $actorId): Invoice {
+        $this->recordPaidPayment($invoice, $data, $actorId);
+
+        return $invoice->refresh()->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
+    }
+
+    public function recordPaidPayment(Invoice $invoice, array $data, ?int $actorId = null): InvoicePayment
+    {
+        if ($invoice->status === Invoice::STATUS_CANCELLED) {
+            throw ValidationException::withMessages([
+                'invoice' => ['لا يمكن إضافة دفعة لفاتورة ملغاة'],
+            ]);
+        }
+
+        $amount = round((float) ($data['amount'] ?? 0), 2);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => ['مبلغ الدفعة يجب أن يكون أكبر من صفر'],
+            ]);
+        }
+
+        $invoice->refresh();
+        $remaining = round((float) $invoice->remaining_amount, 2);
+        if ($amount > $remaining + 0.009) {
+            throw ValidationException::withMessages([
+                'amount' => ['مبلغ الدفعة يتجاوز المبلغ المتبقي على الفاتورة'],
+            ]);
+        }
+
+        /** @var InvoicePayment $payment */
+        $payment = DB::connection('tenant')->transaction(function () use ($invoice, $data, $amount, $actorId): InvoicePayment {
             $payment = InvoicePayment::query()->create([
                 'invoice_id' => $invoice->id,
-                'amount' => round((float) $data['amount'], 2),
+                'amount' => $amount,
                 'status' => InvoicePayment::STATUS_PAID,
                 'payment_type' => InvoicePayment::TYPE_INVOICE_PAYMENT,
                 'method' => $data['method'] ?? null,
                 'reference' => $data['reference'] ?? null,
-                'paid_at' => $data['paid_at'] ?? Carbon::now(),
+                'paid_at' => isset($data['paid_at']) ? Carbon::parse((string) $data['paid_at']) : Carbon::now(),
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $actorId,
             ]);
 
             $this->cashMovementService->recordInvoicePayment($payment, $actorId);
+            $this->invoiceService->refreshFinancials($invoice->refresh());
 
-            return $this->invoiceService->refreshFinancials($invoice->refresh());
+            return $payment;
         });
 
-        $payment = $updatedInvoice->payments()->latest('id')->first();
-        if ($payment instanceof InvoicePayment) {
-            $this->journalEntryPostingService->postFromInvoicePayment($payment, $actorId);
-        }
+        $this->journalEntryPostingService->postFromInvoicePayment($payment, $actorId);
 
-        return $updatedInvoice->refresh()->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
+        return $payment->refresh();
     }
 
     public function paginateForInvoice(Invoice $invoice, int $perPage = 15): LengthAwarePaginator

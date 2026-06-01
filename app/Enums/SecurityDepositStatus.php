@@ -5,6 +5,8 @@ namespace App\Enums;
 enum SecurityDepositStatus: string
 {
     case NONE = 'none';
+    case HELD = 'held';
+    case PARTIALLY_HELD = 'partially_held';
     case PARTIALLY_DEDUCTED = 'partially_deducted';
     case FULLY_DEDUCTED = 'fully_deducted';
     case REFUNDED = 'refunded';
@@ -13,6 +15,8 @@ enum SecurityDepositStatus: string
     {
         return match ($this) {
             self::NONE => 'None',
+            self::HELD => 'Held',
+            self::PARTIALLY_HELD => 'Partially Held',
             self::PARTIALLY_DEDUCTED => 'Partially Deducted',
             self::FULLY_DEDUCTED => 'Fully Deducted',
             self::REFUNDED => 'Refunded',

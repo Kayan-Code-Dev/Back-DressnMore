@@ -171,6 +171,27 @@ class CashMovementService
         ]);
     }
 
+    public function recordSecurityDepositCollection(
+        SecurityDepositTransaction $transaction,
+        ?int $actorId = null
+    ): CashMovement {
+        return $this->createMovement([
+            'type' => CashMovement::TYPE_SECURITY_DEPOSIT_COLLECTION,
+            'direction' => CashMovement::DIRECTION_IN,
+            'amount' => round((float) $transaction->amount, 2),
+            'method' => null,
+            'cashbox_id' => null,
+            'reference_type' => CashMovement::REFERENCE_SECURITY_DEPOSIT_TRANSACTION,
+            'reference_id' => $transaction->id,
+            'reference' => $transaction->reason,
+            'movement_date' => Carbon::now(),
+            'description' => 'Security deposit collection',
+            'notes' => $transaction->notes,
+            'is_reversed' => false,
+            'created_by' => $actorId ?? $transaction->created_by,
+        ]);
+    }
+
     public function recordSecurityDepositDeduction(
         SecurityDepositTransaction $transaction,
         ?int $actorId = null
