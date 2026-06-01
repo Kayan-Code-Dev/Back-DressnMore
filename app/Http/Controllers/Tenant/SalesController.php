@@ -46,7 +46,11 @@ class SalesController extends Controller
     {
         $invoice = $this->salesService->createSale($request->validated(), $request->user()?->id);
 
-        return ApiResponse::success(['id' => $invoice->id], 'Sale invoice created', 201);
+        return ApiResponse::success(
+            $this->salesService->presentCreatedSale($invoice),
+            'Sale invoice created',
+            201,
+        );
     }
 
     public function reportSummary(Request $request): JsonResponse

@@ -258,6 +258,20 @@ class SalesService
     /**
      * @return array<string, mixed>
      */
+    public function presentCreatedSale(Invoice $invoice): array
+    {
+        $invoice->refresh()->loadMissing(['customer', 'branch', 'createdBy', 'items.dress', 'payments']);
+
+        return array_merge(SaleInvoicePresenter::fromInvoice($invoice), [
+            'paid_amount' => $invoice->paid_amount,
+            'remaining_amount' => $invoice->remaining_amount,
+            'status' => $invoice->status,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function presentSaleInvoice(Invoice $invoice): array
     {
         $invoice->loadMissing(['customer', 'branch', 'items.dress', 'payments']);
