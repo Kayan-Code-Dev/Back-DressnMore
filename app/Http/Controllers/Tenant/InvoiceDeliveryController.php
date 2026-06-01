@@ -11,6 +11,7 @@ use App\Http\Resources\Tenant\InvoiceResource;
 use App\Http\Resources\Tenant\SecurityDepositTransactionResource;
 use App\Services\Tenant\InvoiceDeliveryService;
 use App\Services\Tenant\InvoiceService;
+use App\Services\Tenant\RentalReturnSettlementService;
 use App\Services\Tenant\SecurityDepositService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +22,8 @@ class InvoiceDeliveryController extends Controller
     public function __construct(
         private readonly InvoiceService $invoiceService,
         private readonly InvoiceDeliveryService $invoiceDeliveryService,
-        private readonly SecurityDepositService $securityDepositService
+        private readonly SecurityDepositService $securityDepositService,
+        private readonly RentalReturnSettlementService $rentalReturnSettlementService,
     ) {}
 
     public function deliver(DeliverInvoiceRequest $request, int $invoice): JsonResponse
@@ -43,6 +45,12 @@ class InvoiceDeliveryController extends Controller
             invoice: $invoiceModel,
             data: $request->validated(),
             actorId: $request->user()?->id,
+        );
+
+        $this->rentalReturnSettlementService->ensureLegacySettlement(
+            $invoiceModel,
+            $request->validated(),
+            $request->user()?->id,
         );
 
         return ApiResponse::success(new InvoiceResource($invoiceModel), 'Invoice returned');

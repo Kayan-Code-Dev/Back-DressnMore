@@ -23,6 +23,7 @@ use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\PaymentController;
 use App\Http\Controllers\Tenant\PurchaseOrderController;
 use App\Http\Controllers\Tenant\RentalOrderController;
+use App\Http\Controllers\Tenant\RentalReturnSettlementController;
 use App\Http\Controllers\Tenant\ReportController;
 use App\Http\Controllers\Tenant\SalesController;
 use App\Http\Controllers\Tenant\SettingsController;
@@ -81,6 +82,13 @@ Route::prefix('tenant')->group(function (): void {
             ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:returns.enabled']);
         Route::get('/returns/overdue', [DeliveryWorkflowController::class, 'overdue'])
             ->middleware(['tenant.permission:invoice_delivery.view', 'plan.feature:returns.enabled']);
+
+        Route::get('/returns/{invoice}/settlement-preview', [RentalReturnSettlementController::class, 'preview'])
+            ->whereNumber('invoice')
+            ->middleware(['tenant.permission:invoice_delivery.return', 'plan.feature:returns.enabled']);
+        Route::post('/returns/{invoice}/settle', [RentalReturnSettlementController::class, 'settle'])
+            ->whereNumber('invoice')
+            ->middleware(['tenant.permission:invoice_delivery.return', 'plan.feature:returns.enabled']);
 
         Route::get('/supplier-payments', [SupplierPaymentController::class, 'index'])
             ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);

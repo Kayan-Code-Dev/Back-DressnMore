@@ -8,6 +8,7 @@ use App\Models\Tenant\Expense;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoicePayment;
 use App\Models\Tenant\JournalEntry;
+use App\Models\Tenant\RentalReturnSettlement;
 use App\Models\Tenant\SecurityDepositTransaction;
 use App\Models\Tenant\SupplierPayment;
 use Illuminate\Support\Carbon;
@@ -147,6 +148,61 @@ class JournalEntryPostingService
             ['code' => '1000', 'debit' => $amount, 'credit' => 0, 'description' => 'تحصيل تأمين'],
             ['code' => '2100', 'debit' => 0, 'credit' => $amount, 'description' => 'وديعة تأمين مستحقة'],
         ], $actorId);
+    }
+
+    public function postFromRentalReturnSettlement(
+        RentalReturnSettlement $settlement,
+        ?int $actorId = null,
+    ): ?JournalEntry {
+        $withheld = round((float) $settlement->deposit_withheld_amount, 2);
+        $refund = round((float) $settlement->deposit_refund_amount, 2);
+        $additional = round((float) $settlement->additional_amount_due, 2);
+        $lateFee = round((float) $settlement->late_fee, 2);
+        $damageFee = round((float) $settlement->damage_fee, 2);
+        $cleaningFee = round((float) $settlement->cleaning_fee, 2);
+        $otherFee = round((float) $settlement->other_fee, 2);
+
+        if ($withheld <= 0 && $refund <= 0 && $additional <= 0) {
+            return null;
+        }
+
+        $lines = [];
+
+        if ($withheld > 0) {
+            $lines[] = ['code' => '2100', 'debit' => $withheld, 'credit' => 0, 'description' => 'خصم تأمين مقابل رسوم'];
+        }
+
+        if ($refund > 0) {
+            $lines[] = ['code' => '2100', 'debit' => $refund, 'credit' => 0, 'description' => 'استرداد تأمين'];
+            $lines[] = ['code' => '1000', 'debit' => 0, 'credit' => $refund, 'description' => 'صرف استرداد تأمين'];
+        }
+
+        if ($additional > 0) {
+            $lines[] = ['code' => '1200', 'debit' => $additional, 'credit' => 0, 'description' => 'مستحقات عميل - رسوم إرجاع'];
+        }
+
+        foreach ([
+            ['amount' => $lateFee, 'code' => '4200', 'label' => 'غرامة تأخير'],
+            ['amount' => $damageFee, 'code' => '4210', 'label' => 'أضرار'],
+            ['amount' => $cleaningFee, 'code' => '4220', 'label' => 'تنظيف'],
+            ['amount' => $otherFee, 'code' => '4220', 'label' => 'رسوم أخرى'],
+        ] as $fee) {
+            if ($fee['amount'] > 0) {
+                $lines[] = ['code' => $fee['code'], 'debit' => 0, 'credit' => $fee['amount'], 'description' => $fee['label']];
+            }
+        }
+
+        $settlement->loadMissing('invoice');
+        $invoice = $settlement->invoice;
+
+        return $this->safePost([
+            'entry_date' => ($settlement->actual_return_date ?? now())->toDateString(),
+            'source_type' => JournalEntry::SOURCE_RENTAL_RETURN_SETTLEMENT,
+            'source_id' => $settlement->id,
+            'reference_number' => $invoice?->invoice_number,
+            'description' => 'قيد تسوية إرجاع إيجار '.($invoice?->invoice_number ?? ''),
+            'branch_id' => $settlement->branch_id ?? $invoice?->branch_id,
+        ], $lines, $actorId);
     }
 
     public function postFromSupplierPayment(SupplierPayment $payment, ?int $actorId = null): ?JournalEntry

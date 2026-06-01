@@ -43,6 +43,8 @@ class JournalEntry extends BaseTenantModel
 
     public const SOURCE_SECURITY_DEPOSIT_COLLECTION = 'security_deposit_collection';
 
+    public const SOURCE_RENTAL_RETURN_SETTLEMENT = 'rental_return_settlement';
+
     protected $fillable = [
         'entry_number',
         'entry_date',
