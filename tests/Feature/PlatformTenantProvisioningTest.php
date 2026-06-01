@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Central\Plan;
 use App\Models\Central\SuperAdmin;
 use App\Models\Central\Tenant;
+use Database\Seeders\Central\PlanSeeder;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
@@ -20,12 +22,15 @@ class PlatformTenantProvisioningTest extends TestCase
 
     private SuperAdmin $admin;
 
+    private Plan $plan;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->prepareSqliteDatabases();
         $this->runCentralMigrations();
+        $this->seedPlans();
         $this->admin = $this->createSuperAdmin();
     }
 
@@ -39,6 +44,7 @@ class PlatformTenantProvisioningTest extends TestCase
         $response = $this->postJson('/api/platform/tenants', [
             'name' => 'Atelier Cairo',
             'slug' => 'atelier-cairo',
+            'plan_id' => $this->plan->id,
             'database_name' => $tenantDatabasePath,
             'subscription_starts_at' => '2026-05-26 00:00:00',
             'subscription_ends_at' => '2026-06-26 00:00:00',
@@ -96,6 +102,7 @@ class PlatformTenantProvisioningTest extends TestCase
         Tenant::query()->create([
             'name' => 'Tenant One',
             'slug' => 'tenant-one',
+            'plan_id' => $this->plan->id,
             'database_name' => storage_path('framework/testing/tenant-one.sqlite'),
             'status' => 'active',
             'subscription_starts_at' => CarbonImmutable::now()->subDay(),
@@ -199,6 +206,17 @@ class PlatformTenantProvisioningTest extends TestCase
         ]);
     }
 
+    private function seedPlans(): void
+    {
+        Artisan::call('db:seed', [
+            '--database' => 'central',
+            '--class' => PlanSeeder::class,
+            '--force' => true,
+        ]);
+
+        $this->plan = Plan::query()->where('slug', 'basic')->firstOrFail();
+    }
+
     private function createSuperAdmin(): SuperAdmin
     {
         return SuperAdmin::query()->create([
@@ -214,6 +232,7 @@ class PlatformTenantProvisioningTest extends TestCase
         return Tenant::query()->create([
             'name' => 'Managed Tenant',
             'slug' => 'managed-'.uniqid(),
+            'plan_id' => $this->plan->id,
             'database_name' => storage_path('framework/testing/managed-'.uniqid().'.sqlite'),
             'status' => $status,
             'subscription_starts_at' => CarbonImmutable::now()->subMonth(),

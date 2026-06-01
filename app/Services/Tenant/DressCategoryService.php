@@ -2,8 +2,10 @@
 
 namespace App\Services\Tenant;
 
+use App\Enums\CustomerStatus;
 use App\Models\Tenant\DressCategory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Str;
 
 class DressCategoryService
 {
@@ -70,9 +72,20 @@ class DressCategoryService
     /**
      * @return array<string, mixed>
      */
-    private function filterCategoryInput(array $data): array
+    private function filterCategoryInput(array $data, bool $isCreate = false): array
     {
-        return array_intersect_key($data, array_flip(['name', 'parent_id']));
+        $allowed = ['name', 'parent_id', 'slug', 'description', 'status'];
+        $filtered = array_intersect_key($data, array_flip($allowed));
+
+        if ($isCreate && ! array_key_exists('status', $filtered)) {
+            $filtered['status'] = CustomerStatus::ACTIVE->value;
+        }
+
+        if (array_key_exists('name', $filtered) && ! array_key_exists('slug', $filtered)) {
+            $filtered['slug'] = Str::slug((string) $filtered['name']);
+        }
+
+        return $filtered;
     }
 
     public function delete(DressCategory $category): void

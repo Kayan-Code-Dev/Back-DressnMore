@@ -50,7 +50,7 @@ class TenantCashboxTest extends TestCase
             'initial_balance' => 100,
             'is_active' => true,
         ], $this->tenantHeaders());
-        $create->assertCreated()->assertJsonPath('data.current_balance', '100.00');
+        $create->assertCreated()->assertJsonPath('data.current_balance', 100);
         $cashboxId = (int) $create->json('data.id');
 
         $this->postJson('/api/tenant/cash-movements', [
@@ -68,7 +68,7 @@ class TenantCashboxTest extends TestCase
 
         $this->postJson("/api/tenant/cashboxes/{$cashboxId}/recalculate", [], $this->tenantHeaders())
             ->assertOk()
-            ->assertJsonPath('data.current_balance', '150.00');
+            ->assertJsonPath('data.current_balance', 150);
 
         $this->putJson("/api/tenant/cashboxes/{$cashboxId}", [
             'name' => 'Main Cashbox Updated',

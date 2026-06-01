@@ -359,10 +359,18 @@ class TenantDressTest extends TestCase
 
     public function test_dress_can_belong_to_branch(): void
     {
+        $category = DressCategory::query()->create(['name' => 'Branch Cat', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create([
+            'name' => 'Branch Sub',
+            'parent_id' => $category->id,
+            'status' => 'active',
+        ]);
         $branch = Branch::query()->create(['name' => 'Downtown', 'status' => 'active']);
         Sanctum::actingAs($this->ownerUser, ['*']);
 
         $response = $this->postJson('/api/tenant/dresses', [
+            'dress_category_id' => $category->id,
+            'dress_subcategory_id' => $subcategory->id,
             'code' => 'DR-BR-01',
             'name' => 'Branch Dress',
             'branch_id' => $branch->id,
