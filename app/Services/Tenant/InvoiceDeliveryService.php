@@ -77,6 +77,10 @@ class InvoiceDeliveryService
             return $invoice->refresh();
         });
 
+        if ($updated->isTailoring()) {
+            app(TailoringProductionService::class)->syncFromInvoiceStatus($updated);
+        }
+
         return $updated->load(['items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 

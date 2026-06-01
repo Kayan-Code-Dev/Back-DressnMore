@@ -61,6 +61,18 @@ class Invoice extends BaseTenantModel
         'occasion_datetime',
         'days_of_rent',
         'tailoring_notes',
+        'production_stage',
+        'production_status',
+        'priority',
+        'assigned_tailor_id',
+        'fitting_date',
+        'next_follow_up_date',
+        'tailoring_measurements',
+        'design_notes',
+        'workshop_notes',
+        'tailoring_started_at',
+        'tailoring_completed_at',
+        'tailoring_cancelled_at',
         'notes',
         'order_notes',
         'created_by',
@@ -83,6 +95,12 @@ class Invoice extends BaseTenantModel
             'delivery_date' => 'date',
             'return_date' => 'date',
             'tailoring_due_date' => 'date',
+            'fitting_date' => 'date',
+            'next_follow_up_date' => 'date',
+            'tailoring_measurements' => 'array',
+            'tailoring_started_at' => 'datetime',
+            'tailoring_completed_at' => 'datetime',
+            'tailoring_cancelled_at' => 'datetime',
             'visit_datetime' => 'datetime',
             'occasion_datetime' => 'datetime',
             'days_of_rent' => 'integer',
@@ -102,6 +120,21 @@ class Invoice extends BaseTenantModel
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function assignedTailor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_tailor_id');
+    }
+
+    public function tailoringStageHistories(): HasMany
+    {
+        return $this->hasMany(TailoringStageHistory::class)->orderByDesc('changed_at');
+    }
+
+    public function isTailoring(): bool
+    {
+        return $this->type === self::TYPE_TAILORING;
     }
 
     public function items(): HasMany

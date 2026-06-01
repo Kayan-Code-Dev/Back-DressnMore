@@ -161,6 +161,44 @@ class TenantCommercialRoutesPermissionTest extends TestCase
         $this->assertNotContains(2, $ids);
     }
 
+    public function test_tailoring_orders_list_requires_tailoring_view_permission(): void
+    {
+        $user = $this->createTenantUserWithPermissions([]);
+        Sanctum::actingAs($user, ['*']);
+
+        $this->getJson('/api/tenant/tailoring/orders', $this->tenantHeaders())
+            ->assertStatus(403);
+
+        $authorized = $this->createTenantUserWithPermissions(['tailoring.view']);
+        Sanctum::actingAs($authorized, ['*']);
+
+        $this->getJson('/api/tenant/tailoring/orders', $this->tenantHeaders())
+            ->assertOk()
+            ->assertJsonPath('success', true);
+    }
+
+    public function test_tailoring_change_stage_requires_change_stage_permission(): void
+    {
+        $invoice = Invoice::query()->create([
+            'invoice_number' => 'T-PERM-'.uniqid(),
+            'type' => Invoice::TYPE_TAILORING,
+            'status' => Invoice::STATUS_CONFIRMED,
+            'production_stage' => 'new_order',
+            'production_status' => 'pending',
+            'priority' => 'normal',
+            'total' => 200,
+            'remaining_amount' => 200,
+            'paid_amount' => 0,
+        ]);
+
+        $viewer = $this->createTenantUserWithPermissions(['tailoring.view']);
+        Sanctum::actingAs($viewer, ['*']);
+
+        $this->postJson("/api/tenant/tailoring/orders/{$invoice->id}/change-stage", [
+            'to_stage' => 'fabric_cutting',
+        ], $this->tenantHeaders())->assertStatus(403);
+    }
+
     public function test_create_rental_invoice_via_invoices_endpoint(): void
     {
         $customer = Customer::query()->create(['name' => 'Renter', 'status' => 'active']);

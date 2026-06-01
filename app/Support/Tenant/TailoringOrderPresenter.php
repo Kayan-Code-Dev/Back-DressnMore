@@ -2,20 +2,25 @@
 
 namespace App\Support\Tenant;
 
+use App\Enums\TailoringPriority;
+use App\Enums\TailoringProductionStage;
+use App\Enums\TailoringProductionStatus;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoiceItem;
+use App\Models\Tenant\TailoringStageHistory;
 use Illuminate\Support\Carbon;
 
 class TailoringOrderPresenter
 {
     /** @var list<string> */
-    private const STAGES = [
+    public const STAGES = [
         'new_order',
-        'fabric_receipt',
-        'cutting',
+        'measurements_taken',
+        'fabric_cutting',
         'sewing',
-        'finishing',
-        'quality_review',
+        'first_fitting',
+        'adjustments',
+        'final_fitting',
         'ready_for_delivery',
         'delivered',
     ];
@@ -25,7 +30,7 @@ class TailoringOrderPresenter
      */
     public static function fromInvoice(Invoice $invoice, bool $includeDetails = false): array
     {
-        $invoice->loadMissing(['customer', 'items.dress', 'branch', 'createdBy']);
+        $invoice->loadMissing(['customer', 'items.dress', 'branch', 'createdBy', 'assignedTailor', 'payments']);
 
         $firstItem = $invoice->items->first();
         $dueDate = $invoice->tailoring_due_date?->toDateString()
@@ -33,19 +38,27 @@ class TailoringOrderPresenter
             ?? '';
 
         $status = self::mapStatus($invoice);
-        $stage = self::mapStage($invoice);
-        $priority = self::mapPriority($invoice, $status);
+        $stage = self::resolveStage($invoice);
+        $productionStatus = self::resolveProductionStatus($invoice);
+        $priority = self::resolvePriority($invoice, $status);
         $daysRemaining = self::daysRemaining($dueDate, $status);
         $stageIndex = max(0, array_search($stage, self::STAGES, true) ?: 0);
         $stagesTotal = count(self::STAGES);
+
+        $stageEnum = TailoringProductionStage::tryFrom($stage);
+        $statusEnum = TailoringProductionStatus::tryFrom($productionStatus);
+        $priorityEnum = TailoringPriority::tryFrom($priority);
 
         $payload = [
             'id' => $invoice->id,
             'order_number' => $invoice->invoice_number !== '' ? $invoice->invoice_number : ('T'.str_pad((string) $invoice->id, 3, '0', STR_PAD_LEFT)),
             'client_name' => $invoice->customer?->name ?? '',
             'client_phone' => $invoice->customer?->phone ?? '',
+            'customer_id' => $invoice->customer_id,
+            'branch_id' => $invoice->branch_id,
             'employee_name' => $invoice->createdBy?->name ?? '',
-            'tailor_name' => $invoice->createdBy?->name ?? '',
+            'tailor_name' => $invoice->assignedTailor?->name ?? '',
+            'assigned_tailor_id' => $invoice->assigned_tailor_id,
             'branch_name' => $invoice->branch?->name ?? '',
             'garment_name' => self::garmentName($firstItem),
             'fabric_name' => self::fabricLabel($firstItem),
@@ -58,16 +71,27 @@ class TailoringOrderPresenter
             'delivery_date' => $invoice->delivery_date?->toDateString(),
             'occasion_date' => $invoice->occasion_datetime?->toDateString(),
             'visit_date' => $invoice->visit_datetime?->toDateString(),
+            'fitting_date' => $invoice->fitting_date?->toDateString(),
+            'next_follow_up_date' => $invoice->next_follow_up_date?->toDateString(),
             'status' => $status,
             'priority' => $priority,
+            'priority_label' => $priorityEnum?->labelAr() ?? $priority,
+            'production_status' => $productionStatus,
+            'production_status_label' => $statusEnum?->labelAr() ?? $productionStatus,
             'payment_status' => self::mapPaymentStatus($invoice),
             'current_stage' => $stage,
+            'current_stage_label' => $stageEnum?->labelAr() ?? $stage,
             'days_remaining' => $daysRemaining,
             'days_remaining_label' => self::daysRemainingLabel($daysRemaining, $dueDate),
             'total_price' => (float) $invoice->total,
             'paid' => (float) $invoice->paid_amount,
             'remaining' => (float) $invoice->remaining_amount,
             'notes' => self::plainNotes($invoice->tailoring_notes) ?: ($invoice->notes ?? ''),
+            'design_notes' => $invoice->design_notes ?? ($invoice->order_notes ?? ''),
+            'workshop_notes' => $invoice->workshop_notes ?? '',
+            'started_at' => $invoice->tailoring_started_at?->toIso8601String(),
+            'completed_at' => $invoice->tailoring_completed_at?->toIso8601String(),
+            'cancelled_at' => $invoice->tailoring_cancelled_at?->toIso8601String(),
             'stages_completed' => min($stagesTotal, $stageIndex + 1),
             'stages_total' => $stagesTotal,
             'progress_percent' => (int) round(($stageIndex / max(1, $stagesTotal - 1)) * 100),
@@ -75,7 +99,7 @@ class TailoringOrderPresenter
         ];
 
         if ($includeDetails) {
-            $payload['measurements'] = self::parseMeasurements($invoice->tailoring_notes);
+            $payload['measurements'] = self::resolveMeasurements($invoice);
             $payload['customer'] = [
                 'name' => $invoice->customer?->name ?? '',
                 'phone' => $invoice->customer?->phone ?? '',
@@ -84,25 +108,69 @@ class TailoringOrderPresenter
                 'address' => $invoice->customer?->address ?? '',
                 'district' => '',
                 'neighborhood' => '',
-                'tag' => $priority === 'VIP' ? 'VIP' : ($priority === 'urgent' ? 'عاجل' : 'عميلة دائمة'),
+                'tag' => $priority === TailoringPriority::HIGH->value || $priority === TailoringPriority::URGENT->value
+                    ? 'عاجل'
+                    : 'عميلة دائمة',
             ];
-            $payload['design_description'] = $invoice->order_notes ?? '';
+            $payload['design_description'] = $invoice->design_notes ?? ($invoice->order_notes ?? '');
             $payload['design_style'] = '';
             $payload['fabric_quantity'] = '';
             $payload['fabric_supplier'] = '';
-            $payload['progress_log'] = self::buildProgressLog($invoice, $stage, $stageIndex);
+            $payload['progress_log'] = self::buildProgressLog($invoice);
+            $payload['stage_history'] = self::buildStageHistory($invoice);
         }
 
         return $payload;
     }
 
+    public static function resolveStage(Invoice $invoice): string
+    {
+        if ($invoice->production_stage !== null && $invoice->production_stage !== '') {
+            return (string) $invoice->production_stage;
+        }
+
+        if ($invoice->status === Invoice::STATUS_DELIVERED || $invoice->status === Invoice::STATUS_RETURNED) {
+            return TailoringProductionStage::DELIVERED->value;
+        }
+
+        if ($invoice->status === Invoice::STATUS_CANCELLED) {
+            return TailoringProductionStage::CANCELLED->value;
+        }
+
+        return TailoringProductionStage::NEW_ORDER->value;
+    }
+
+    public static function resolveProductionStatus(Invoice $invoice): string
+    {
+        if ($invoice->production_status !== null && $invoice->production_status !== '') {
+            return (string) $invoice->production_status;
+        }
+
+        return TailoringProductionStatus::PENDING->value;
+    }
+
+    public static function resolvePriority(Invoice $invoice, string $listStatus): string
+    {
+        if ($invoice->priority !== null && $invoice->priority !== '') {
+            return (string) $invoice->priority;
+        }
+
+        if ($listStatus === 'overdue') {
+            return TailoringPriority::URGENT->value;
+        }
+
+        return TailoringPriority::NORMAL->value;
+    }
+
     public static function mapStatus(Invoice $invoice): string
     {
-        if ($invoice->status === Invoice::STATUS_CANCELLED) {
+        if ($invoice->status === Invoice::STATUS_CANCELLED
+            || $invoice->production_stage === TailoringProductionStage::CANCELLED->value) {
             return 'cancelled';
         }
 
-        if (in_array($invoice->status, [Invoice::STATUS_DELIVERED, Invoice::STATUS_RETURNED], true)) {
+        if (in_array($invoice->status, [Invoice::STATUS_DELIVERED, Invoice::STATUS_RETURNED], true)
+            || $invoice->production_stage === TailoringProductionStage::DELIVERED->value) {
             return 'completed';
         }
 
@@ -118,36 +186,6 @@ class TailoringOrderPresenter
         }
 
         return 'active';
-    }
-
-    public static function mapStage(Invoice $invoice): string
-    {
-        if ($invoice->status === Invoice::STATUS_DELIVERED || $invoice->status === Invoice::STATUS_RETURNED) {
-            return 'delivered';
-        }
-
-        if (in_array($invoice->status, [Invoice::STATUS_PAID], true)) {
-            return 'ready_for_delivery';
-        }
-
-        $index = $invoice->id % 5;
-
-        return self::STAGES[$index];
-    }
-
-    public static function mapPriority(Invoice $invoice, string $status): string
-    {
-        if ($status === 'overdue') {
-            return 'urgent';
-        }
-
-        return match ($invoice->id % 5) {
-            0 => 'VIP',
-            1 => 'VIP',
-            2 => 'normal',
-            3 => 'normal',
-            default => 'normal',
-        };
     }
 
     public static function mapPaymentStatus(Invoice $invoice): string
@@ -166,6 +204,18 @@ class TailoringOrderPresenter
     /**
      * @return list<array{id:int,label:string,value:string,unit:string}>
      */
+    public static function resolveMeasurements(Invoice $invoice): array
+    {
+        if (is_array($invoice->tailoring_measurements) && $invoice->tailoring_measurements !== []) {
+            return self::normalizeMeasurements($invoice->tailoring_measurements);
+        }
+
+        return self::parseMeasurements($invoice->tailoring_notes);
+    }
+
+    /**
+     * @return list<array{id:int,label:string,value:string,unit:string}>
+     */
     public static function parseMeasurements(?string $raw): array
     {
         if ($raw === null || trim($raw) === '') {
@@ -177,7 +227,16 @@ class TailoringOrderPresenter
             return [];
         }
 
-        return collect($decoded)
+        return self::normalizeMeasurements($decoded);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $measurements
+     * @return list<array{id:int,label:string,value:string,unit:string}>
+     */
+    public static function normalizeMeasurements(array $measurements): array
+    {
+        return collect($measurements)
             ->values()
             ->map(fn ($row, $index): array => [
                 'id' => (int) ($row['id'] ?? ($index + 1)),
@@ -273,28 +332,46 @@ class TailoringOrderPresenter
     /**
      * @return list<array<string, mixed>>
      */
-    private static function buildProgressLog(Invoice $invoice, string $stage, int $stageIndex): array
+    private static function buildProgressLog(Invoice $invoice): array
     {
-        $labels = [
-            'new_order' => 'طلب جديد',
-            'fabric_receipt' => 'استلام القماش',
-            'cutting' => 'القص والتحضير',
-            'sewing' => 'الخياطة',
-            'finishing' => 'التشطيب والتطريز',
-            'quality_review' => 'مراجعة الجودة',
-            'ready_for_delivery' => 'جاهز للتسليم',
-            'delivered' => 'تم التسليم',
-        ];
+        return self::buildStageHistory($invoice);
+    }
 
-        $by = $invoice->createdBy?->name ?? 'النظام';
-        $date = $invoice->created_at?->format('m/d') ?? '';
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function buildStageHistory(Invoice $invoice): array
+    {
+        $histories = $invoice->relationLoaded('tailoringStageHistories')
+            ? $invoice->tailoringStageHistories
+            : $invoice->tailoringStageHistories()->with('changedByUser')->orderByDesc('changed_at')->get();
 
-        return [[
-            'id' => 1,
-            'stage' => $stage,
-            'stage_label' => $labels[$stage] ?? $stage,
-            'date' => $date,
-            'by' => $by,
-        ]];
+        if ($histories->isEmpty()) {
+            $stage = self::resolveStage($invoice);
+
+            return [[
+                'id' => 0,
+                'stage' => $stage,
+                'stage_label' => TailoringProductionStage::tryFrom($stage)?->labelAr() ?? $stage,
+                'date' => $invoice->created_at?->format('m/d') ?? '',
+                'by' => $invoice->createdBy?->name ?? 'النظام',
+            ]];
+        }
+
+        return $histories
+            ->sortByDesc('changed_at')
+            ->values()
+            ->map(fn (TailoringStageHistory $row): array => [
+                'id' => $row->id,
+                'stage' => $row->to_stage,
+                'stage_label' => TailoringProductionStage::tryFrom($row->to_stage)?->labelAr() ?? $row->to_stage,
+                'from_stage' => $row->from_stage,
+                'to_stage' => $row->to_stage,
+                'date' => $row->changed_at?->format('m/d') ?? '',
+                'changed_at' => $row->changed_at?->toIso8601String(),
+                'by' => $row->changedByUser?->name ?? 'النظام',
+                'notes' => $row->notes,
+            ])
+            ->all();
     }
 }

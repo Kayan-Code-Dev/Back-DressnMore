@@ -93,14 +93,28 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('/supplier-payments', [SupplierPaymentController::class, 'index'])
             ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);
 
-        Route::prefix('/tailoring')->middleware(['plan.feature:invoices.enabled', 'tenant.permission:invoices.view'])->group(function (): void {
+        Route::prefix('/tailoring')->middleware(['plan.feature:invoices.enabled', 'tenant.permission:tailoring.view'])->group(function (): void {
             Route::get('/orders/stats', [TailoringOrderController::class, 'stats']);
             Route::get('/orders', [TailoringOrderController::class, 'index']);
+            Route::post('/orders', [TailoringOrderController::class, 'store'])
+                ->middleware('tenant.permission:tailoring.create');
             Route::get('/orders/{invoice}', [TailoringOrderController::class, 'show'])
+                ->whereNumber('invoice');
+            Route::patch('/orders/{invoice}', [TailoringOrderController::class, 'update'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:tailoring.update');
+            Route::post('/orders/{invoice}/change-stage', [TailoringOrderController::class, 'changeStage'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:tailoring.change_stage');
+            Route::get('/orders/{invoice}/stage-history', [TailoringOrderController::class, 'stageHistory'])
                 ->whereNumber('invoice');
             Route::put('/orders/{invoice}/measurements', [TailoringOrderController::class, 'updateMeasurements'])
                 ->whereNumber('invoice')
-                ->middleware('tenant.permission:invoices.update');
+                ->middleware('tenant.permission:tailoring.update');
+            Route::get('/workshop-board', [TailoringOrderController::class, 'workshopBoard'])
+                ->middleware('tenant.permission:tailoring.view_workshop');
+            Route::get('/schedule', [TailoringOrderController::class, 'schedule'])
+                ->middleware('tenant.permission:tailoring.view_schedule');
             Route::get('/deliveries', [TailoringOrderController::class, 'deliveries']);
         });
 

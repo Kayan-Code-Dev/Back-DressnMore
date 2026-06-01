@@ -86,6 +86,13 @@ class TenantRolePermissionSeeder extends Seeder
             ['name' => 'Invoices Delete', 'key' => 'invoices.delete'],
             ['name' => 'Invoices Cancel', 'key' => 'invoices.cancel'],
             ['name' => 'Invoices Export', 'key' => 'invoices.export'],
+            ['name' => 'Tailoring View', 'key' => 'tailoring.view'],
+            ['name' => 'Tailoring Create', 'key' => 'tailoring.create'],
+            ['name' => 'Tailoring Update', 'key' => 'tailoring.update'],
+            ['name' => 'Tailoring Change Stage', 'key' => 'tailoring.change_stage'],
+            ['name' => 'Tailoring Override Stage', 'key' => 'tailoring.override_stage'],
+            ['name' => 'Tailoring View Workshop', 'key' => 'tailoring.view_workshop'],
+            ['name' => 'Tailoring View Schedule', 'key' => 'tailoring.view_schedule'],
             ['name' => 'Invoice Payments View', 'key' => 'invoice_payments.view'],
             ['name' => 'Invoice Payments Create', 'key' => 'invoice_payments.create'],
             ['name' => 'Invoice Delivery View', 'key' => 'invoice_delivery.view'],
@@ -138,6 +145,27 @@ class TenantRolePermissionSeeder extends Seeder
             ->each(function (Role $role) use ($journalPermissionIds): void {
                 $role->permissions()->syncWithoutDetaching($journalPermissionIds);
             });
+
+        $managerPermissionIds = Permission::query()
+            ->whereIn('key', [
+                'tailoring.view',
+                'tailoring.update',
+                'tailoring.change_stage',
+                'tailoring.view_workshop',
+                'tailoring.view_schedule',
+                'invoices.view',
+                'invoices.create',
+                'customers.view',
+                'customers.create',
+            ])
+            ->pluck('id')
+            ->all();
+
+        $managerRole = Role::query()->updateOrCreate(
+            ['slug' => 'manager'],
+            ['name' => 'Manager']
+        );
+        $managerRole->permissions()->syncWithoutDetaching($managerPermissionIds);
 
         $this->call(AccountSeeder::class);
     }

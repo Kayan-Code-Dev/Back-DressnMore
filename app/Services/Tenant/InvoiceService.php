@@ -67,8 +67,8 @@ class InvoiceService
         }
 
         /** @var Invoice $invoice */
-        $invoice = DB::connection('tenant')->transaction(function () use ($data, $items, $summary, $status, $actorId): Invoice {
-            $invoice = Invoice::query()->create([
+        $invoice = DB::connection('tenant')->transaction(function () use ($data, $items, $summary, $status, $actorId, $invoiceType): Invoice {
+            $payload = [
                 'invoice_number' => $this->generateInvoiceNumber(),
                 'customer_id' => $data['customer_id'] ?? null,
                 'branch_id' => $data['branch_id'] ?? null,
@@ -98,7 +98,23 @@ class InvoiceService
                 'notes' => $data['notes'] ?? null,
                 'order_notes' => $data['order_notes'] ?? null,
                 'created_by' => $actorId,
-            ]);
+            ];
+
+            if ($invoiceType === Invoice::TYPE_TAILORING) {
+                $payload = array_merge($payload, [
+                    'production_stage' => $data['production_stage'] ?? \App\Enums\TailoringProductionStage::NEW_ORDER->value,
+                    'production_status' => $data['production_status'] ?? \App\Enums\TailoringProductionStatus::PENDING->value,
+                    'priority' => $data['priority'] ?? \App\Enums\TailoringPriority::NORMAL->value,
+                    'assigned_tailor_id' => $data['assigned_tailor_id'] ?? null,
+                    'fitting_date' => $data['fitting_date'] ?? null,
+                    'next_follow_up_date' => $data['next_follow_up_date'] ?? null,
+                    'tailoring_measurements' => $data['tailoring_measurements'] ?? null,
+                    'design_notes' => $data['design_notes'] ?? null,
+                    'workshop_notes' => $data['workshop_notes'] ?? null,
+                ]);
+            }
+
+            $invoice = Invoice::query()->create($payload);
 
             $this->replaceItems($invoice, $items);
 
