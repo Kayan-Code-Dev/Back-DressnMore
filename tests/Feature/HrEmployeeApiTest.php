@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Central\TenantUserDirectory;
 use App\Models\Tenant\Branch;
 use App\Models\Tenant\HrDepartment;
 use App\Models\Tenant\HrEmployee;
@@ -81,6 +82,128 @@ class HrEmployeeApiTest extends TenantHrTestCase
 
         $this->deleteJson("/api/tenant/hr/employees/{$employeeId}", [], $headers)->assertOk();
         $this->assertSoftDeleted('hr_employees', ['id' => $employeeId], 'tenant');
+    }
+
+    public function test_create_employee_without_status_field_allows_immediate_login(): void
+    {
+        $headers = $this->hrHeaders();
+        $email = 'hr.nostatus.'.uniqid().'@tenant.test';
+        $password = 'SecretPass1';
+        $role = Role::query()->firstOrCreate(
+            ['slug' => 'hr-nostatus-staff'],
+            ['name' => 'HR No Status Staff']
+        );
+
+        $payload = [
+            'employee_code' => 'EMP-NS-'.uniqid('', true),
+            'full_name' => 'No Status Employee',
+            'phone' => '+966500000099',
+            'employment_type' => 'full_time',
+            'joining_date' => '2024-01-01',
+            'base_salary' => 5000,
+            'salary_type' => 'monthly',
+            'user_account' => [
+                'email' => $email,
+                'password' => $password,
+                'password_confirmation' => $password,
+                'role_id' => $role->id,
+            ],
+        ];
+
+        $this->postJson('/api/tenant/hr/employees', $payload, $headers)->assertCreated();
+
+        $this->postJson('/api/tenant/login', [
+            'email' => $email,
+            'password' => $password,
+        ], $this->tenantHeaders())
+            ->assertOk()
+            ->assertJsonPath('data.user.status', 'active');
+    }
+
+    public function test_create_employee_with_user_account_allows_immediate_login(): void
+    {
+        $headers = $this->hrHeaders();
+        $email = 'hr.login.'.uniqid().'@tenant.test';
+        $password = 'SecretPass1';
+
+        $role = Role::query()->firstOrCreate(
+            ['slug' => 'hr-login-staff'],
+            ['name' => 'HR Login Staff']
+        );
+
+        $payload = array_merge($this->employeePayload('EMP-LOGIN-'.uniqid('', true), null), [
+            'user_account' => [
+                'email' => $email,
+                'password' => $password,
+                'password_confirmation' => $password,
+                'role_id' => $role->id,
+            ],
+        ]);
+
+        $this->postJson('/api/tenant/hr/employees', $payload, $headers)
+            ->assertCreated()
+            ->assertJsonPath('data.user_account.email', $email);
+
+        $this->assertSame(
+            1,
+            TenantUserDirectory::query()->where('email', $email)->count()
+        );
+
+        $this->postJson('/api/tenant/login', [
+            'email' => $email,
+            'password' => $password,
+        ], $this->tenantHeaders())
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.email', $email);
+    }
+
+    public function test_update_employee_user_account_email_uses_single_directory_record(): void
+    {
+        $headers = $this->hrHeaders();
+        $role = Role::query()->firstOrCreate(
+            ['slug' => 'hr-update-staff'],
+            ['name' => 'HR Update Staff']
+        );
+        $initialEmail = 'hr.initial.'.uniqid().'@tenant.test';
+        $updatedEmail = 'hr.updated.'.uniqid().'@tenant.test';
+        $password = 'SecretPass1';
+
+        $create = $this->postJson('/api/tenant/hr/employees', array_merge(
+            $this->employeePayload('EMP-UPD-'.uniqid('', true), null),
+            [
+                'user_account' => [
+                    'email' => $initialEmail,
+                    'password' => $password,
+                    'password_confirmation' => $password,
+                    'role_id' => $role->id,
+                ],
+            ]
+        ), $headers)->assertCreated();
+
+        $employeeId = (int) $create->json('data.id');
+        $this->assertSame(1, TenantUserDirectory::query()->where('email', $initialEmail)->count());
+
+        $this->putJson("/api/tenant/hr/employees/{$employeeId}", [
+            'user_account' => [
+                'email' => $updatedEmail,
+            ],
+        ], $headers)->assertOk();
+
+        $this->assertSame(1, TenantUserDirectory::query()->where('email', $updatedEmail)->count());
+
+        $this->putJson("/api/tenant/hr/employees/{$employeeId}", [
+            'phone' => '+966502222222',
+        ], $headers)->assertOk();
+
+        $this->assertSame(1, TenantUserDirectory::query()->where('email', $updatedEmail)->count());
+
+        $this->postJson('/api/tenant/login', [
+            'email' => $updatedEmail,
+            'password' => $password,
+        ], $this->tenantHeaders())
+            ->assertOk()
+            ->assertJsonPath('data.user.email', $updatedEmail);
     }
 
     public function test_create_employee_with_user_account_and_custom_permissions(): void

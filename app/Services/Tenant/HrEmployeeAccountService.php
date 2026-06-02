@@ -11,6 +11,11 @@ use Illuminate\Validation\ValidationException;
 
 class HrEmployeeAccountService
 {
+    public function __construct(
+        private readonly TenantUserDirectoryService $tenantUserDirectoryService,
+        private readonly TenantContext $tenantContext,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $account
      */
@@ -34,13 +39,15 @@ class HrEmployeeAccountService
             'email' => $email,
             'password' => (string) $account['password'],
             'phone' => $employee->phone,
-            'status' => $employee->status === 'active' ? 'active' : 'inactive',
+            'status' => $this->userStatusForEmployee($employee),
         ]);
 
         $this->syncUserAccess($user, $account);
 
         $employee->user_id = $user->id;
         $employee->save();
+
+        $this->registerInDirectory($email);
 
         return $user;
     }
@@ -89,14 +96,34 @@ class HrEmployeeAccountService
             $user->phone = $employee->phone;
         }
 
-        $user->status = $employee->status === 'active' ? 'active' : 'inactive';
+        $user->status = $this->userStatusForEmployee($employee);
         $user->save();
 
         if (array_key_exists('role_id', $account) || array_key_exists('permission_ids', $account)) {
             $this->syncUserAccess($user, $account);
         }
 
+        $this->registerInDirectory(strtolower((string) $user->email));
+
         return $user;
+    }
+
+    private function userStatusForEmployee(HrEmployee $employee): string
+    {
+        return ($employee->status ?? 'active') === 'active' ? 'active' : 'inactive';
+    }
+
+    private function registerInDirectory(string $email): void
+    {
+        $normalized = strtolower(trim($email));
+        if ($normalized === '') {
+            return;
+        }
+
+        $this->tenantUserDirectoryService->register(
+            $this->tenantContext->requireTenant(),
+            $normalized,
+        );
     }
 
     /**
