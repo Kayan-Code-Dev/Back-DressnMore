@@ -143,6 +143,9 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:invoices.view');
             Route::get('/invoices', [SalesController::class, 'indexInvoices'])
                 ->middleware('tenant.permission:invoices.view');
+            Route::get('/invoices/{invoice}', [SalesController::class, 'show'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.view');
             Route::post('/invoices', [SalesController::class, 'storeInvoice'])
                 ->middleware('tenant.permission:invoices.create');
         });

@@ -20,6 +20,10 @@ class StoreSaleInvoiceRequest extends FormRequest
         return [
             'customer_id' => ['required', 'integer', Rule::exists('tenant.customers', 'id')->whereNull('deleted_at')],
             'branch_id' => ['nullable', 'integer'],
+            'delivery_date' => ['nullable', 'date'],
+            'return_date' => ['nullable', 'date'],
+            'occasion_datetime' => ['nullable', 'date'],
+            'visit_datetime' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'order_notes' => ['nullable', 'string'],
             'tax' => ['nullable', 'numeric', 'min:0'],

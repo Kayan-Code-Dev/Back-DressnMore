@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Sales\StoreSaleInvoiceRequest;
 use App\Services\Tenant\SalesService;
 use App\Support\ApiResponse;
+use App\Support\Tenant\SaleInvoicePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -40,6 +41,15 @@ class SalesController extends Controller
         ]);
 
         return ApiResponse::success($stats);
+    }
+
+    public function show(int $invoice): JsonResponse
+    {
+        $invoiceModel = $this->salesService->findSaleOrFail($invoice);
+
+        return ApiResponse::success(
+            SaleInvoicePresenter::fromInvoice($invoiceModel, includeItems: true, includeDetails: true),
+        );
     }
 
     public function storeInvoice(StoreSaleInvoiceRequest $request): JsonResponse

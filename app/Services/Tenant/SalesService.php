@@ -26,8 +26,13 @@ class SalesService
         return $this->saleInvoiceQuery($filters)
             ->latest('id')
             ->paginate($perPage)
-            ->through(fn (Invoice $invoice): array => SaleInvoicePresenter::fromInvoice($invoice))
+            ->through(fn (Invoice $invoice): array => SaleInvoicePresenter::fromInvoice($invoice, includeItems: true))
             ->withQueryString();
+    }
+
+    public function findSaleOrFail(int $invoiceId): Invoice
+    {
+        return $this->saleInvoiceQuery([])->findOrFail($invoiceId);
     }
 
     /**
@@ -264,6 +269,10 @@ class SalesService
             'status' => Invoice::STATUS_CONFIRMED,
             'customer_id' => $data['customer_id'] ?? null,
             'branch_id' => $data['branch_id'] ?? null,
+            'delivery_date' => $data['delivery_date'] ?? null,
+            'return_date' => $data['return_date'] ?? null,
+            'occasion_datetime' => $data['occasion_datetime'] ?? null,
+            'visit_datetime' => $data['visit_datetime'] ?? null,
             'notes' => $data['notes'] ?? null,
             'order_notes' => $data['order_notes'] ?? null,
             'discount' => $data['discount'] ?? 0,
