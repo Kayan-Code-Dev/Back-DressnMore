@@ -25,7 +25,7 @@ class UpdateProfileRequest extends FormRequest
                 'required',
                 'email',
                 'max:190',
-                Rule::unique('users', 'email')->ignore($userId),
+                Rule::unique('tenant.users', 'email')->ignore($userId),
             ],
         ];
     }

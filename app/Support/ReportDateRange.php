@@ -43,7 +43,11 @@ class ReportDateRange
                 'from' => $now->subMonthNoOverflow()->startOfMonth()->toDateString(),
                 'to' => $now->subMonthNoOverflow()->endOfMonth()->toDateString(),
             ],
-            'month', 'monthly', default => [
+            'month', 'monthly' => [
+                'from' => $now->startOfMonth()->toDateString(),
+                'to' => $now->endOfMonth()->toDateString(),
+            ],
+            default => [
                 'from' => $now->startOfMonth()->toDateString(),
                 'to' => $now->endOfMonth()->toDateString(),
             ],
