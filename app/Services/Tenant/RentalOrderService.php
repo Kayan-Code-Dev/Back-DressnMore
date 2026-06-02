@@ -75,7 +75,7 @@ class RentalOrderService
     private function baseQuery(array $filters): Builder
     {
         $query = Invoice::query()
-            ->with(['customer', 'items.dress', 'payments'])
+            ->with(['customer', 'branch', 'items.dress', 'payments', 'createdBy'])
             ->where('type', Invoice::TYPE_RENT);
 
         $search = trim((string) ($filters['search'] ?? ($filters['client_name'] ?? '')));
