@@ -23,11 +23,11 @@ class ReportDateRange
         $period = (string) ($filters['period'] ?? 'month');
 
         return match ($period) {
-            'today' => [
+            'today', 'daily' => [
                 'from' => $now->toDateString(),
                 'to' => $now->toDateString(),
             ],
-            'week' => [
+            'week', 'weekly' => [
                 'from' => $now->startOfWeek()->toDateString(),
                 'to' => $now->endOfWeek()->toDateString(),
             ],
@@ -35,7 +35,7 @@ class ReportDateRange
                 'from' => $now->subWeek()->startOfWeek()->toDateString(),
                 'to' => $now->subWeek()->endOfWeek()->toDateString(),
             ],
-            'year' => [
+            'year', 'yearly' => [
                 'from' => $now->startOfYear()->toDateString(),
                 'to' => $now->endOfYear()->toDateString(),
             ],
@@ -43,7 +43,7 @@ class ReportDateRange
                 'from' => $now->subMonthNoOverflow()->startOfMonth()->toDateString(),
                 'to' => $now->subMonthNoOverflow()->endOfMonth()->toDateString(),
             ],
-            default => [
+            'month', 'monthly', default => [
                 'from' => $now->startOfMonth()->toDateString(),
                 'to' => $now->endOfMonth()->toDateString(),
             ],

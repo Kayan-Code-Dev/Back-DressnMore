@@ -193,12 +193,17 @@ Route::prefix('tenant')->group(function (): void {
         });
 
         Route::prefix('/reports')->middleware('plan.feature:reports.enabled')->group(function (): void {
+            Route::get('/catalog', [ReportController::class, 'catalog'])
+                ->middleware('tenant.permission:reports.view');
             Route::get('/overview', [ReportController::class, 'overview'])
                 ->middleware('tenant.permission:reports.view');
             Route::get('/sales', [ReportController::class, 'sales'])
                 ->middleware('tenant.permission:reports.sales');
             Route::get('/tailoring', [ReportController::class, 'tailoring'])
                 ->middleware('tenant.permission:reports.tailoring');
+            Route::get('/{type}', [ReportController::class, 'show'])
+                ->where('type', 'sales-daily|sales-products|sales-employees|rental|deliveries|returns|customers|inventory|expenses|cash|accounting|payments|suppliers')
+                ->middleware('tenant.permission:reports.view');
         });
 
         Route::prefix('/accounting')->middleware('plan.feature:accounting.enabled')->group(function (): void {

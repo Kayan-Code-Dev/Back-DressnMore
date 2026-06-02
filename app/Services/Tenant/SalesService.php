@@ -229,11 +229,29 @@ class SalesService
      */
     public function employeeSales(array $filters): array
     {
-        return [[
-            'employee_name' => '—',
-            'invoices_count' => 0,
-            'total_sales' => 0,
-        ]];
+        $period = ReportDateRange::resolve($filters);
+
+        return $this->saleScope($filters)
+            ->with('createdBy')
+            ->whereDate('created_at', '>=', $period['from'])
+            ->whereDate('created_at', '<=', $period['to'])
+            ->whereNotIn('status', [InvoiceStatus::CANCELLED->value, InvoiceStatus::DRAFT->value])
+            ->get()
+            ->groupBy(fn (Invoice $invoice): string => (string) ($invoice->created_by ?? 'unknown'))
+            ->map(function ($invoices, $userId): array {
+                /** @var Invoice $first */
+                $first = $invoices->first();
+
+                return [
+                    'employee_name' => $first->createdBy?->name ?? 'Unassigned',
+                    'invoices_count' => $invoices->count(),
+                    'total_sales' => round((float) $invoices->sum('total'), 2),
+                ];
+            })
+            ->values()
+            ->sortByDesc('total_sales')
+            ->values()
+            ->all();
     }
 
     /**
