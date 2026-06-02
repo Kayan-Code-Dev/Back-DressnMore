@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Services\Tenant\TenantContext;
 use App\Services\Tenant\TenantDatabaseManager;
 use App\Support\ApiResponse;
+use App\Support\TenantMessages;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -23,7 +24,7 @@ class SetTenantDatabase
         $tenant = $this->tenantContext->tenant();
 
         if ($tenant === null) {
-            return ApiResponse::error('Tenant workspace is required', 400);
+            return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
         }
 
         try {

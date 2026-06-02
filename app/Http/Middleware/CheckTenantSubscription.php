@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
+use App\Support\TenantMessages;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ class CheckTenantSubscription
         $tenant = $this->tenantContext->tenant();
 
         if ($tenant === null) {
-            return ApiResponse::error('Tenant workspace is required', 400);
+            return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
         }
 
         $status = (string) $tenant->status;

@@ -28,7 +28,7 @@ class TenantAuthLoginTest extends TestCase
         $this->seedTenantPermissions();
     }
 
-    public function test_tenant_can_login_with_workspace(): void
+    public function test_tenant_can_login_with_x_tenant_header(): void
     {
         $tenant = $this->createTenant('atelier-alpha');
         $this->connectTenant($tenant);
@@ -36,10 +36,12 @@ class TenantAuthLoginTest extends TestCase
         app(TenantUserDirectoryService::class)->register($tenant, 'owner@atelier.test');
 
         $response = $this->postJson('/api/tenant/login', [
-            'workspace' => 'atelier-alpha',
             'email' => 'owner@atelier.test',
             'password' => 'secret123',
-        ], ['Accept' => 'application/json']);
+        ], [
+            'Accept' => 'application/json',
+            'X-Tenant' => 'atelier-alpha',
+        ]);
 
         $response->assertOk()
             ->assertJsonPath('success', true)
@@ -58,10 +60,12 @@ class TenantAuthLoginTest extends TestCase
         app(TenantUserDirectoryService::class)->register($tenant, 'admin@beta.test');
 
         $this->postJson('/api/tenant/login', [
-            'workspace' => 'atelier-beta',
             'email' => 'admin@beta.test',
             'password' => 'wrong-password',
-        ], ['Accept' => 'application/json'])
+        ], [
+            'Accept' => 'application/json',
+            'X-Tenant' => 'atelier-beta',
+        ])
             ->assertStatus(422)
             ->assertJsonPath('success', false);
     }
@@ -73,10 +77,12 @@ class TenantAuthLoginTest extends TestCase
         $this->createOwnerUser('legacy@tenant.test', 'legacy-pass');
 
         $this->postJson('/api/tenant/login', [
-            'workspace' => 'legacy-tenant',
             'email' => 'legacy@tenant.test',
             'password' => 'legacy-pass',
-        ], ['Accept' => 'application/json'])
+        ], [
+            'Accept' => 'application/json',
+            'X-Tenant' => 'legacy-tenant',
+        ])
             ->assertStatus(422)
             ->assertJsonPath('success', false);
     }

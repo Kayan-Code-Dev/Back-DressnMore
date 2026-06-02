@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Tenant\DressCategory;
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
+use App\Support\TenantMessages;
 use App\Support\PlanFeatureGate;
 use Closure;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ class CheckDressCategoryPlanFeature
         $tenant = $this->tenantContext->tenant();
 
         if ($tenant === null) {
-            return ApiResponse::error('Tenant workspace is required', 400);
+            return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
         }
 
         $featureKey = $this->resolveFeatureKey($request);

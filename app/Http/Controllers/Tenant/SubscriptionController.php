@@ -8,6 +8,7 @@ use App\Http\Requests\Tenant\Subscription\UpgradeSubscriptionRequest;
 use App\Services\Platform\TenantSubscriptionBillingService;
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
+use App\Support\TenantMessages;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
 
@@ -22,7 +23,7 @@ class SubscriptionController extends Controller
     {
         $tenant = $this->tenantContext->tenant();
         if ($tenant === null) {
-            return ApiResponse::error('Tenant workspace is required', 400);
+            return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
         }
 
         return ApiResponse::success($this->billingService->overview($tenant));
@@ -38,7 +39,7 @@ class SubscriptionController extends Controller
         try {
             $tenant = $this->tenantContext->tenant();
             if ($tenant === null) {
-                return ApiResponse::error('Tenant workspace is required', 400);
+                return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
             }
 
             $subscription = $this->billingService->renew($tenant, $request->validated());
@@ -54,7 +55,7 @@ class SubscriptionController extends Controller
         try {
             $tenant = $this->tenantContext->tenant();
             if ($tenant === null) {
-                return ApiResponse::error('Tenant workspace is required', 400);
+                return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
             }
 
             $subscription = $this->billingService->upgrade($tenant, $request->validated());

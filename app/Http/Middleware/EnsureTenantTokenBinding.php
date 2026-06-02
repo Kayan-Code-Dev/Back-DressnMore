@@ -6,6 +6,7 @@ use App\Models\Central\PersonalAccessToken;
 use App\Models\Tenant\User as TenantUser;
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
+use App\Support\TenantMessages;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\TransientToken;
@@ -36,11 +37,11 @@ class EnsureTenantTokenBinding
         $tenant = $this->tenantContext->tenant();
 
         if ($tenant === null) {
-            return ApiResponse::error('Tenant workspace is required', 400);
+            return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
         }
 
         if ($token->tenant_id === null || (int) $token->tenant_id !== (int) $tenant->id) {
-            return ApiResponse::error('Token is not valid for this tenant workspace', 403);
+            return ApiResponse::error(TenantMessages::TOKEN_MISMATCH, 403);
         }
 
         return $next($request);

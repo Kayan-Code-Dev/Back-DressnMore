@@ -24,7 +24,7 @@ class TenantAuthService
 
         if ($tenant === null) {
             throw ValidationException::withMessages([
-                'workspace' => ['Tenant workspace is required.'],
+                'email' => ['Tenant context is required.'],
             ]);
         }
 

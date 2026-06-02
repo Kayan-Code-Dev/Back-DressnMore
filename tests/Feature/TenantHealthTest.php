@@ -13,7 +13,7 @@ class TenantHealthTest extends TestCase
         $response->assertStatus(400)
             ->assertJsonPath('success', false)
             ->assertJson([
-                'message' => 'Tenant workspace is required',
+                'message' => 'Tenant context is required',
             ]);
     }
 }

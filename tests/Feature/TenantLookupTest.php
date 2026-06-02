@@ -81,7 +81,7 @@ class TenantLookupTest extends TestCase
 
         $response->assertStatus(400)
             ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Tenant workspace is required');
+            ->assertJsonPath('message', 'Tenant context is required');
     }
 
     public function test_invalid_tenant_rejected(): void

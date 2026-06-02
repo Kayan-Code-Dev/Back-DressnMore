@@ -206,7 +206,7 @@ class TenantDressCategoryTest extends TestCase
         ]);
 
         $response->assertStatus(400)
-            ->assertJson(['message' => 'Tenant workspace is required']);
+            ->assertJson(['message' => 'Tenant context is required']);
     }
 
     public function test_invalid_tenant_rejected(): void

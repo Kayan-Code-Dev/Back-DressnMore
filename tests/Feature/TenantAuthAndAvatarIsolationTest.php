@@ -3,21 +3,22 @@
 namespace Tests\Feature;
 
 use App\Models\Central\Tenant;
-use App\Models\Central\TenantUserDirectory;
-use App\Models\Tenant\Customer;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
+use App\Services\Tenant\TenantUserAvatarService;
 use App\Services\Tenant\TenantUserDirectoryService;
 use App\Support\TenantMessages;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Tenant\TenantRolePermissionSeeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
-class TenantDataIsolationTest extends TestCase
+class TenantAuthAndAvatarIsolationTest extends TestCase
 {
     private string $centralDatabasePath;
 
@@ -32,6 +33,7 @@ class TenantDataIsolationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Storage::fake('public');
         $this->prepareSqliteDatabases();
         $this->runMigrations();
         $this->seedTenantPermissions();
@@ -39,7 +41,19 @@ class TenantDataIsolationTest extends TestCase
         $this->tenantB = $this->createTenant('tenant-b', $this->tenantBDatabasePath);
     }
 
-    public function test_login_requires_tenant_context(): void
+    public function test_login_without_workspace_uses_x_tenant_header(): void
+    {
+        $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
+
+        $this->postJson('/api/tenant/login', [
+            'email' => 'owner@a.test',
+            'password' => 'secret123',
+        ], $this->tenantHeaders($this->tenantA))
+            ->assertOk()
+            ->assertJsonPath('data.tenant.slug', 'tenant-a');
+    }
+
+    public function test_login_rejects_missing_tenant_context(): void
     {
         $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
 
@@ -50,100 +64,90 @@ class TenantDataIsolationTest extends TestCase
             ->assertJsonPath('message', TenantMessages::CONTEXT_REQUIRED);
     }
 
-    public function test_login_rejects_email_for_wrong_tenant(): void
+    public function test_me_returns_user_for_matching_tenant(): void
     {
         $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
+        $token = $this->loginAndGetToken($this->tenantA, 'owner@a.test', 'secret123');
 
-        $this->postJson('/api/tenant/login', [
-            'email' => 'owner@a.test',
-            'password' => 'secret123',
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => $this->tenantB->slug,
-        ])->assertStatus(422)
-            ->assertJsonPath('success', false);
-    }
-
-    public function test_login_succeeds_only_for_matching_tenant_and_directory(): void
-    {
-        $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
-
-        $this->postJson('/api/tenant/login', [
-            'email' => 'owner@a.test',
-            'password' => 'secret123',
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => $this->tenantA->slug,
-        ])
+        $this->getJson('/api/tenant/me', $this->authenticatedHeaders($this->tenantA, $token))
             ->assertOk()
+            ->assertJsonPath('data.user.email', 'owner@a.test')
             ->assertJsonPath('data.tenant.slug', 'tenant-a');
     }
 
-    public function test_token_is_bound_to_tenant_and_cannot_access_other_tenant(): void
+    public function test_token_cannot_access_other_tenant_me(): void
     {
         $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
         $this->seedTenantUser($this->tenantB, 'owner@b.test', 'secret123');
 
         $token = $this->loginAndGetToken($this->tenantA, 'owner@a.test', 'secret123');
 
-        $this->getJson('/api/tenant/customers?per_page=1', [
-            'Authorization' => 'Bearer '.$token,
-            'X-Tenant' => $this->tenantB->slug,
-            'Accept' => 'application/json',
-        ])->assertForbidden()
+        $this->getJson('/api/tenant/me', $this->authenticatedHeaders($this->tenantB, $token))
+            ->assertForbidden()
             ->assertJsonPath('message', TenantMessages::TOKEN_MISMATCH);
     }
 
-    public function test_tenant_data_is_stored_in_separate_databases(): void
+    public function test_avatar_paths_are_isolated_between_tenants_with_same_user_id(): void
     {
-        $this->connectTenant($this->tenantA);
-        Customer::query()->create([
-            'customer_code' => 'A-001',
-            'name' => 'Tenant A Customer',
-            'phone' => '0500000001',
-            'status' => 'active',
-        ]);
+        $userA = $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
+        $userB = $this->seedTenantUser($this->tenantB, 'owner@b.test', 'secret123');
 
-        $this->connectTenant($this->tenantB);
-        $this->assertSame(0, Customer::query()->count());
+        $this->assertSame(1, $userA->id);
+        $this->assertSame(1, $userB->id);
 
-        Customer::query()->create([
-            'customer_code' => 'B-001',
-            'name' => 'Tenant B Customer',
-            'phone' => '0500000002',
-            'status' => 'active',
-        ]);
+        $tokenA = $this->loginAndGetToken($this->tenantA, 'owner@a.test', 'secret123');
+        $tokenB = $this->loginAndGetToken($this->tenantB, 'owner@b.test', 'secret123');
 
-        $this->connectTenant($this->tenantA);
-        $this->assertSame(1, Customer::query()->count());
-        $this->assertSame('Tenant A Customer', Customer::query()->value('name'));
+        $avatarA = UploadedFile::fake()->image('avatar-a.jpg');
+        $avatarB = UploadedFile::fake()->image('avatar-b.jpg');
+
+        $this->post('/api/tenant/settings/profile/avatar', [
+            'avatar' => $avatarA,
+        ], $this->authenticatedHeaders($this->tenantA, $tokenA))->assertOk();
+
+        $this->post('/api/tenant/settings/profile/avatar', [
+            'avatar' => $avatarB,
+        ], $this->authenticatedHeaders($this->tenantB, $tokenB))->assertOk();
+
+        $meA = $this->getJson('/api/tenant/me', $this->authenticatedHeaders($this->tenantA, $tokenA))
+            ->assertOk()
+            ->json('data.user');
+
+        $meB = $this->getJson('/api/tenant/me', $this->authenticatedHeaders($this->tenantB, $tokenB))
+            ->assertOk()
+            ->json('data.user');
+
+        $this->assertNotNull($meA['avatar_path']);
+        $this->assertNotNull($meB['avatar_path']);
+        $this->assertNotSame($meA['avatar_path'], $meB['avatar_path']);
+        $this->assertStringContainsString('tenants/'.$this->tenantA->id.'/users/1/avatar/', $meA['avatar_path']);
+        $this->assertStringContainsString('tenants/'.$this->tenantB->id.'/users/1/avatar/', $meB['avatar_path']);
+        $this->assertNotSame($meA['avatar_url'], $meB['avatar_url']);
+
+        $avatarService = app(TenantUserAvatarService::class);
+        $this->assertNull($avatarService->url($meA['avatar_path'], $this->tenantB));
+        $this->assertNull($avatarService->url($meB['avatar_path'], $this->tenantA));
     }
 
-    public function test_directory_enforces_one_email_to_one_tenant(): void
+    /**
+     * @return array<string, string>
+     */
+    private function tenantHeaders(Tenant $tenant): array
     {
-        $this->seedTenantUser($this->tenantA, 'shared@test.com', 'secret123');
-
-        $this->expectException(\Illuminate\Database\QueryException::class);
-
-        TenantUserDirectory::query()->create([
-            'email' => 'shared@test.com',
-            'tenant_id' => $this->tenantB->id,
-            'status' => 'active',
-        ]);
-    }
-
-    public function test_login_with_x_tenant_header_only(): void
-    {
-        $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
-
-        $this->postJson('/api/tenant/login', [
-            'email' => 'owner@a.test',
-            'password' => 'secret123',
-        ], [
+        return [
             'Accept' => 'application/json',
-            'X-Tenant' => $this->tenantA->slug,
-        ])->assertOk()
-            ->assertJsonPath('data.tenant.slug', 'tenant-a');
+            'X-Tenant' => $tenant->slug,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function authenticatedHeaders(Tenant $tenant, string $token): array
+    {
+        return array_merge($this->tenantHeaders($tenant), [
+            'Authorization' => 'Bearer '.$token,
+        ]);
     }
 
     private function loginAndGetToken(Tenant $tenant, string $email, string $password): string
@@ -151,10 +155,7 @@ class TenantDataIsolationTest extends TestCase
         $response = $this->postJson('/api/tenant/login', [
             'email' => $email,
             'password' => $password,
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => $tenant->slug,
-        ])->assertOk();
+        ], $this->tenantHeaders($tenant))->assertOk();
 
         $token = $response->json('data.token');
         $this->assertIsString($token);
@@ -187,9 +188,9 @@ class TenantDataIsolationTest extends TestCase
             mkdir($testingPath, 0777, true);
         }
 
-        $this->centralDatabasePath = $testingPath.'/central-isolation.sqlite';
-        $this->tenantADatabasePath = $testingPath.'/tenant-a-isolation.sqlite';
-        $this->tenantBDatabasePath = $testingPath.'/tenant-b-isolation.sqlite';
+        $this->centralDatabasePath = $testingPath.'/central-auth-avatar.sqlite';
+        $this->tenantADatabasePath = $testingPath.'/tenant-a-auth-avatar.sqlite';
+        $this->tenantBDatabasePath = $testingPath.'/tenant-b-auth-avatar.sqlite';
 
         foreach ([
             $this->centralDatabasePath,

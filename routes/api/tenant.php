@@ -143,6 +143,8 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:settings.profile');
             Route::put('/profile', [SettingsController::class, 'updateProfile'])
                 ->middleware('tenant.permission:settings.profile');
+            Route::post('/profile/avatar', [SettingsController::class, 'uploadAvatar'])
+                ->middleware('tenant.permission:settings.profile');
         });
 
         Route::prefix('/employees')->group(function (): void {

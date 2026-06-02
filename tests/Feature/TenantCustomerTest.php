@@ -159,7 +159,7 @@ class TenantCustomerTest extends TestCase
 
         $response->assertStatus(400)
             ->assertJson([
-                'message' => 'Tenant workspace is required',
+                'message' => 'Tenant context is required',
             ]);
     }
 
