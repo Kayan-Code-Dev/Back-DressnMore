@@ -39,8 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'plan.dress_category' => CheckDressCategoryPlanFeature::class,
         ]);
 
-        $middleware->prependToPriorityList(AuthenticatesRequests::class, EnsureTenantTokenBinding::class);
-        $middleware->prependToPriorityList(EnsureTenantTokenBinding::class, SetTenantDatabase::class);
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, SetTenantDatabase::class);
         $middleware->prependToPriorityList(SetTenantDatabase::class, CheckTenantSubscription::class);
         $middleware->prependToPriorityList(CheckTenantSubscription::class, IdentifyTenant::class);
     })
