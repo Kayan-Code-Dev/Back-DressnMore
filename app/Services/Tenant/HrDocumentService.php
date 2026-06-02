@@ -1,0 +1,149 @@
+<?php
+
+namespace App\Services\Tenant;
+
+use App\Enums\HrDocumentStatus;
+use App\Models\Tenant\HrDocument;
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+
+class HrDocumentService
+{
+    public function __construct(private readonly HrSettingService $hrSettingService) {}
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
+    {
+        $query = HrDocument::query()->with('employee')->latest('id');
+
+        $this->applyFilters($query, $filters);
+
+        return $query->paginate($perPage)->withQueryString();
+    }
+
+    public function create(array $data, ?int $uploadedBy = null): HrDocument
+    {
+        if ($uploadedBy !== null) {
+            $data['uploaded_by'] = $uploadedBy;
+        }
+
+        $data['status'] = $this->resolveStatus(
+            $data['status'] ?? null,
+            $data['expiry_date'] ?? null,
+        );
+
+        $document = HrDocument::query()->create($data);
+
+        return $document->load('employee');
+    }
+
+    public function findOrFail(int $documentId): HrDocument
+    {
+        return HrDocument::query()->with('employee')->findOrFail($documentId);
+    }
+
+    public function update(HrDocument $document, array $data): HrDocument
+    {
+        $document->fill($data);
+        $document->status = $this->resolveStatus(
+            $document->status,
+            $document->expiry_date?->toDateString(),
+        );
+        $document->save();
+
+        return $document->refresh()->load('employee');
+    }
+
+    public function delete(HrDocument $document): void
+    {
+        $document->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function expiryAlerts(array $filters, int $perPage = 15): LengthAwarePaginator
+    {
+        $alertDays = $this->hrSettingService->documentExpiryAlertDays();
+
+        $query = HrDocument::query()
+            ->with('employee')
+            ->whereNotNull('expiry_date')
+            ->where(function ($builder) use ($alertDays): void {
+                $builder
+                    ->where('status', HrDocumentStatus::EXPIRED->value)
+                    ->orWhere('status', HrDocumentStatus::EXPIRING_SOON->value)
+                    ->orWhereDate('expiry_date', '<=', CarbonImmutable::today()->addDays($alertDays));
+            })
+            ->orderBy('expiry_date');
+
+        $this->applyFilters($query, $filters);
+
+        return $query->paginate($perPage)->withQueryString();
+    }
+
+    public function countExpiring(): int
+    {
+        $alertDays = $this->hrSettingService->documentExpiryAlertDays();
+
+        return HrDocument::query()
+            ->whereNotNull('expiry_date')
+            ->where(function ($builder) use ($alertDays): void {
+                $builder
+                    ->where('status', HrDocumentStatus::EXPIRING_SOON->value)
+                    ->orWhereDate('expiry_date', '<=', CarbonImmutable::today()->addDays($alertDays))
+                    ->whereDate('expiry_date', '>=', CarbonImmutable::today());
+            })
+            ->count();
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<HrDocument>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    private function applyFilters($query, array $filters): void
+    {
+        if (! empty($filters['employee_id'])) {
+            $query->where('employee_id', $filters['employee_id']);
+        }
+
+        if (! empty($filters['document_type'])) {
+            $query->where('document_type', $filters['document_type']);
+        }
+
+        if (! empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (! empty($filters['expires_before'])) {
+            $query->whereDate('expiry_date', '<=', $filters['expires_before']);
+        }
+    }
+
+    private function resolveStatus(?string $requestedStatus, mixed $expiryDate): string
+    {
+        if ($requestedStatus === HrDocumentStatus::MISSING->value) {
+            return HrDocumentStatus::MISSING->value;
+        }
+
+        if ($expiryDate === null || $expiryDate === '') {
+            return HrDocumentStatus::VALID->value;
+        }
+
+        $expiry = CarbonImmutable::parse($expiryDate)->startOfDay();
+        $today = CarbonImmutable::today();
+
+        if ($expiry->lt($today)) {
+            return HrDocumentStatus::EXPIRED->value;
+        }
+
+        $alertDays = $this->hrSettingService->documentExpiryAlertDays();
+        if ($expiry->lte($today->addDays($alertDays))) {
+            return HrDocumentStatus::EXPIRING_SOON->value;
+        }
+
+        return HrDocumentStatus::VALID->value;
+    }
+}

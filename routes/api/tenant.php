@@ -15,6 +15,12 @@ use App\Http\Controllers\Tenant\ExpenseCategoryController;
 use App\Http\Controllers\Tenant\ExpenseController;
 use App\Http\Controllers\Tenant\FactoryController;
 use App\Http\Controllers\Tenant\HealthController;
+use App\Http\Controllers\Tenant\HrDashboardController;
+use App\Http\Controllers\Tenant\HrDepartmentController;
+use App\Http\Controllers\Tenant\HrDocumentController;
+use App\Http\Controllers\Tenant\HrEmployeeController;
+use App\Http\Controllers\Tenant\HrJobTitleController;
+use App\Http\Controllers\Tenant\HrSettingController;
 use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Tenant\InvoiceDeliveryController;
 use App\Http\Controllers\Tenant\JournalEntryController;
@@ -516,6 +522,83 @@ Route::prefix('tenant')->group(function (): void {
             Route::get('/{invoice}/security-deposit/transactions', [InvoiceDeliveryController::class, 'securityDepositTransactions'])
                 ->whereNumber('invoice')
                 ->middleware('tenant.permission:security_deposit.view');
+        });
+
+        Route::prefix('/hr')->group(function (): void {
+            Route::get('/dashboard', [HrDashboardController::class, 'index'])
+                ->middleware('tenant.permission:hr.dashboard.view');
+
+            Route::get('/departments', [HrDepartmentController::class, 'index'])
+                ->middleware('tenant.permission:hr.departments.view');
+            Route::post('/departments', [HrDepartmentController::class, 'store'])
+                ->middleware('tenant.permission:hr.departments.create');
+            Route::get('/departments/{department}', [HrDepartmentController::class, 'show'])
+                ->whereNumber('department')
+                ->middleware('tenant.permission:hr.departments.view');
+            Route::put('/departments/{department}', [HrDepartmentController::class, 'update'])
+                ->whereNumber('department')
+                ->middleware('tenant.permission:hr.departments.update');
+            Route::delete('/departments/{department}', [HrDepartmentController::class, 'destroy'])
+                ->whereNumber('department')
+                ->middleware('tenant.permission:hr.departments.delete');
+
+            Route::get('/job-titles', [HrJobTitleController::class, 'index'])
+                ->middleware('tenant.permission:hr.job_titles.view');
+            Route::post('/job-titles', [HrJobTitleController::class, 'store'])
+                ->middleware('tenant.permission:hr.job_titles.create');
+            Route::get('/job-titles/{jobTitle}', [HrJobTitleController::class, 'show'])
+                ->whereNumber('jobTitle')
+                ->middleware('tenant.permission:hr.job_titles.view');
+            Route::put('/job-titles/{jobTitle}', [HrJobTitleController::class, 'update'])
+                ->whereNumber('jobTitle')
+                ->middleware('tenant.permission:hr.job_titles.update');
+            Route::delete('/job-titles/{jobTitle}', [HrJobTitleController::class, 'destroy'])
+                ->whereNumber('jobTitle')
+                ->middleware('tenant.permission:hr.job_titles.delete');
+
+            Route::get('/employees', [HrEmployeeController::class, 'index'])
+                ->middleware('tenant.permission:hr.employees.view');
+            Route::post('/employees', [HrEmployeeController::class, 'store'])
+                ->middleware('tenant.permission:hr.employees.create');
+            Route::patch('/employees/{employee}/status', [HrEmployeeController::class, 'updateStatus'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.employees.status');
+            Route::get('/employees/{employee}/summary', [HrEmployeeController::class, 'summary'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.employees.view');
+            Route::get('/employees/{employee}/documents', [HrEmployeeController::class, 'documents'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.documents.view');
+            Route::get('/employees/{employee}', [HrEmployeeController::class, 'show'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.employees.view');
+            Route::put('/employees/{employee}', [HrEmployeeController::class, 'update'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.employees.update');
+            Route::delete('/employees/{employee}', [HrEmployeeController::class, 'destroy'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.employees.delete');
+
+            Route::get('/documents/expiry-alerts', [HrDocumentController::class, 'expiryAlerts'])
+                ->middleware('tenant.permission:hr.documents.view');
+            Route::get('/documents', [HrDocumentController::class, 'index'])
+                ->middleware('tenant.permission:hr.documents.view');
+            Route::post('/documents', [HrDocumentController::class, 'store'])
+                ->middleware('tenant.permission:hr.documents.upload');
+            Route::get('/documents/{document}', [HrDocumentController::class, 'show'])
+                ->whereNumber('document')
+                ->middleware('tenant.permission:hr.documents.view');
+            Route::put('/documents/{document}', [HrDocumentController::class, 'update'])
+                ->whereNumber('document')
+                ->middleware('tenant.permission:hr.documents.upload');
+            Route::delete('/documents/{document}', [HrDocumentController::class, 'destroy'])
+                ->whereNumber('document')
+                ->middleware('tenant.permission:hr.documents.delete');
+
+            Route::get('/settings', [HrSettingController::class, 'index'])
+                ->middleware('tenant.permission:hr.settings.view');
+            Route::put('/settings', [HrSettingController::class, 'update'])
+                ->middleware('tenant.permission:hr.settings.update');
         });
     });
 });
