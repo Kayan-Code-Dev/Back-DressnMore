@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Tenant;
 
+use App\Services\Tenant\HrEmployeeAccountService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,8 +10,15 @@ class HrEmployeeResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $accountService = app(HrEmployeeAccountService::class);
+
         return [
             'id' => $this->id,
+            'user_id' => $this->user_id,
+            'user_account' => $this->when(
+                $this->relationLoaded('user'),
+                fn () => $accountService->presentAccount($this->user)
+            ),
             'employee_code' => $this->employee_code,
             'full_name' => $this->full_name,
             'avatar_path' => $this->avatar_path,

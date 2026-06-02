@@ -6,6 +6,9 @@ use App\Models\Tenant\Branch;
 use App\Models\Tenant\HrDepartment;
 use App\Models\Tenant\HrEmployee;
 use App\Models\Tenant\HrJobTitle;
+use App\Models\Tenant\Permission;
+use App\Models\Tenant\Role;
+use App\Models\Tenant\User;
 
 class HrEmployeeApiTest extends TenantHrTestCase
 {
@@ -80,11 +83,56 @@ class HrEmployeeApiTest extends TenantHrTestCase
         $this->assertSoftDeleted('hr_employees', ['id' => $employeeId], 'tenant');
     }
 
+    public function test_create_employee_with_user_account_and_custom_permissions(): void
+    {
+        $headers = $this->hrHeaders();
+
+        $permissionIds = Permission::query()
+            ->whereIn('key', ['hr.employees.view', 'hr.attendance.view'])
+            ->pluck('id')
+            ->all();
+        $this->assertNotEmpty($permissionIds);
+
+        $email = 'hr.staff.'.uniqid().'@tenant.test';
+        $payload = array_merge($this->employeePayload('EMP-100', null), [
+            'user_account' => [
+                'email' => $email,
+                'password' => 'SecretPass1',
+                'password_confirmation' => 'SecretPass1',
+                'permission_ids' => $permissionIds,
+            ],
+        ]);
+
+        $response = $this->postJson('/api/tenant/hr/employees', $payload, $headers)
+            ->assertCreated()
+            ->assertJsonPath('data.user_account.email', $email);
+
+        $userId = (int) $response->json('data.user_id');
+        $user = User::query()->findOrFail($userId);
+        $this->assertSame($email, $user->email);
+        $this->assertTrue($user->roles()->exists());
+    }
+
+    public function test_list_hr_access_roles_and_permissions(): void
+    {
+        $headers = $this->hrHeaders();
+
+        Role::query()->firstOrCreate(['slug' => 'cashier'], ['name' => 'Cashier']);
+
+        $this->getJson('/api/tenant/hr/access/roles', $headers)
+            ->assertOk()
+            ->assertJsonStructure(['data' => [['id', 'name', 'slug', 'permission_ids']]]);
+
+        $this->getJson('/api/tenant/hr/access/permissions', $headers)
+            ->assertOk()
+            ->assertJsonStructure(['data' => [['id', 'key', 'name', 'group']]]);
+    }
+
     public function test_show_employee_details(): void
     {
         $headers = $this->hrHeaders();
 
-        $employee = HrEmployee::query()->create(array_merge($this->employeePayload('EMP-020', null), [
+        $employee = HrEmployee::query()->create(array_merge($this->employeeAttributes('EMP-020', null), [
             'full_name' => 'Detail Employee',
         ]));
 
@@ -97,13 +145,18 @@ class HrEmployeeApiTest extends TenantHrTestCase
     /**
      * @return array<string, mixed>
      */
-    private function employeePayload(string $code, ?string $nationalId): array
+    /**
+     * @return array<string, mixed>
+     */
+    private function employeeAttributes(string $code, ?string $nationalId): array
     {
+        $email = strtolower($code).'@hr-employee.test';
+
         return [
             'employee_code' => $code,
             'full_name' => 'Test Employee',
             'phone' => '+966500000001',
-            'email' => 'employee@test.com',
+            'email' => $email,
             'national_id' => $nationalId,
             'employment_type' => 'full_time',
             'status' => 'active',
@@ -111,6 +164,46 @@ class HrEmployeeApiTest extends TenantHrTestCase
             'base_salary' => 5000,
             'salary_type' => 'monthly',
             'working_hours_per_day' => 8,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function employeePayload(string $code, ?string $nationalId): array
+    {
+        $role = Role::query()->firstOrCreate(
+            ['slug' => 'hr-test-staff'],
+            ['name' => 'HR Test Staff']
+        );
+        $permissionIds = Permission::query()
+            ->whereIn('key', ['hr.employees.view', 'hr.dashboard.view'])
+            ->pluck('id')
+            ->all();
+        if ($permissionIds !== []) {
+            $role->permissions()->syncWithoutDetaching($permissionIds);
+        }
+
+        $email = strtolower($code).'@hr-employee.test';
+
+        return [
+            'employee_code' => $code,
+            'full_name' => 'Test Employee',
+            'phone' => '+966500000001',
+            'email' => $email,
+            'national_id' => $nationalId,
+            'employment_type' => 'full_time',
+            'status' => 'active',
+            'joining_date' => '2024-01-01',
+            'base_salary' => 5000,
+            'salary_type' => 'monthly',
+            'working_hours_per_day' => 8,
+            'user_account' => [
+                'email' => $email,
+                'password' => 'SecretPass1',
+                'password_confirmation' => 'SecretPass1',
+                'role_id' => $role->id,
+            ],
         ];
     }
 }

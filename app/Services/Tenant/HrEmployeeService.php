@@ -5,16 +5,19 @@ namespace App\Services\Tenant;
 use App\Models\Tenant\HrEmployee;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class HrEmployeeService
 {
+    public function __construct(private readonly HrEmployeeAccountService $accountService) {}
+
     /**
      * @param  array<string, mixed>  $filters
      */
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = HrEmployee::query()
-            ->with(['branch', 'department', 'jobTitle'])
+            ->with(['branch', 'department', 'jobTitle', 'user.roles'])
             ->latest('id');
 
         $this->applyFilters($query, $filters);
@@ -22,26 +25,49 @@ class HrEmployeeService
         return $query->paginate($perPage)->withQueryString();
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public function create(array $data): HrEmployee
     {
-        $employee = HrEmployee::query()->create($data);
+        $account = (array) ($data['user_account'] ?? []);
+        unset($data['user_account']);
 
-        return $employee->load(['branch', 'department', 'jobTitle']);
+        return DB::connection('tenant')->transaction(function () use ($data, $account): HrEmployee {
+            $employee = HrEmployee::query()->create($data);
+            $this->accountService->createForEmployee($employee, $account);
+
+            return $this->loadEmployee($employee->id);
+        });
     }
 
     public function findOrFail(int $employeeId): HrEmployee
     {
-        return HrEmployee::query()
-            ->with(['branch', 'department', 'jobTitle'])
-            ->findOrFail($employeeId);
+        return $this->loadEmployee($employeeId);
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public function update(HrEmployee $employee, array $data): HrEmployee
     {
-        $employee->fill($data);
-        $employee->save();
+        $account = array_key_exists('user_account', $data)
+            ? (array) ($data['user_account'] ?? [])
+            : null;
+        unset($data['user_account']);
 
-        return $employee->refresh()->load(['branch', 'department', 'jobTitle']);
+        return DB::connection('tenant')->transaction(function () use ($employee, $data, $account): HrEmployee {
+            $employee->fill($data);
+            $employee->save();
+
+            if ($account !== null) {
+                $this->accountService->updateForEmployee($employee, $account);
+            } elseif ($employee->user_id) {
+                $this->accountService->updateForEmployee($employee, []);
+            }
+
+            return $this->loadEmployee($employee->id);
+        });
     }
 
     public function delete(HrEmployee $employee): void
@@ -60,7 +86,11 @@ class HrEmployeeService
         }
         $employee->save();
 
-        return $employee->refresh()->load(['branch', 'department', 'jobTitle']);
+        if ($employee->user_id) {
+            $this->accountService->updateForEmployee($employee, []);
+        }
+
+        return $this->loadEmployee($employee->id);
     }
 
     /**
@@ -68,7 +98,7 @@ class HrEmployeeService
      */
     public function buildSummary(HrEmployee $employee): array
     {
-        $employee->load(['branch', 'department', 'jobTitle']);
+        $employee = $this->loadEmployee($employee->id);
 
         $documentsQuery = $employee->documents();
         $documentsCount = (clone $documentsQuery)->count();
@@ -98,6 +128,13 @@ class HrEmployeeService
                 'leave_balances' => [],
             ],
         ];
+    }
+
+    private function loadEmployee(int $employeeId): HrEmployee
+    {
+        return HrEmployee::query()
+            ->with(['branch', 'department', 'jobTitle', 'user.roles.permissions'])
+            ->findOrFail($employeeId);
     }
 
     /**

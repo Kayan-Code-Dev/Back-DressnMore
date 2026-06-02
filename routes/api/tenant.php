@@ -16,6 +16,7 @@ use App\Http\Controllers\Tenant\ExpenseController;
 use App\Http\Controllers\Tenant\FactoryController;
 use App\Http\Controllers\Tenant\HealthController;
 use App\Http\Controllers\Tenant\HrDashboardController;
+use App\Http\Controllers\Tenant\HrAccessController;
 use App\Http\Controllers\Tenant\HrAttendanceController;
 use App\Http\Controllers\Tenant\HrDepartmentController;
 use App\Http\Controllers\Tenant\HrDocumentController;
@@ -558,6 +559,11 @@ Route::prefix('tenant')->group(function (): void {
             Route::delete('/job-titles/{jobTitle}', [HrJobTitleController::class, 'destroy'])
                 ->whereNumber('jobTitle')
                 ->middleware('tenant.permission:hr.job_titles.delete');
+
+            Route::get('/access/roles', [HrAccessController::class, 'roles'])
+                ->middleware('tenant.permission:hr.employees.view');
+            Route::get('/access/permissions', [HrAccessController::class, 'permissions'])
+                ->middleware('tenant.permission:hr.employees.view');
 
             Route::get('/employees', [HrEmployeeController::class, 'index'])
                 ->middleware('tenant.permission:hr.employees.view');

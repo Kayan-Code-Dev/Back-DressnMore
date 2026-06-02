@@ -5,11 +5,15 @@ namespace App\Http\Requests\Tenant\Hr\Employee;
 use App\Enums\HrEmployeeStatus;
 use App\Enums\HrEmploymentType;
 use App\Enums\HrSalaryType;
+use App\Http\Requests\Tenant\Hr\Employee\Concerns\ValidatesHrEmployeeUserAccount;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreHrEmployeeRequest extends FormRequest
 {
+    use ValidatesHrEmployeeUserAccount;
+
     public function authorize(): bool
     {
         return true;
@@ -17,7 +21,7 @@ class StoreHrEmployeeRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        return array_merge([
             'employee_code' => ['required', 'string', 'max:50', Rule::unique('tenant.hr_employees', 'employee_code')->whereNull('deleted_at')],
             'full_name' => ['required', 'string', 'max:190'],
             'phone' => ['required', 'string', 'max:30'],
@@ -39,6 +43,27 @@ class StoreHrEmployeeRequest extends FormRequest
             'emergency_contact_name' => ['nullable', 'string', 'max:120'],
             'emergency_contact_phone' => ['nullable', 'string', 'max:30'],
             'notes' => ['nullable', 'string'],
-        ];
+        ], $this->userAccountRules(true));
+    }
+
+    public function messages(): array
+    {
+        return $this->userAccountMessages();
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $account = (array) $this->input('user_account', []);
+            $roleId = $account['role_id'] ?? null;
+            $permissionIds = (array) ($account['permission_ids'] ?? []);
+
+            if (! $roleId && $permissionIds === []) {
+                $validator->errors()->add(
+                    'user_account.role_id',
+                    'اختر دوراً جاهزاً أو حدد صلاحيات مخصصة.'
+                );
+            }
+        });
     }
 }

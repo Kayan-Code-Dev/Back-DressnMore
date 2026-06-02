@@ -14,6 +14,7 @@ class HrEmployee extends BaseTenantModel
     use SoftDeletes;
 
     protected $fillable = [
+        'user_id',
         'employee_code',
         'full_name',
         'avatar_path',
@@ -47,6 +48,11 @@ class HrEmployee extends BaseTenantModel
             'base_salary' => 'decimal:2',
             'working_hours_per_day' => 'decimal:2',
         ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function branch(): BelongsTo

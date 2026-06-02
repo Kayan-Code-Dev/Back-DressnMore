@@ -5,11 +5,16 @@ namespace App\Http\Requests\Tenant\Hr\Employee;
 use App\Enums\HrEmployeeStatus;
 use App\Enums\HrEmploymentType;
 use App\Enums\HrSalaryType;
+use App\Http\Requests\Tenant\Hr\Employee\Concerns\ValidatesHrEmployeeUserAccount;
+use App\Models\Tenant\HrEmployee;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateHrEmployeeRequest extends FormRequest
 {
+    use ValidatesHrEmployeeUserAccount;
+
     public function authorize(): bool
     {
         return true;
@@ -18,8 +23,17 @@ class UpdateHrEmployeeRequest extends FormRequest
     public function rules(): array
     {
         $employeeId = (int) $this->route('employee');
+        $employee = HrEmployee::query()->with('user')->find($employeeId);
+        $userId = $employee?->user_id;
 
-        return [
+        $userEmailRule = ['sometimes', 'email', 'max:190'];
+        if ($userId) {
+            $userEmailRule[] = Rule::unique('tenant.users', 'email')->ignore($userId);
+        } else {
+            $userEmailRule[] = Rule::unique('tenant.users', 'email');
+        }
+
+        return array_merge([
             'employee_code' => ['sometimes', 'required', 'string', 'max:50', Rule::unique('tenant.hr_employees', 'employee_code')->ignore($employeeId)->whereNull('deleted_at')],
             'full_name' => ['sometimes', 'required', 'string', 'max:190'],
             'phone' => ['sometimes', 'required', 'string', 'max:30'],
@@ -41,6 +55,37 @@ class UpdateHrEmployeeRequest extends FormRequest
             'emergency_contact_name' => ['sometimes', 'nullable', 'string', 'max:120'],
             'emergency_contact_phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'notes' => ['sometimes', 'nullable', 'string'],
-        ];
+            'user_account' => ['sometimes', 'array'],
+            'user_account.email' => $userEmailRule,
+            'user_account.password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
+            'user_account.role_id' => ['nullable', 'integer', Rule::exists('tenant.roles', 'id')],
+            'user_account.permission_ids' => ['nullable', 'array', 'min:1'],
+            'user_account.permission_ids.*' => ['integer', Rule::exists('tenant.permissions', 'id')],
+        ]);
+    }
+
+    public function messages(): array
+    {
+        return $this->userAccountMessages();
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if (! $this->has('user_account')) {
+                return;
+            }
+
+            $account = (array) $this->input('user_account', []);
+            $roleId = $account['role_id'] ?? null;
+            $permissionIds = (array) ($account['permission_ids'] ?? []);
+
+            if (! $roleId && $permissionIds === []) {
+                $validator->errors()->add(
+                    'user_account.role_id',
+                    'اختر دوراً جاهزاً أو حدد صلاحيات مخصصة.'
+                );
+            }
+        });
     }
 }
