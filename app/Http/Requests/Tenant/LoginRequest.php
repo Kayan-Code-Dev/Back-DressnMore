@@ -11,10 +11,19 @@ class LoginRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if (! $this->filled('workspace') && $this->headers->has('X-Tenant')) {
+            $this->merge([
+                'workspace' => $this->header('X-Tenant'),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         return [
-            'workspace' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'workspace' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ];

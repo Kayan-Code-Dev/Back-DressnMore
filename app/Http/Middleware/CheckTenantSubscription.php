@@ -50,11 +50,11 @@ class CheckTenantSubscription
 
     private function isExempt(Request $request): bool
     {
-        return $request->is('tenant/me')
-            || $request->is('tenant/subscription')
-            || $request->is('tenant/subscription/*')
-            || $request->is('tenant/settings/password')
-            || $request->is('tenant/settings/account')
-            || $request->is('tenant/logout');
+        return $request->is('api/tenant/me')
+            || $request->is('api/tenant/subscription')
+            || $request->is('api/tenant/subscription/*')
+            || $request->is('api/tenant/settings/password')
+            || $request->is('api/tenant/settings/account')
+            || $request->is('api/tenant/logout');
     }
 }

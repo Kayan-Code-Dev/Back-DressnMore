@@ -47,15 +47,20 @@ class TenantUserDirectoryService
             return $entry->tenant;
         }
 
-        return Tenant::query()
-            ->with('plan')
-            ->where('status', 'active')
-            ->get()
-            ->first(function (Tenant $tenant) use ($normalizedEmail): bool {
-                $metadata = is_array($tenant->metadata) ? $tenant->metadata : [];
-                $adminEmail = strtolower(trim((string) ($metadata['admin_email'] ?? '')));
+        return null;
+    }
 
-                return $adminEmail !== '' && $adminEmail === $normalizedEmail;
-            });
+    public function emailBelongsToTenant(Tenant $tenant, string $email): bool
+    {
+        $normalizedEmail = strtolower(trim($email));
+        if ($normalizedEmail === '') {
+            return false;
+        }
+
+        return TenantUserDirectory::query()
+            ->where('email', $normalizedEmail)
+            ->where('tenant_id', $tenant->id)
+            ->where('status', 'active')
+            ->exists();
     }
 }

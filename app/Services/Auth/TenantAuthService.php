@@ -2,6 +2,7 @@
 
 namespace App\Services\Auth;
 
+use App\Models\Central\Tenant;
 use App\Models\Tenant\User;
 use App\Services\Tenant\TenantContext;
 use App\Services\Tenant\TenantDatabaseManager;
@@ -19,16 +20,20 @@ class TenantAuthService
 
     public function login(string $email, string $password): array
     {
-        $tenant = $this->tenantContext->tenant()
-            ?? $this->tenantUserDirectoryService->findTenantByEmail($email);
+        $tenant = $this->tenantContext->tenant();
 
         if ($tenant === null) {
+            throw ValidationException::withMessages([
+                'workspace' => ['Tenant workspace is required.'],
+            ]);
+        }
+
+        if (! $this->tenantUserDirectoryService->emailBelongsToTenant($tenant, $email)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
         }
 
-        $this->tenantContext->setTenant($tenant);
         $this->tenantDatabaseManager->connect($tenant);
 
         $user = User::query()
@@ -50,12 +55,20 @@ class TenantAuthService
         $permissions = $this->permissionsForUser($user);
 
         return [
-            'token' => $user->createToken('tenant-token')->plainTextToken,
+            'token' => $this->issueTenantToken($user, $tenant),
             'user' => $user,
             'tenant' => $tenant->loadMissing('plan'),
             'permissions' => $permissions,
             'plan' => $tenant->plan,
         ];
+    }
+
+    public function issueTenantToken(User $user, Tenant $tenant): string
+    {
+        $tokenResult = $user->createToken('tenant-token');
+        $tokenResult->accessToken->forceFill(['tenant_id' => $tenant->id])->save();
+
+        return $tokenResult->plainTextToken;
     }
 
     /**

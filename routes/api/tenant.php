@@ -38,12 +38,14 @@ Route::prefix('tenant')->group(function (): void {
     Route::get('/health', [HealthController::class, 'index'])
         ->middleware(['identify.tenant', 'check.tenant.subscription', 'set.tenant.database']);
 
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware(['identify.tenant', 'check.tenant.subscription', 'set.tenant.database']);
 
     Route::middleware([
         'identify.tenant',
         'set.tenant.database',
         'auth:sanctum',
+        'ensure.tenant.token',
     ])->group(function (): void {
         Route::get('/subscription/overview', [SubscriptionController::class, 'overview']);
         Route::get('/subscription/payment-gateways', [SubscriptionController::class, 'paymentGateways']);
@@ -58,6 +60,7 @@ Route::prefix('tenant')->group(function (): void {
         'check.tenant.subscription',
         'set.tenant.database',
         'auth:sanctum',
+        'ensure.tenant.token',
     ])->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);

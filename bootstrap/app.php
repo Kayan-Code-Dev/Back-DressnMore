@@ -5,6 +5,7 @@ use App\Http\Middleware\CheckPlanFeature;
 use App\Http\Middleware\CheckTenantPermission;
 use App\Http\Middleware\CheckTenantSubscription;
 use App\Http\Middleware\EnsurePlatformAdmin;
+use App\Http\Middleware\EnsureTenantTokenBinding;
 use App\Http\Middleware\IdentifyTenant;
 use App\Http\Middleware\SetTenantDatabase;
 use App\Support\ApiResponse;
@@ -32,12 +33,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'identify.tenant' => IdentifyTenant::class,
             'check.tenant.subscription' => CheckTenantSubscription::class,
             'set.tenant.database' => SetTenantDatabase::class,
+            'ensure.tenant.token' => EnsureTenantTokenBinding::class,
             'tenant.permission' => CheckTenantPermission::class,
             'plan.feature' => CheckPlanFeature::class,
             'plan.dress_category' => CheckDressCategoryPlanFeature::class,
         ]);
 
-        $middleware->prependToPriorityList(AuthenticatesRequests::class, SetTenantDatabase::class);
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, EnsureTenantTokenBinding::class);
+        $middleware->prependToPriorityList(EnsureTenantTokenBinding::class, SetTenantDatabase::class);
         $middleware->prependToPriorityList(SetTenantDatabase::class, CheckTenantSubscription::class);
         $middleware->prependToPriorityList(CheckTenantSubscription::class, IdentifyTenant::class);
     })

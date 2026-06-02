@@ -39,17 +39,19 @@ If connection fails:
 
 `POST /api/tenant/login` runs middleware in required order:
 
-1. identify tenant
+1. identify tenant (`workspace`, `X-Tenant`, or `?tenant=`)
 2. check subscription
 3. set tenant database
 
-Then auth service validates tenant user credentials from tenant DB and returns:
+Then auth service:
 
-- token
-- user
-- tenant
-- permissions
-- plan
+- verifies email belongs to the resolved tenant via `tenant_user_directory`
+- validates credentials in that tenant DB only
+- issues a Sanctum token bound to `tenant_id`
+
+Protected routes also run `ensure.tenant.token` so tokens cannot be reused across workspaces.
+
+See also: `docs/tenant-isolation.md`
 
 ## Tenant provisioning concept (high-level)
 
