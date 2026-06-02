@@ -16,11 +16,14 @@ use App\Http\Controllers\Tenant\ExpenseController;
 use App\Http\Controllers\Tenant\FactoryController;
 use App\Http\Controllers\Tenant\HealthController;
 use App\Http\Controllers\Tenant\HrDashboardController;
+use App\Http\Controllers\Tenant\HrAttendanceController;
 use App\Http\Controllers\Tenant\HrDepartmentController;
 use App\Http\Controllers\Tenant\HrDocumentController;
 use App\Http\Controllers\Tenant\HrEmployeeController;
 use App\Http\Controllers\Tenant\HrJobTitleController;
+use App\Http\Controllers\Tenant\HrLeaveController;
 use App\Http\Controllers\Tenant\HrSettingController;
+use App\Http\Controllers\Tenant\HrShiftController;
 use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Tenant\InvoiceDeliveryController;
 use App\Http\Controllers\Tenant\JournalEntryController;
@@ -599,6 +602,36 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:hr.settings.view');
             Route::put('/settings', [HrSettingController::class, 'update'])
                 ->middleware('tenant.permission:hr.settings.update');
+
+            Route::get('/shifts', [HrShiftController::class, 'index'])
+                ->middleware('tenant.permission:hr.shifts.view');
+            Route::post('/shifts', [HrShiftController::class, 'store'])
+                ->middleware('tenant.permission:hr.shifts.create');
+            Route::get('/shifts/{shift}', [HrShiftController::class, 'show'])
+                ->whereNumber('shift')
+                ->middleware('tenant.permission:hr.shifts.view');
+            Route::put('/shifts/{shift}', [HrShiftController::class, 'update'])
+                ->whereNumber('shift')
+                ->middleware('tenant.permission:hr.shifts.update');
+            Route::delete('/shifts/{shift}', [HrShiftController::class, 'destroy'])
+                ->whereNumber('shift')
+                ->middleware('tenant.permission:hr.shifts.delete');
+
+            Route::get('/attendance', [HrAttendanceController::class, 'index'])
+                ->middleware('tenant.permission:hr.attendance.view');
+            Route::post('/attendance', [HrAttendanceController::class, 'store'])
+                ->middleware('tenant.permission:hr.attendance.create');
+            Route::put('/attendance/{attendance}', [HrAttendanceController::class, 'update'])
+                ->whereNumber('attendance')
+                ->middleware('tenant.permission:hr.attendance.update');
+
+            Route::get('/leaves', [HrLeaveController::class, 'index'])
+                ->middleware('tenant.permission:hr.leaves.view');
+            Route::post('/leaves', [HrLeaveController::class, 'store'])
+                ->middleware('tenant.permission:hr.leaves.create');
+            Route::patch('/leaves/{leave}/status', [HrLeaveController::class, 'updateStatus'])
+                ->whereNumber('leave')
+                ->middleware('tenant.permission:hr.leaves.status');
         });
     });
 });

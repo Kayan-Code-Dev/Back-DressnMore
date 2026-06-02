@@ -69,6 +69,16 @@ class HrEmployee extends BaseTenantModel
         return $this->hasMany(HrDocument::class, 'employee_id');
     }
 
+    public function attendanceRecords(): HasMany
+    {
+        return $this->hasMany(HrAttendanceRecord::class, 'employee_id');
+    }
+
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(HrLeaveRequest::class, 'employee_id');
+    }
+
     /**
      * @return list<string>
      */

@@ -143,6 +143,16 @@ class TenantRolePermissionSeeder extends Seeder
             ['name' => 'HR Job Titles Create', 'key' => 'hr.job_titles.create'],
             ['name' => 'HR Job Titles Update', 'key' => 'hr.job_titles.update'],
             ['name' => 'HR Job Titles Delete', 'key' => 'hr.job_titles.delete'],
+            ['name' => 'HR Shifts View', 'key' => 'hr.shifts.view'],
+            ['name' => 'HR Shifts Create', 'key' => 'hr.shifts.create'],
+            ['name' => 'HR Shifts Update', 'key' => 'hr.shifts.update'],
+            ['name' => 'HR Shifts Delete', 'key' => 'hr.shifts.delete'],
+            ['name' => 'HR Attendance View', 'key' => 'hr.attendance.view'],
+            ['name' => 'HR Attendance Create', 'key' => 'hr.attendance.create'],
+            ['name' => 'HR Attendance Update', 'key' => 'hr.attendance.update'],
+            ['name' => 'HR Leaves View', 'key' => 'hr.leaves.view'],
+            ['name' => 'HR Leaves Create', 'key' => 'hr.leaves.create'],
+            ['name' => 'HR Leaves Status', 'key' => 'hr.leaves.status'],
         ];
 
         $permissionIds = [];
