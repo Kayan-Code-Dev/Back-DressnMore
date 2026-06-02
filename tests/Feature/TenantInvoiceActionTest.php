@@ -6,6 +6,7 @@ use App\Models\Central\Tenant;
 use App\Models\Tenant\Branch;
 use App\Models\Tenant\Customer;
 use App\Models\Tenant\Invoice;
+use App\Models\Tenant\InvoicePayment;
 use App\Models\Tenant\Permission;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
@@ -97,6 +98,165 @@ class TenantInvoiceActionTest extends TestCase
         $response->assertOk();
         $this->assertStringContainsString('invoices.csv', (string) $response->headers->get('content-disposition'));
         $this->assertStringContainsString('INV-CANCEL-UI', $response->streamedContent());
+    }
+
+    public function test_partially_paid_invoice_cannot_be_cancelled(): void
+    {
+        $invoice = $this->createSellInvoice(total: 100, paidAmount: 40, remainingAmount: 60, status: Invoice::STATUS_PARTIALLY_PAID);
+        InvoicePayment::query()->create([
+            'invoice_id' => $invoice->id,
+            'amount' => 40,
+            'status' => InvoicePayment::STATUS_PAID,
+            'payment_type' => InvoicePayment::TYPE_INVOICE_PAYMENT,
+            'paid_at' => now(),
+        ]);
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/cancel", [], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['invoice'])
+            ->assertJsonPath(
+                'errors.invoice.0',
+                'Cannot cancel invoice with recorded payments. Cancel or reverse payments first.',
+            );
+
+        $this->assertSame(Invoice::STATUS_PARTIALLY_PAID, $invoice->refresh()->status);
+    }
+
+    public function test_fully_paid_invoice_cannot_be_cancelled(): void
+    {
+        $invoice = $this->createSellInvoice(total: 100, paidAmount: 100, remainingAmount: 0, status: Invoice::STATUS_PAID);
+        InvoicePayment::query()->create([
+            'invoice_id' => $invoice->id,
+            'amount' => 100,
+            'status' => InvoicePayment::STATUS_PAID,
+            'payment_type' => InvoicePayment::TYPE_INVOICE_PAYMENT,
+            'paid_at' => now(),
+        ]);
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/cancel", [], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['invoice']);
+
+        $this->assertSame(Invoice::STATUS_PAID, $invoice->refresh()->status);
+    }
+
+    public function test_rent_invoice_with_paid_payment_cannot_be_cancelled(): void
+    {
+        $invoice = Invoice::query()->create([
+            'invoice_number' => 'INV-RENT-PAY-'.uniqid(),
+            'type' => Invoice::TYPE_RENT,
+            'status' => Invoice::STATUS_PARTIALLY_PAID,
+            'total' => 200,
+            'paid_amount' => 50,
+            'remaining_amount' => 150,
+        ]);
+        InvoicePayment::query()->create([
+            'invoice_id' => $invoice->id,
+            'amount' => 50,
+            'status' => InvoicePayment::STATUS_PAID,
+            'payment_type' => InvoicePayment::TYPE_INVOICE_PAYMENT,
+            'paid_at' => now(),
+        ]);
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/cancel", [], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['invoice']);
+    }
+
+    public function test_already_cancelled_invoice_cannot_be_cancelled_again(): void
+    {
+        $invoice = Invoice::query()->create([
+            'invoice_number' => 'INV-CANCELLED-'.uniqid(),
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_CANCELLED,
+            'total' => 100,
+            'paid_amount' => 0,
+            'remaining_amount' => 100,
+        ]);
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/cancel", [], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['invoice'])
+            ->assertJsonPath('errors.invoice.0', 'Invoice already cancelled');
+    }
+
+    public function test_delivered_invoice_cannot_be_cancelled(): void
+    {
+        $invoice = Invoice::query()->create([
+            'invoice_number' => 'INV-DELIVERED-'.uniqid(),
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_DELIVERED,
+            'total' => 100,
+            'paid_amount' => 0,
+            'remaining_amount' => 100,
+        ]);
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/cancel", [], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['invoice'])
+            ->assertJsonPath('errors.invoice.0', 'Delivered or returned invoices cannot be cancelled');
+    }
+
+    public function test_returned_invoice_cannot_be_cancelled(): void
+    {
+        $invoice = Invoice::query()->create([
+            'invoice_number' => 'INV-RETURNED-'.uniqid(),
+            'type' => Invoice::TYPE_RENT,
+            'status' => Invoice::STATUS_RETURNED,
+            'total' => 100,
+            'paid_amount' => 0,
+            'remaining_amount' => 0,
+        ]);
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/cancel", [], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['invoice'])
+            ->assertJsonPath('errors.invoice.0', 'Delivered or returned invoices cannot be cancelled');
+    }
+
+    public function test_cancelled_invoice_rejects_new_payment(): void
+    {
+        $user = $this->createTenantUserWithPermissions([
+            'invoices.view',
+            'invoices.cancel',
+            'invoice_payments.create',
+        ]);
+        $invoice = $this->createSellInvoice(total: 100, paidAmount: 0, remainingAmount: 100, status: Invoice::STATUS_CONFIRMED);
+        Sanctum::actingAs($user, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/cancel", [], $this->tenantHeaders())
+            ->assertOk()
+            ->assertJsonPath('data.status', 'cancelled');
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/payments", [
+            'amount' => 10,
+            'method' => 'cash',
+        ], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['invoice'])
+            ->assertJsonPath('errors.invoice.0', 'Cannot add payment to a cancelled invoice');
+    }
+
+    private function createSellInvoice(
+        float $total,
+        float $paidAmount,
+        float $remainingAmount,
+        string $status,
+    ): Invoice {
+        return Invoice::query()->create([
+            'invoice_number' => 'INV-SELL-'.uniqid(),
+            'type' => Invoice::TYPE_SELL,
+            'status' => $status,
+            'total' => $total,
+            'paid_amount' => $paidAmount,
+            'remaining_amount' => $remainingAmount,
+        ]);
     }
 
     private function prepareSqliteDatabases(): void

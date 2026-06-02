@@ -257,6 +257,12 @@ class InvoiceService
             ]);
         }
 
+        if ($this->recordedPaidAmount($invoice) > 0) {
+            throw ValidationException::withMessages([
+                'invoice' => ['Cannot cancel invoice with recorded payments. Cancel or reverse payments first.'],
+            ]);
+        }
+
         $invoice->status = Invoice::STATUS_CANCELLED;
         $invoice->save();
 
@@ -498,5 +504,15 @@ class InvoiceService
     private function money(float $value): float
     {
         return round($value, 2);
+    }
+
+    private function recordedPaidAmount(Invoice $invoice): float
+    {
+        return $this->money((float) $invoice->payments()
+            ->where(function (Builder $builder): void {
+                $builder->where('status', InvoicePayment::STATUS_PAID)
+                    ->orWhereNull('status');
+            })
+            ->sum('amount'));
     }
 }
