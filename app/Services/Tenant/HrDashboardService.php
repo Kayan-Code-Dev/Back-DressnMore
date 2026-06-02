@@ -10,7 +10,10 @@ use App\Models\Tenant\HrJobTitle;
 
 class HrDashboardService
 {
-    public function __construct(private readonly HrDocumentService $hrDocumentService) {}
+    public function __construct(
+        private readonly HrDocumentService $hrDocumentService,
+        private readonly HrMetricsService $hrMetricsService,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -27,6 +30,10 @@ class HrDashboardService
             ->groupBy('status')
             ->pluck('aggregate', 'status');
 
+        $today = now()->toDateString();
+        $attendanceSnapshot = $this->hrMetricsService->attendanceSnapshotForDate($today, $branchId);
+        $payrollSummary = $this->hrMetricsService->payrollEstimate($branchId);
+
         return [
             'kpis' => [
                 'total_employees' => (clone $employeeQuery)->count(),
@@ -38,26 +45,15 @@ class HrDashboardService
                 'job_titles_count' => HrJobTitle::query()->count(),
                 'documents_count' => HrDocument::query()->count(),
                 'expiring_documents_count' => $this->hrDocumentService->countExpiring(),
-                'on_leave_today' => 0,
-                'late_today' => 0,
-                'payroll_this_month' => 0,
-                'pending_requests' => 0,
+                'on_leave_today' => $this->hrMetricsService->countOnLeaveToday($branchId),
+                'late_today' => $attendanceSnapshot['late'],
+                'payroll_this_month' => $payrollSummary['net_payroll'],
+                'pending_requests' => $this->hrMetricsService->countPendingLeaveRequests($branchId),
             ],
-            'attendance_snapshot' => [
-                'present' => 0,
-                'absent' => 0,
-                'late' => 0,
-                'leave' => 0,
-                'day_off' => 0,
-            ],
-            'payroll_summary' => [
-                'gross_salaries' => 0,
-                'deductions' => 0,
-                'bonuses' => 0,
-                'net_payroll' => 0,
-            ],
-            'upcoming_events' => [],
-            'recent_activity' => [],
+            'attendance_snapshot' => $attendanceSnapshot,
+            'payroll_summary' => $payrollSummary,
+            'upcoming_events' => $this->hrMetricsService->upcomingEvents($branchId),
+            'recent_activity' => $this->hrMetricsService->recentActivity($branchId),
         ];
     }
 }

@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 
 class HrEmployeeService
 {
-    public function __construct(private readonly HrEmployeeAccountService $accountService) {}
+    public function __construct(
+        private readonly HrEmployeeAccountService $accountService,
+        private readonly HrMetricsService $hrMetricsService,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $filters
@@ -113,20 +116,12 @@ class HrEmployeeService
             'documents_count' => $documentsCount,
             'expired_documents_count' => $expiredDocumentsCount,
             'expiring_documents_count' => $expiringDocumentsCount,
-            'attendance' => [
-                'present_days_this_month' => 0,
-                'late_days_this_month' => 0,
-                'absent_days_this_month' => 0,
-            ],
+            'attendance' => $this->hrMetricsService->employeeMonthAttendance($employee),
             'payroll' => [
-                'net_salary_estimate' => null,
+                'net_salary_estimate' => (float) $employee->base_salary,
                 'last_payroll_month' => null,
             ],
-            'leaves' => [
-                'approved_leaves_this_month' => 0,
-                'pending_requests' => 0,
-                'leave_balances' => [],
-            ],
+            'leaves' => $this->hrMetricsService->employeeMonthLeaves($employee),
         ];
     }
 
