@@ -28,7 +28,7 @@ class TenantAuthLoginTest extends TestCase
         $this->seedTenantPermissions();
     }
 
-    public function test_tenant_can_login_with_x_tenant_header(): void
+    public function test_tenant_can_login_with_email_and_password_only(): void
     {
         $tenant = $this->createTenant('atelier-alpha');
         $this->connectTenant($tenant);
@@ -38,10 +38,7 @@ class TenantAuthLoginTest extends TestCase
         $response = $this->postJson('/api/tenant/login', [
             'email' => 'owner@atelier.test',
             'password' => 'secret123',
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => 'atelier-alpha',
-        ]);
+        ], ['Accept' => 'application/json']);
 
         $response->assertOk()
             ->assertJsonPath('success', true)
@@ -62,10 +59,7 @@ class TenantAuthLoginTest extends TestCase
         $this->postJson('/api/tenant/login', [
             'email' => 'admin@beta.test',
             'password' => 'wrong-password',
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => 'atelier-beta',
-        ])
+        ], ['Accept' => 'application/json'])
             ->assertStatus(422)
             ->assertJsonPath('success', false);
     }
@@ -79,10 +73,7 @@ class TenantAuthLoginTest extends TestCase
         $this->postJson('/api/tenant/login', [
             'email' => 'legacy@tenant.test',
             'password' => 'legacy-pass',
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => 'legacy-tenant',
-        ])
+        ], ['Accept' => 'application/json'])
             ->assertStatus(422)
             ->assertJsonPath('success', false);
     }

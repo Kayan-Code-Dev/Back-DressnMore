@@ -7,6 +7,7 @@ use App\Models\Tenant\User;
 use App\Services\Tenant\TenantContext;
 use App\Services\Tenant\TenantDatabaseManager;
 use App\Services\Tenant\TenantUserDirectoryService;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -20,24 +21,29 @@ class TenantAuthService
 
     public function login(string $email, string $password): array
     {
-        $tenant = $this->tenantContext->tenant();
+        $normalizedEmail = strtolower(trim($email));
 
-        if ($tenant === null) {
-            throw ValidationException::withMessages([
-                'email' => ['Tenant context is required.'],
-            ]);
-        }
-
-        if (! $this->tenantUserDirectoryService->emailBelongsToTenant($tenant, $email)) {
+        if ($normalizedEmail === '') {
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
         }
 
+        $tenant = $this->tenantUserDirectoryService->findTenantByEmail($normalizedEmail);
+
+        if ($tenant === null) {
+            throw ValidationException::withMessages([
+                'email' => ['Invalid credentials.'],
+            ]);
+        }
+
+        $this->assertTenantCanAuthenticate($tenant);
+
+        $this->tenantContext->setTenant($tenant);
         $this->tenantDatabaseManager->connect($tenant);
 
         $user = User::query()
-            ->whereRaw('LOWER(email) = ?', [strtolower($email)])
+            ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
             ->first();
 
         if ($user === null || ! Hash::check($password, $user->password)) {
@@ -85,5 +91,24 @@ class TenantAuthService
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function assertTenantCanAuthenticate(Tenant $tenant): void
+    {
+        $status = (string) $tenant->status;
+        if ($status !== 'active') {
+            throw ValidationException::withMessages([
+                'email' => ['This tenant account is not available.'],
+            ]);
+        }
+
+        if ($tenant->subscription_ends_at !== null) {
+            $endsAt = CarbonImmutable::parse((string) $tenant->subscription_ends_at);
+            if ($endsAt->lt(CarbonImmutable::today())) {
+                throw ValidationException::withMessages([
+                    'email' => ['Tenant subscription has expired.'],
+                ]);
+            }
+        }
     }
 }

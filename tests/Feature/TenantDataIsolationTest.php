@@ -39,28 +39,27 @@ class TenantDataIsolationTest extends TestCase
         $this->tenantB = $this->createTenant('tenant-b', $this->tenantBDatabasePath);
     }
 
-    public function test_login_requires_tenant_context(): void
+    public function test_login_works_with_email_and_password_only(): void
     {
         $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
 
         $this->postJson('/api/tenant/login', [
             'email' => 'owner@a.test',
             'password' => 'secret123',
-        ])->assertStatus(400)
-            ->assertJsonPath('message', TenantMessages::CONTEXT_REQUIRED);
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.tenant.slug', 'tenant-a');
     }
 
-    public function test_login_rejects_email_for_wrong_tenant(): void
+    public function test_login_rejects_unknown_email(): void
     {
         $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
 
         $this->postJson('/api/tenant/login', [
-            'email' => 'owner@a.test',
+            'email' => 'unknown@test.com',
             'password' => 'secret123',
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => $this->tenantB->slug,
-        ])->assertStatus(422)
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(422)
             ->assertJsonPath('success', false);
     }
 
@@ -132,29 +131,12 @@ class TenantDataIsolationTest extends TestCase
         ]);
     }
 
-    public function test_login_with_x_tenant_header_only(): void
-    {
-        $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
-
-        $this->postJson('/api/tenant/login', [
-            'email' => 'owner@a.test',
-            'password' => 'secret123',
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => $this->tenantA->slug,
-        ])->assertOk()
-            ->assertJsonPath('data.tenant.slug', 'tenant-a');
-    }
-
     private function loginAndGetToken(Tenant $tenant, string $email, string $password): string
     {
         $response = $this->postJson('/api/tenant/login', [
             'email' => $email,
             'password' => $password,
-        ], [
-            'Accept' => 'application/json',
-            'X-Tenant' => $tenant->slug,
-        ])->assertOk();
+        ], ['Accept' => 'application/json'])->assertOk();
 
         $token = $response->json('data.token');
         $this->assertIsString($token);

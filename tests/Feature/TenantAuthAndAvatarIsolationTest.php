@@ -41,27 +41,16 @@ class TenantAuthAndAvatarIsolationTest extends TestCase
         $this->tenantB = $this->createTenant('tenant-b', $this->tenantBDatabasePath);
     }
 
-    public function test_login_without_workspace_uses_x_tenant_header(): void
+    public function test_login_with_email_and_password_only(): void
     {
         $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
 
         $this->postJson('/api/tenant/login', [
             'email' => 'owner@a.test',
             'password' => 'secret123',
-        ], $this->tenantHeaders($this->tenantA))
+        ], ['Accept' => 'application/json'])
             ->assertOk()
             ->assertJsonPath('data.tenant.slug', 'tenant-a');
-    }
-
-    public function test_login_rejects_missing_tenant_context(): void
-    {
-        $this->seedTenantUser($this->tenantA, 'owner@a.test', 'secret123');
-
-        $this->postJson('/api/tenant/login', [
-            'email' => 'owner@a.test',
-            'password' => 'secret123',
-        ])->assertStatus(400)
-            ->assertJsonPath('message', TenantMessages::CONTEXT_REQUIRED);
     }
 
     public function test_me_returns_user_for_matching_tenant(): void
@@ -155,7 +144,7 @@ class TenantAuthAndAvatarIsolationTest extends TestCase
         $response = $this->postJson('/api/tenant/login', [
             'email' => $email,
             'password' => $password,
-        ], $this->tenantHeaders($tenant))->assertOk();
+        ], ['Accept' => 'application/json'])->assertOk();
 
         $token = $response->json('data.token');
         $this->assertIsString($token);
