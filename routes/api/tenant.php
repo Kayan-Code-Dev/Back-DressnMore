@@ -48,7 +48,7 @@ Route::prefix('tenant')->group(function (): void {
     Route::get('/health', [HealthController::class, 'index'])
         ->middleware(['identify.tenant', 'check.tenant.subscription', 'set.tenant.database']);
 
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
     Route::middleware([
         'identify.tenant',
@@ -58,8 +58,10 @@ Route::prefix('tenant')->group(function (): void {
     ])->group(function (): void {
         Route::get('/subscription/overview', [SubscriptionController::class, 'overview']);
         Route::get('/subscription/payment-gateways', [SubscriptionController::class, 'paymentGateways']);
-        Route::post('/subscription/renew', [SubscriptionController::class, 'renew']);
-        Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade']);
+        Route::post('/subscription/renew', [SubscriptionController::class, 'renew'])
+            ->middleware('tenant.permission:settings.manage');
+        Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])
+            ->middleware('tenant.permission:settings.manage');
         Route::put('/settings/password', [SettingsController::class, 'updatePassword']);
         Route::delete('/settings/account', [SettingsController::class, 'deleteAccount']);
     });

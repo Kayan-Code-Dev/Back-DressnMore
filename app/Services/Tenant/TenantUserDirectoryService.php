@@ -4,6 +4,7 @@ namespace App\Services\Tenant;
 
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantUserDirectory;
+use Illuminate\Validation\ValidationException;
 
 class TenantUserDirectoryService
 {
@@ -14,12 +15,22 @@ class TenantUserDirectoryService
             return;
         }
 
+        $existing = TenantUserDirectory::query()
+            ->where('email', $normalizedEmail)
+            ->first();
+
+        if ($existing instanceof TenantUserDirectory && (int) $existing->tenant_id !== (int) $tenant->id) {
+            throw ValidationException::withMessages([
+                'email' => ['This email is already registered for another tenant.'],
+            ]);
+        }
+
         TenantUserDirectory::query()->updateOrCreate(
-            ['email' => $normalizedEmail],
             [
                 'tenant_id' => $tenant->id,
-                'status' => 'active',
+                'email' => $normalizedEmail,
             ],
+            ['status' => 'active'],
         );
     }
 

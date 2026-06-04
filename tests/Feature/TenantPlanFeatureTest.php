@@ -96,6 +96,23 @@ class TenantPlanFeatureTest extends TestCase
             ->assertJsonMissing(['subcategories']);
     }
 
+    public function test_subscription_upgrade_requires_settings_permission(): void
+    {
+        $upgradePlan = Plan::query()->create([
+            'name' => 'Upgrade Plan',
+            'slug' => 'upgrade-plan-'.uniqid(),
+            'price' => 0,
+            'billing_cycle' => 'monthly',
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson('/api/tenant/subscription/upgrade', [
+            'plan_code' => $upgradePlan->slug,
+        ], $this->tenantHeaders())->assertForbidden();
+    }
+
     private function prepareSqliteDatabases(): void
     {
         $this->centralDatabasePath = database_path('testing-central-plan-features.sqlite');

@@ -12,7 +12,9 @@ class EnsurePlatformAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->user() instanceof SuperAdmin) {
+        $user = $request->user();
+
+        if (! $user instanceof SuperAdmin || (string) $user->status !== 'active') {
             return ApiResponse::forbidden('Platform admin access required');
         }
 

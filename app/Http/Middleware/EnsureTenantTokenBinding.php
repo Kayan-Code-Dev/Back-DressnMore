@@ -20,8 +20,12 @@ class EnsureTenantTokenBinding
     {
         $user = $request->user();
 
-        if ($user === null || ! $user instanceof TenantUser) {
-            return $next($request);
+        if ($user === null) {
+            return ApiResponse::unauthorized();
+        }
+
+        if (! $user instanceof TenantUser) {
+            return ApiResponse::forbidden(TenantMessages::TOKEN_MISMATCH);
         }
 
         $token = $user->currentAccessToken();
@@ -31,7 +35,7 @@ class EnsureTenantTokenBinding
         }
 
         if (! $token instanceof PersonalAccessToken) {
-            return $next($request);
+            return ApiResponse::unauthorized();
         }
 
         $tenant = $this->tenantContext->tenant();

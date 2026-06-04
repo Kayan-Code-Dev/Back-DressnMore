@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Central\Plan;
 use App\Models\Central\SuperAdmin;
 use App\Models\Central\Tenant;
+use App\Models\Central\TenantUserDirectory;
 use Database\Seeders\Central\PlanSeeder;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
@@ -38,14 +39,16 @@ class PlatformTenantProvisioningTest extends TestCase
     {
         Sanctum::actingAs($this->admin, ['*']);
 
-        $tenantDatabasePath = storage_path('framework/testing/provisioned-tenant-api.sqlite');
+        $tenantDatabaseName = 'provisioned_tenant_api';
+        $storedTenantDatabaseName = $tenantDatabaseName.'.sqlite';
+        $tenantDatabasePath = storage_path('framework/tenants/'.$storedTenantDatabaseName);
         @unlink($tenantDatabasePath);
 
         $response = $this->postJson('/api/platform/tenants', [
             'name' => 'Atelier Cairo',
             'slug' => 'atelier-cairo',
             'plan_id' => $this->plan->id,
-            'database_name' => $tenantDatabasePath,
+            'database_name' => $tenantDatabaseName,
             'subscription_starts_at' => '2026-05-26 00:00:00',
             'subscription_ends_at' => '2026-06-26 00:00:00',
             'metadata' => [
@@ -66,7 +69,7 @@ class PlatformTenantProvisioningTest extends TestCase
         $this->assertDatabaseHas('tenants', [
             'id' => $tenantId,
             'status' => 'provisioning',
-            'database_name' => $tenantDatabasePath,
+            'database_name' => $storedTenantDatabaseName,
         ], 'central');
         $this->assertDatabaseHas('tenant_provisioning_logs', [
             'tenant_id' => $tenantId,
@@ -93,6 +96,66 @@ class PlatformTenantProvisioningTest extends TestCase
         ], 'central');
 
         $this->assertFileExists($tenantDatabasePath);
+    }
+
+    public function test_platform_tenant_create_rejects_absolute_database_path(): void
+    {
+        Sanctum::actingAs($this->admin, ['*']);
+
+        $this->postJson('/api/platform/tenants', [
+            'name' => 'Unsafe Tenant',
+            'slug' => 'unsafe-tenant',
+            'plan_id' => $this->plan->id,
+            'database_name' => storage_path('framework/testing/unsafe.sqlite'),
+        ], [
+            'Accept' => 'application/json',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['database_name']);
+    }
+
+    public function test_seed_response_hides_password_and_blocks_cross_tenant_email_reassignment(): void
+    {
+        Sanctum::actingAs($this->admin, ['*']);
+
+        $firstTenant = $this->createProvisionedTenant('seed-one');
+        $secondTenant = $this->createProvisionedTenant('seed-two');
+
+        $firstResponse = $this->postJson("/api/platform/tenants/{$firstTenant->id}/seed", [
+            'admin_email' => 'owner@example.test',
+            'admin_password' => 'secret-password',
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $firstResponse->assertOk()
+            ->assertJsonMissingPath('data.password')
+            ->assertJsonMissingPath('data.admin.password')
+            ->assertJsonPath('data.email', 'owner@example.test');
+
+        $this->postJson("/api/platform/tenants/{$secondTenant->id}/seed", [
+            'admin_email' => 'owner@example.test',
+            'admin_password' => 'secret-password',
+        ], [
+            'Accept' => 'application/json',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
+
+        $this->assertDatabaseHas('tenant_user_directory', [
+            'tenant_id' => $firstTenant->id,
+            'email' => 'owner@example.test',
+            'status' => 'active',
+        ], 'central');
+        $this->assertSame(1, TenantUserDirectory::query()->where('email', 'owner@example.test')->count());
+    }
+
+    public function test_inactive_platform_admin_token_is_forbidden(): void
+    {
+        $this->admin->forceFill(['status' => 'inactive'])->save();
+        Sanctum::actingAs($this->admin, ['*']);
+
+        $this->getJson('/api/platform/tenants', [
+            'Accept' => 'application/json',
+        ])->assertForbidden();
     }
 
     public function test_platform_admin_can_list_tenants(): void
@@ -238,5 +301,34 @@ class PlatformTenantProvisioningTest extends TestCase
             'subscription_starts_at' => CarbonImmutable::now()->subMonth(),
             'subscription_ends_at' => CarbonImmutable::now()->subDay(),
         ]);
+    }
+
+    private function createProvisionedTenant(string $slug): Tenant
+    {
+        $tenantDatabasePath = storage_path('framework/testing/'.$slug.'.sqlite');
+        @unlink($tenantDatabasePath);
+
+        $tenant = Tenant::query()->create([
+            'name' => 'Seed '.$slug,
+            'slug' => $slug,
+            'plan_id' => $this->plan->id,
+            'database_name' => $tenantDatabasePath,
+            'status' => 'active',
+            'subscription_starts_at' => CarbonImmutable::now()->subDay(),
+            'subscription_ends_at' => CarbonImmutable::now()->addDays(30),
+        ]);
+
+        touch($tenantDatabasePath);
+        Config::set('database.connections.tenant.database', $tenantDatabasePath);
+        DB::purge('tenant');
+        DB::reconnect('tenant');
+        Artisan::call('migrate:fresh', [
+            '--database' => 'tenant',
+            '--path' => base_path('database/migrations/tenant'),
+            '--realpath' => true,
+            '--force' => true,
+        ]);
+
+        return $tenant;
     }
 }

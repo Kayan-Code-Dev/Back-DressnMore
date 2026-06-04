@@ -34,11 +34,11 @@ Last verified with: `php artisan route:list --path=api/tenant`
 - Query params: None
 - Request body: None
 - Response fields (`data`):
-  - `tenant_name`, `tenant_slug`, `tenant_database_name`, `tenant_database_connection`, `timestamp`
+  - `ok`, `timestamp`
 - Pagination meta: N/A
 - Lookups used: None
 - Export behavior: N/A
-- Notes/deferred: Health only, no permissions map dependency.
+- Notes/deferred: Health only, no permissions map dependency; tenant/database identifiers are intentionally omitted.
 
 ### 2) `POST /api/tenant/login`
 - Auth required: No

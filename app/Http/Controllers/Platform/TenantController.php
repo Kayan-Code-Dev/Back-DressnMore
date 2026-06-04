@@ -16,6 +16,7 @@ use App\Services\Platform\TenantProvisioningService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -68,7 +69,9 @@ class TenantController extends Controller
         try {
             $tenant = $this->tenantProvisioningService->migrate($tenant);
         } catch (RuntimeException $exception) {
-            return ApiResponse::serverError($exception->getMessage());
+            report($exception);
+
+            return ApiResponse::serverError('Tenant migration failed.');
         }
 
         return ApiResponse::success(new TenantResource($tenant), 'Tenant migrated');
@@ -78,8 +81,12 @@ class TenantController extends Controller
     {
         try {
             $credentials = $this->tenantProvisioningService->seedAdmin($tenant, $request->validated());
+        } catch (ValidationException $exception) {
+            throw $exception;
         } catch (Throwable $exception) {
-            return ApiResponse::serverError('Tenant seed failed: '.$exception->getMessage());
+            report($exception);
+
+            return ApiResponse::serverError('Tenant seed failed.');
         }
 
         $tenant->refresh()->load(['plan', 'domains']);

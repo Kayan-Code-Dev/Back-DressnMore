@@ -166,9 +166,51 @@ class TenantDatabaseManager
         }
 
         if (str_starts_with($databaseName, '/')) {
-            return $databaseName;
+            $allowedRoots = [storage_path('framework/tenants')];
+            if (app()->environment('testing')) {
+                $allowedRoots[] = storage_path('framework/testing');
+            }
+
+            foreach ($allowedRoots as $allowedRoot) {
+                if ($this->pathIsWithin($databaseName, $allowedRoot)) {
+                    return $databaseName;
+                }
+            }
+
+            throw new RuntimeException('Unsafe tenant SQLite path.');
+        }
+
+        if (str_contains($databaseName, '/') || str_contains($databaseName, '\\')) {
+            throw new RuntimeException('Unsafe tenant SQLite path.');
         }
 
         return storage_path('framework/tenants/'.$databaseName);
+    }
+
+    private function pathIsWithin(string $path, string $root): bool
+    {
+        $rootRealPath = realpath($root);
+        if ($rootRealPath === false) {
+            File::makeDirectory($root, 0775, true, true);
+            $rootRealPath = realpath($root);
+            if ($rootRealPath === false) {
+                return false;
+            }
+        }
+
+        $pathRealPath = realpath($path);
+        if ($pathRealPath === false) {
+            $directoryRealPath = realpath(dirname($path));
+            if ($directoryRealPath === false) {
+                return false;
+            }
+
+            $pathRealPath = $directoryRealPath.'/'.basename($path);
+        }
+
+        $normalizedPath = rtrim(str_replace('\\', '/', $pathRealPath), '/');
+        $normalizedRoot = rtrim(str_replace('\\', '/', $rootRealPath), '/');
+
+        return $normalizedPath === $normalizedRoot || str_starts_with($normalizedPath, $normalizedRoot.'/');
     }
 }
