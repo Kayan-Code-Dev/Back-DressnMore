@@ -3,13 +3,15 @@
 namespace App\Services\Tenant;
 
 use App\Enums\SecurityDepositStatus;
+use App\Enums\TailoringPriority;
+use App\Enums\TailoringProductionStage;
+use App\Enums\TailoringProductionStatus;
 use App\Models\Tenant\Dress;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoiceItem;
 use App\Models\Tenant\InvoicePayment;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -106,9 +108,9 @@ class InvoiceService
 
             if ($invoiceType === Invoice::TYPE_TAILORING) {
                 $payload = array_merge($payload, [
-                    'production_stage' => $data['production_stage'] ?? \App\Enums\TailoringProductionStage::NEW_ORDER->value,
-                    'production_status' => $data['production_status'] ?? \App\Enums\TailoringProductionStatus::PENDING->value,
-                    'priority' => $data['priority'] ?? \App\Enums\TailoringPriority::NORMAL->value,
+                    'production_stage' => $data['production_stage'] ?? TailoringProductionStage::NEW_ORDER->value,
+                    'production_status' => $data['production_status'] ?? TailoringProductionStatus::PENDING->value,
+                    'priority' => $data['priority'] ?? TailoringPriority::NORMAL->value,
                     'assigned_tailor_id' => $data['assigned_tailor_id'] ?? null,
                     'fitting_date' => $data['fitting_date'] ?? null,
                     'next_follow_up_date' => $data['next_follow_up_date'] ?? null,
