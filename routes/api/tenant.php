@@ -599,6 +599,9 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:hr.documents.view');
             Route::post('/documents', [HrDocumentController::class, 'store'])
                 ->middleware('tenant.permission:hr.documents.upload');
+            Route::get('/documents/{document}/download', [HrDocumentController::class, 'download'])
+                ->whereNumber('document')
+                ->middleware('tenant.permission:hr.documents.download');
             Route::get('/documents/{document}', [HrDocumentController::class, 'show'])
                 ->whereNumber('document')
                 ->middleware('tenant.permission:hr.documents.view');

@@ -9,6 +9,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HrDocumentService
 {
@@ -73,6 +74,23 @@ class HrDocumentService
         }
 
         $document->delete();
+    }
+
+    public function download(HrDocument $document): ?StreamedResponse
+    {
+        if (! is_string($document->file_path) || $document->file_path === '') {
+            return null;
+        }
+
+        if (! Storage::disk('local')->exists($document->file_path)) {
+            return null;
+        }
+
+        $downloadName = trim((string) $document->file_name) !== ''
+            ? (string) $document->file_name
+            : basename($document->file_path);
+
+        return Storage::disk('local')->download($document->file_path, $downloadName);
     }
 
     /**

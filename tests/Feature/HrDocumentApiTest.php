@@ -48,6 +48,16 @@ class HrDocumentApiTest extends TenantHrTestCase
         Storage::disk('local')->assertExists((string) $create->json('data.file_path'));
         $documentId = (int) $create->json('data.id');
 
+        $download = $this->get('/api/tenant/hr/documents/'.$documentId.'/download', $headers);
+        $download->assertOk();
+        $this->assertStringContainsString('contract.pdf', (string) $download->headers->get('content-disposition'));
+
+        $viewOnlyUser = $this->createTenantUserWithPermissions([
+            'hr.documents.view',
+        ]);
+        $this->get('/api/tenant/hr/documents/'.$documentId.'/download', $this->authHeaders($viewOnlyUser))
+            ->assertForbidden();
+
         $this->post('/api/tenant/hr/documents', [
             'employee_id' => $employee->id,
             'document_type' => 'contract',
@@ -80,6 +90,12 @@ class HrDocumentApiTest extends TenantHrTestCase
             ->assertJson(fn ($json) => $json->where('success', true)->etc());
 
         $storedPath = (string) $create->json('data.file_path');
+        Storage::disk('local')->delete($storedPath);
+        $this->getJson('/api/tenant/hr/documents/'.$documentId.'/download', $headers)
+            ->assertNotFound()
+            ->assertJsonPath('message', 'Document file not found');
+
+        Storage::disk('local')->put($storedPath, 'restored');
         $this->deleteJson('/api/tenant/hr/documents/'.$documentId, [], $headers)->assertOk();
         $this->assertDatabaseMissing('hr_documents', ['id' => $documentId], 'tenant');
         Storage::disk('local')->assertMissing($storedPath);
