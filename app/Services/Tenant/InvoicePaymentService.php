@@ -37,12 +37,6 @@ class InvoicePaymentService
 
     public function recordPaidPayment(Invoice $invoice, array $data, ?int $actorId = null): InvoicePayment
     {
-        if ($invoice->status === Invoice::STATUS_CANCELLED) {
-            throw ValidationException::withMessages([
-                'invoice' => ['لا يمكن إضافة دفعة لفاتورة ملغاة'],
-            ]);
-        }
-
         $amount = round((float) ($data['amount'] ?? 0), 2);
         if ($amount <= 0) {
             throw ValidationException::withMessages([
@@ -50,18 +44,32 @@ class InvoicePaymentService
             ]);
         }
 
-        $invoice->refresh();
-        $remaining = round((float) $invoice->remaining_amount, 2);
-        if ($amount > $remaining + 0.009) {
-            throw ValidationException::withMessages([
-                'amount' => ['مبلغ الدفعة يتجاوز المبلغ المتبقي على الفاتورة'],
-            ]);
-        }
-
         /** @var InvoicePayment $payment */
         $payment = DB::connection('tenant')->transaction(function () use ($invoice, $data, $amount, $actorId): InvoicePayment {
+            /** @var Invoice $lockedInvoice */
+            $lockedInvoice = Invoice::query()
+                ->whereKey($invoice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedInvoice->status === Invoice::STATUS_CANCELLED) {
+                throw ValidationException::withMessages([
+                    'invoice' => ['لا يمكن إضافة دفعة لفاتورة ملغاة'],
+                ]);
+            }
+
+            $this->invoiceService->refreshFinancials($lockedInvoice);
+            $lockedInvoice->refresh();
+
+            $remaining = round((float) $lockedInvoice->remaining_amount, 2);
+            if ($amount > $remaining + 0.009) {
+                throw ValidationException::withMessages([
+                    'amount' => ['مبلغ الدفعة يتجاوز المبلغ المتبقي على الفاتورة'],
+                ]);
+            }
+
             $payment = InvoicePayment::query()->create([
-                'invoice_id' => $invoice->id,
+                'invoice_id' => $lockedInvoice->id,
                 'amount' => $amount,
                 'status' => InvoicePayment::STATUS_PAID,
                 'payment_type' => InvoicePayment::TYPE_INVOICE_PAYMENT,
@@ -73,7 +81,7 @@ class InvoicePaymentService
             ]);
 
             $this->cashMovementService->recordInvoicePayment($payment, $actorId);
-            $this->invoiceService->refreshFinancials($invoice->refresh());
+            $this->invoiceService->refreshFinancials($lockedInvoice->refresh());
 
             return $payment;
         });

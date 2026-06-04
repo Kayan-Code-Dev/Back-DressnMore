@@ -29,7 +29,6 @@ class UpdateInvoiceRequest extends FormRequest
             'branch_id' => ['nullable', 'integer', Rule::exists('tenant.branches', 'id')->whereNull('deleted_at')],
             'type' => ['required', 'string', Rule::in(Invoice::types())],
             'status' => ['nullable', 'string', Rule::in(Invoice::statuses())],
-            'allow_cancelled_update' => ['nullable', 'boolean'],
 
             'discount' => ['nullable', 'numeric', 'min:0'],
             'discount_type' => ['nullable', 'string', Rule::in(VatType::values())],

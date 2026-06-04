@@ -3,6 +3,7 @@
 namespace App\Services\Tenant;
 
 use App\Enums\SecurityDepositStatus;
+use App\Models\Tenant\Dress;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoiceItem;
 use App\Models\Tenant\InvoicePayment;
@@ -57,17 +58,20 @@ class InvoiceService
         $status = (string) ($data['status'] ?? Invoice::STATUS_DRAFT);
         $invoiceType = (string) $data['type'];
 
-        if ($invoiceType === Invoice::TYPE_RENT && $status === Invoice::STATUS_CONFIRMED) {
-            $this->assertRentAvailability(
-                items: $items,
-                rentStartDate: $data['rent_start_date'] ?? null,
-                rentEndDate: $data['rent_end_date'] ?? null,
-                ignoreInvoiceId: null,
-            );
-        }
+        $this->assertInitialStatusAllowed($status);
 
         /** @var Invoice $invoice */
         $invoice = DB::connection('tenant')->transaction(function () use ($data, $items, $summary, $status, $actorId, $invoiceType): Invoice {
+            if ($invoiceType === Invoice::TYPE_RENT && $status === Invoice::STATUS_CONFIRMED) {
+                $this->lockInvoiceDresses($items);
+                $this->assertRentAvailability(
+                    items: $items,
+                    rentStartDate: $data['rent_start_date'] ?? null,
+                    rentEndDate: $data['rent_end_date'] ?? null,
+                    ignoreInvoiceId: null,
+                );
+            }
+
             $payload = [
                 'invoice_number' => $this->generateInvoiceNumber(),
                 'customer_id' => $data['customer_id'] ?? null,
@@ -157,14 +161,6 @@ class InvoiceService
 
     public function update(Invoice $invoice, array $data, ?int $actorId = null): Invoice
     {
-        $allowCancelledUpdate = (bool) ($data['allow_cancelled_update'] ?? false);
-
-        if ($invoice->status === Invoice::STATUS_CANCELLED && ! $allowCancelledUpdate) {
-            throw ValidationException::withMessages([
-                'invoice' => ['Cancelled invoice cannot be updated'],
-            ]);
-        }
-
         $newStatus = (string) ($data['status'] ?? $invoice->status);
         $newType = (string) ($data['type'] ?? $invoice->type);
         $newItems = array_key_exists('items', $data)
@@ -178,15 +174,6 @@ class InvoiceService
                 'total' => (float) $item->total,
             ])->all();
 
-        if ($newType === Invoice::TYPE_RENT && $newStatus === Invoice::STATUS_CONFIRMED) {
-            $this->assertRentAvailability(
-                items: $newItems,
-                rentStartDate: $data['rent_start_date'] ?? $invoice->rent_start_date?->toDateString(),
-                rentEndDate: $data['rent_end_date'] ?? $invoice->rent_end_date?->toDateString(),
-                ignoreInvoiceId: $invoice->id,
-            );
-        }
-
         $summary = $this->calculateSummary(
             items: $newItems,
             discount: (float) ($data['discount'] ?? $invoice->discount),
@@ -197,9 +184,27 @@ class InvoiceService
 
         /** @var Invoice $updatedInvoice */
         $updatedInvoice = DB::connection('tenant')->transaction(function () use ($invoice, $data, $newItems, $summary, $newStatus, $newType, $actorId): Invoice {
-            $invoice->fill([
-                'customer_id' => $data['customer_id'] ?? $invoice->customer_id,
-                'branch_id' => $data['branch_id'] ?? $invoice->branch_id,
+            /** @var Invoice $lockedInvoice */
+            $lockedInvoice = Invoice::query()
+                ->whereKey($invoice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertStatusTransitionAllowed((string) $lockedInvoice->status, $newStatus);
+
+            if ($newType === Invoice::TYPE_RENT && $newStatus === Invoice::STATUS_CONFIRMED) {
+                $this->lockInvoiceDresses($newItems);
+                $this->assertRentAvailability(
+                    items: $newItems,
+                    rentStartDate: $data['rent_start_date'] ?? $lockedInvoice->rent_start_date?->toDateString(),
+                    rentEndDate: $data['rent_end_date'] ?? $lockedInvoice->rent_end_date?->toDateString(),
+                    ignoreInvoiceId: $lockedInvoice->id,
+                );
+            }
+
+            $lockedInvoice->fill([
+                'customer_id' => $data['customer_id'] ?? $lockedInvoice->customer_id,
+                'branch_id' => $data['branch_id'] ?? $lockedInvoice->branch_id,
                 'type' => $newType,
                 'status' => $newStatus,
                 'subtotal' => $summary['subtotal'],
@@ -208,31 +213,31 @@ class InvoiceService
                 'discount_value' => $summary['discount_value'],
                 'tax' => $summary['tax'],
                 'total' => $summary['total'],
-                'rent_start_date' => $data['rent_start_date'] ?? $invoice->rent_start_date,
-                'rent_end_date' => $data['rent_end_date'] ?? $invoice->rent_end_date,
-                'delivery_date' => $data['delivery_date'] ?? $invoice->delivery_date,
-                'return_date' => $data['return_date'] ?? $invoice->return_date,
-                'security_deposit' => $data['security_deposit'] ?? $invoice->security_deposit,
+                'rent_start_date' => $data['rent_start_date'] ?? $lockedInvoice->rent_start_date,
+                'rent_end_date' => $data['rent_end_date'] ?? $lockedInvoice->rent_end_date,
+                'delivery_date' => $data['delivery_date'] ?? $lockedInvoice->delivery_date,
+                'return_date' => $data['return_date'] ?? $lockedInvoice->return_date,
+                'security_deposit' => $data['security_deposit'] ?? $lockedInvoice->security_deposit,
                 'security_deposit_status' => $data['security_deposit_status']
-                    ?? ((float) ($data['security_deposit'] ?? $invoice->security_deposit) > 0
-                        ? ($invoice->security_deposit_status ?: SecurityDepositStatus::NONE->value)
+                    ?? ((float) ($data['security_deposit'] ?? $lockedInvoice->security_deposit) > 0
+                        ? ($lockedInvoice->security_deposit_status ?: SecurityDepositStatus::NONE->value)
                         : null),
-                'tailoring_due_date' => $data['tailoring_due_date'] ?? $invoice->tailoring_due_date,
-                'visit_datetime' => $data['visit_datetime'] ?? $invoice->visit_datetime,
-                'occasion_datetime' => $data['occasion_datetime'] ?? $invoice->occasion_datetime,
-                'days_of_rent' => $data['days_of_rent'] ?? $invoice->days_of_rent,
-                'tailoring_notes' => $data['tailoring_notes'] ?? $invoice->tailoring_notes,
-                'notes' => $data['notes'] ?? $invoice->notes,
-                'order_notes' => $data['order_notes'] ?? $invoice->order_notes,
-                'created_by' => $invoice->created_by ?? $actorId,
+                'tailoring_due_date' => $data['tailoring_due_date'] ?? $lockedInvoice->tailoring_due_date,
+                'visit_datetime' => $data['visit_datetime'] ?? $lockedInvoice->visit_datetime,
+                'occasion_datetime' => $data['occasion_datetime'] ?? $lockedInvoice->occasion_datetime,
+                'days_of_rent' => $data['days_of_rent'] ?? $lockedInvoice->days_of_rent,
+                'tailoring_notes' => $data['tailoring_notes'] ?? $lockedInvoice->tailoring_notes,
+                'notes' => $data['notes'] ?? $lockedInvoice->notes,
+                'order_notes' => $data['order_notes'] ?? $lockedInvoice->order_notes,
+                'created_by' => $lockedInvoice->created_by ?? $actorId,
             ]);
-            $invoice->save();
+            $lockedInvoice->save();
 
             if (array_key_exists('items', $data)) {
-                $this->replaceItems($invoice, $newItems);
+                $this->replaceItems($lockedInvoice, $newItems);
             }
 
-            return $this->refreshFinancials($invoice, $newStatus);
+            return $this->refreshFinancials($lockedInvoice, $newStatus);
         });
 
         return $updatedInvoice->refresh()->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
@@ -240,7 +245,16 @@ class InvoiceService
 
     public function delete(Invoice $invoice): void
     {
-        $invoice->delete();
+        DB::connection('tenant')->transaction(function () use ($invoice): void {
+            /** @var Invoice $lockedInvoice */
+            $lockedInvoice = Invoice::query()
+                ->whereKey($invoice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertDeletable($lockedInvoice);
+            $lockedInvoice->delete();
+        });
     }
 
     public function cancel(Invoice $invoice): Invoice
@@ -322,19 +336,86 @@ class InvoiceService
         }, $rows);
     }
 
+    private function assertInitialStatusAllowed(string $status): void
+    {
+        if (! in_array($status, [Invoice::STATUS_DRAFT, Invoice::STATUS_CONFIRMED], true)) {
+            throw ValidationException::withMessages([
+                'status' => ['Invoice status must start as draft or confirmed.'],
+            ]);
+        }
+    }
+
+    private function assertStatusTransitionAllowed(string $currentStatus, string $newStatus): void
+    {
+        $allowed = [
+            Invoice::STATUS_DRAFT => [Invoice::STATUS_DRAFT, Invoice::STATUS_CONFIRMED, Invoice::STATUS_CANCELLED],
+            Invoice::STATUS_CONFIRMED => [Invoice::STATUS_CONFIRMED, Invoice::STATUS_CANCELLED],
+            Invoice::STATUS_PARTIALLY_PAID => [Invoice::STATUS_PARTIALLY_PAID],
+            Invoice::STATUS_PAID => [Invoice::STATUS_PAID],
+            Invoice::STATUS_DELIVERED => [Invoice::STATUS_DELIVERED],
+            Invoice::STATUS_RETURNED => [Invoice::STATUS_RETURNED],
+            Invoice::STATUS_CANCELLED => [Invoice::STATUS_CANCELLED],
+        ];
+
+        if (! in_array($newStatus, $allowed[$currentStatus] ?? [], true)) {
+            throw ValidationException::withMessages([
+                'status' => ['Invoice status transition is not allowed.'],
+            ]);
+        }
+
+        if (in_array($currentStatus, [
+            Invoice::STATUS_PAID,
+            Invoice::STATUS_DELIVERED,
+            Invoice::STATUS_RETURNED,
+            Invoice::STATUS_CANCELLED,
+        ], true)) {
+            throw ValidationException::withMessages([
+                'invoice' => ['Invoice cannot be updated in its current status.'],
+            ]);
+        }
+    }
+
+    private function assertDeletable(Invoice $invoice): void
+    {
+        if ($invoice->status !== Invoice::STATUS_DRAFT) {
+            throw ValidationException::withMessages([
+                'invoice' => ['Only draft invoices can be deleted.'],
+            ]);
+        }
+
+        if ($this->recordedPaidAmount($invoice) > 0
+            || $invoice->deliveryRecords()->exists()
+            || $invoice->securityDepositTransactions()->exists()) {
+            throw ValidationException::withMessages([
+                'invoice' => ['Invoice has financial or delivery activity and cannot be deleted.'],
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<array<string,mixed>>  $items
+     */
+    private function lockInvoiceDresses(array $items): void
+    {
+        $dressIds = $this->dressIdsFromItems($items);
+        if ($dressIds === []) {
+            return;
+        }
+
+        Dress::query()
+            ->whereIn('id', $dressIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id']);
+    }
+
     private function assertRentAvailability(
         array $items,
         mixed $rentStartDate,
         mixed $rentEndDate,
         ?int $ignoreInvoiceId
     ): void {
-        $dressIds = collect($items)
-            ->pluck('dress_id')
-            ->filter(fn (mixed $id): bool => $id !== null)
-            ->map(fn (mixed $id): int => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
+        $dressIds = $this->dressIdsFromItems($items);
 
         if ($dressIds === []) {
             return;
@@ -355,7 +436,7 @@ class InvoiceService
             Invoice::STATUS_RETURNED,
         ];
 
-        $exists = Invoice::query()
+        $blockingInvoice = Invoice::query()
             ->where('type', Invoice::TYPE_RENT)
             ->whereIn('status', $blockingStatuses)
             ->when($ignoreInvoiceId !== null, fn (Builder $q) => $q->where('id', '!=', $ignoreInvoiceId))
@@ -364,13 +445,29 @@ class InvoiceService
             ->whereHas('items', function (Builder $query) use ($dressIds): void {
                 $query->whereIn('dress_id', $dressIds);
             })
-            ->exists();
+            ->lockForUpdate()
+            ->first(['id']);
 
-        if ($exists) {
+        if ($blockingInvoice instanceof Invoice) {
             throw ValidationException::withMessages([
                 'rent_period' => ['الفستان غير متاح خلال فترة التأجير المحددة.'],
             ]);
         }
+    }
+
+    /**
+     * @param  list<array<string,mixed>>  $items
+     * @return list<int>
+     */
+    private function dressIdsFromItems(array $items): array
+    {
+        return collect($items)
+            ->pluck('dress_id')
+            ->filter(fn (mixed $id): bool => $id !== null)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

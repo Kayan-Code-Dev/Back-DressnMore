@@ -156,6 +156,22 @@ class TenantInvoiceTest extends TestCase
             ->assertJsonPath('data.remaining_amount', '115.00');
     }
 
+    public function test_invoice_cannot_be_created_with_advanced_lifecycle_status(): void
+    {
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->postJson('/api/tenant/invoices', [
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_PAID,
+            'items' => [
+                ['description' => 'Invalid status item', 'quantity' => 1, 'unit_price' => 100],
+            ],
+        ], $this->tenantHeaders());
+
+        $response->assertStatus(422)
+            ->assertJsonPath('errors.status.0', 'Invoice status must start as draft or confirmed.');
+    }
+
     public function test_tenant_user_can_update_invoice(): void
     {
         $invoice = Invoice::query()->create([
@@ -209,6 +225,79 @@ class TenantInvoiceTest extends TestCase
             ->assertJsonPath('message', 'Invoice deleted');
 
         $this->assertSoftDeleted('invoices', ['id' => $invoice->id], 'tenant');
+    }
+
+    public function test_paid_delivered_and_returned_invoices_cannot_be_deleted(): void
+    {
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        foreach ([Invoice::STATUS_PAID, Invoice::STATUS_DELIVERED, Invoice::STATUS_RETURNED] as $status) {
+            $invoice = Invoice::query()->create([
+                'invoice_number' => 'INV-NODEL-'.strtoupper($status).'-'.uniqid(),
+                'type' => Invoice::TYPE_RENT,
+                'status' => $status,
+                'total' => 100,
+                'paid_amount' => $status === Invoice::STATUS_PAID ? 100 : 0,
+                'remaining_amount' => $status === Invoice::STATUS_PAID ? 0 : 100,
+            ]);
+
+            $response = $this->deleteJson("/api/tenant/invoices/{$invoice->id}", [], $this->tenantHeaders());
+
+            $response->assertStatus(422)
+                ->assertJsonPath('errors.invoice.0', 'Only draft invoices can be deleted.');
+
+            $this->assertDatabaseHas('invoices', [
+                'id' => $invoice->id,
+                'deleted_at' => null,
+            ], 'tenant');
+        }
+    }
+
+    public function test_cancelled_invoice_cannot_be_updated_even_with_client_bypass_flag(): void
+    {
+        $invoice = Invoice::query()->create([
+            'invoice_number' => 'INV-CANCELLED-UPDATE',
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_CANCELLED,
+            'total' => 100,
+            'remaining_amount' => 100,
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->putJson("/api/tenant/invoices/{$invoice->id}", [
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_CONFIRMED,
+            'allow_cancelled_update' => true,
+            'notes' => 'Should not be saved',
+        ], $this->tenantHeaders());
+
+        $response->assertStatus(422);
+        $this->assertNull($invoice->refresh()->notes);
+        $this->assertSame(Invoice::STATUS_CANCELLED, $invoice->status);
+    }
+
+    public function test_invoice_update_rejects_invalid_status_transition(): void
+    {
+        $invoice = Invoice::query()->create([
+            'invoice_number' => 'INV-BAD-TRANSITION',
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_DRAFT,
+            'total' => 100,
+            'remaining_amount' => 100,
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->putJson("/api/tenant/invoices/{$invoice->id}", [
+            'type' => Invoice::TYPE_SELL,
+            'status' => Invoice::STATUS_PAID,
+        ], $this->tenantHeaders());
+
+        $response->assertStatus(422)
+            ->assertJsonPath('errors.status.0', 'Invoice status transition is not allowed.');
+
+        $this->assertSame(Invoice::STATUS_DRAFT, $invoice->refresh()->status);
     }
 
     public function test_search_filter_works(): void
@@ -431,6 +520,62 @@ class TenantInvoiceTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.type', Invoice::TYPE_RENT);
+    }
+
+    public function test_cannot_update_rent_invoice_to_overlap_existing_booking(): void
+    {
+        $dress = $this->createDress();
+
+        $existing = Invoice::query()->create([
+            'invoice_number' => 'INV-RENT-LOCK-1',
+            'type' => Invoice::TYPE_RENT,
+            'status' => Invoice::STATUS_CONFIRMED,
+            'rent_start_date' => '2026-06-01',
+            'rent_end_date' => '2026-06-10',
+            'total' => 100,
+            'remaining_amount' => 100,
+        ]);
+        $existing->items()->create([
+            'dress_id' => $dress->id,
+            'quantity' => 1,
+            'unit_price' => 100,
+            'total' => 100,
+        ]);
+
+        $candidate = Invoice::query()->create([
+            'invoice_number' => 'INV-RENT-LOCK-2',
+            'type' => Invoice::TYPE_RENT,
+            'status' => Invoice::STATUS_CONFIRMED,
+            'rent_start_date' => '2026-06-11',
+            'rent_end_date' => '2026-06-15',
+            'total' => 80,
+            'remaining_amount' => 80,
+        ]);
+        $candidate->items()->create([
+            'dress_id' => $dress->id,
+            'quantity' => 1,
+            'unit_price' => 80,
+            'total' => 80,
+        ]);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $response = $this->putJson("/api/tenant/invoices/{$candidate->id}", [
+            'type' => Invoice::TYPE_RENT,
+            'status' => Invoice::STATUS_CONFIRMED,
+            'rent_start_date' => '2026-06-05',
+            'rent_end_date' => '2026-06-12',
+            'items' => [
+                ['dress_id' => $dress->id, 'quantity' => 1, 'unit_price' => 80],
+            ],
+        ], $this->tenantHeaders());
+
+        $response->assertStatus(422)
+            ->assertJsonPath('errors.rent_period.0', 'الفستان غير متاح خلال فترة التأجير المحددة.');
+
+        $candidate->refresh();
+        $this->assertSame('2026-06-11', $candidate->rent_start_date->toDateString());
+        $this->assertSame('2026-06-15', $candidate->rent_end_date->toDateString());
     }
 
     public function test_cancelled_invoice_does_not_block_availability(): void
