@@ -99,7 +99,6 @@ class TenantPurchaseOrderTest extends TestCase
         $this->assertMatchesRegularExpression('/^PO-\d{8}-\d{4}$/', (string) $response->json('data.purchase_order_number'));
     }
 
-
     public function test_tenant_user_can_create_purchase_order_with_item_code_category_subcategory_and_deposit(): void
     {
         $supplier = $this->createSupplier();
@@ -286,7 +285,6 @@ class TenantPurchaseOrderTest extends TestCase
             ->assertJsonPath('data.remaining_amount', '0.00');
     }
 
-
     public function test_supplier_balance_and_account_purchase_order_fields_update_after_deposit(): void
     {
         $supplier = $this->createSupplier();
@@ -400,7 +398,6 @@ class TenantPurchaseOrderTest extends TestCase
             'current_balance' => 0,
         ]);
     }
-
 
     private function createBranch(): Branch
     {
@@ -520,7 +517,6 @@ class TenantPurchaseOrderTest extends TestCase
             'subscription_ends_at' => CarbonImmutable::now()->addDays(10),
         ]);
     }
-
 
     private function actingAsTenant(User $user): void
     {
