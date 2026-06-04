@@ -206,34 +206,52 @@ class ExpenseService
 
     public function pay(Expense $expense, array $data, ?int $actorId = null): Expense
     {
-        if ($expense->status === Expense::STATUS_CANCELLED) {
-            throw ValidationException::withMessages([
-                'expense' => ['Cancelled expense cannot be paid'],
-            ]);
-        }
+        /** @var Expense $paidExpense */
+        $paidExpense = DB::connection('tenant')->transaction(function () use ($expense, $data, $actorId): Expense {
+            /** @var Expense $lockedExpense */
+            $lockedExpense = Expense::query()
+                ->whereKey($expense->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        if (isset($data['cashbox_id'])) {
-            $expense->cashbox_id = $data['cashbox_id'];
-        }
-        if (isset($data['method'])) {
-            $expense->method = $data['method'];
-        }
-        if (isset($data['transaction_id'])) {
-            $expense->transaction_id = $data['transaction_id'];
-        }
-        if (isset($data['notes'])) {
-            $expense->notes = $data['notes'];
-        }
+            if ($lockedExpense->status === Expense::STATUS_CANCELLED) {
+                throw ValidationException::withMessages([
+                    'expense' => ['Cancelled expense cannot be paid'],
+                ]);
+            }
 
-        $expense->status = Expense::STATUS_PAID;
-        $expense->paid_at = $data['paid_at'] ?? Carbon::now();
-        $expense->cancelled_at = null;
-        $expense->save();
+            if ($lockedExpense->status === Expense::STATUS_PAID) {
+                throw ValidationException::withMessages([
+                    'expense' => ['Expense is already paid. Reverse or cancel the posted payment before changing payment details.'],
+                ]);
+            }
 
-        $this->cashMovementService->syncExpenseMovement($expense, $actorId);
-        $this->journalEntryPostingService->postFromExpense($expense->refresh(), $actorId);
+            if (isset($data['cashbox_id'])) {
+                $lockedExpense->cashbox_id = $data['cashbox_id'];
+            }
+            if (isset($data['method'])) {
+                $lockedExpense->method = $data['method'];
+            }
+            if (isset($data['transaction_id'])) {
+                $lockedExpense->transaction_id = $data['transaction_id'];
+            }
+            if (isset($data['notes'])) {
+                $lockedExpense->notes = $data['notes'];
+            }
 
-        return $expense->refresh()->load(['category', 'branch', 'cashbox']);
+            $lockedExpense->status = Expense::STATUS_PAID;
+            $lockedExpense->paid_at = $data['paid_at'] ?? Carbon::now();
+            $lockedExpense->cancelled_at = null;
+            $lockedExpense->save();
+
+            $this->cashMovementService->syncExpenseMovement($lockedExpense, $actorId);
+
+            return $lockedExpense->refresh();
+        });
+
+        $this->journalEntryPostingService->postFromExpense($paidExpense, $actorId);
+
+        return $paidExpense->load(['category', 'branch', 'cashbox']);
     }
 
     /**

@@ -5,11 +5,15 @@ namespace Tests\Feature;
 use App\Models\Tenant\HrDocument;
 use App\Models\Tenant\HrEmployee;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class HrDocumentApiTest extends TenantHrTestCase
 {
     public function test_document_metadata_crud_filters_and_expiry_alerts(): void
     {
+        Storage::fake('local');
+
         $user = $this->createTenantUserWithPermissions([
             'hr.employees.view',
             'hr.documents.view',
@@ -29,22 +33,34 @@ class HrDocumentApiTest extends TenantHrTestCase
             'salary_type' => 'monthly',
         ]);
 
-        $create = $this->postJson('/api/tenant/hr/documents', [
+        $create = $this->post('/api/tenant/hr/documents', [
             'employee_id' => $employee->id,
             'document_type' => 'contract',
-            'file_name' => 'contract.pdf',
+            'file' => UploadedFile::fake()->create('contract.pdf', 32, 'application/pdf'),
             'issue_date' => '2024-01-01',
             'expiry_date' => '2024-06-01',
         ], $headers);
         $create->assertCreated()->assertJsonPath('data.file_name', 'contract.pdf');
+        $this->assertStringStartsWith(
+            'tenants/'.$this->tenant->id.'/hr/documents/'.$employee->id.'/',
+            (string) $create->json('data.file_path'),
+        );
+        Storage::disk('local')->assertExists((string) $create->json('data.file_path'));
         $documentId = (int) $create->json('data.id');
+
+        $this->post('/api/tenant/hr/documents', [
+            'employee_id' => $employee->id,
+            'document_type' => 'contract',
+            'file' => UploadedFile::fake()->create('bad.pdf', 32, 'application/pdf'),
+            'issue_date' => '2024-06-01',
+            'expiry_date' => '2024-01-01',
+        ], $headers)->assertStatus(422);
 
         $this->postJson('/api/tenant/hr/documents', [
             'employee_id' => $employee->id,
             'document_type' => 'contract',
-            'file_name' => 'bad.pdf',
-            'issue_date' => '2024-06-01',
-            'expiry_date' => '2024-01-01',
+            'file_name' => 'manual.pdf',
+            'file_path' => '/tmp/manual.pdf',
         ], $headers)->assertStatus(422);
 
         HrDocument::query()->create([
@@ -63,7 +79,9 @@ class HrDocumentApiTest extends TenantHrTestCase
             ->assertOk()
             ->assertJson(fn ($json) => $json->where('success', true)->etc());
 
+        $storedPath = (string) $create->json('data.file_path');
         $this->deleteJson('/api/tenant/hr/documents/'.$documentId, [], $headers)->assertOk();
         $this->assertDatabaseMissing('hr_documents', ['id' => $documentId], 'tenant');
+        Storage::disk('local')->assertMissing($storedPath);
     }
 }

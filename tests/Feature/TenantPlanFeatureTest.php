@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Central\Plan;
 use App\Models\Central\PlanFeature;
+use App\Models\Central\Payment;
+use App\Models\Central\PaymentGateway;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\DressCategory;
 use App\Models\Tenant\Permission;
@@ -113,6 +115,53 @@ class TenantPlanFeatureTest extends TestCase
         ], $this->tenantHeaders())->assertForbidden();
     }
 
+    public function test_paid_subscription_upgrade_rejects_mock_payment_when_disabled(): void
+    {
+        Config::set('billing.allow_mock_payments', false);
+        Config::set('billing.mock_payment_environments', []);
+        $paidPlan = $this->createPaidPlan();
+        $gateway = $this->createPaymentGateway();
+        $billingUser = $this->createTenantUserWithPermissions(['settings.manage']);
+
+        Sanctum::actingAs($billingUser, ['*']);
+
+        $this->postJson('/api/tenant/subscription/upgrade', [
+            'plan_code' => $paidPlan->slug,
+            'payment_gateway_id' => $gateway->id,
+            'mock_payment_confirmed' => true,
+        ], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Mock payments are disabled for this environment');
+
+        $this->assertSame(0, Payment::query()->count());
+    }
+
+    public function test_paid_subscription_upgrade_records_verified_mock_payment_when_allowed(): void
+    {
+        Config::set('billing.allow_mock_payments', true);
+        Config::set('billing.mock_payment_environments', []);
+        $paidPlan = $this->createPaidPlan();
+        $gateway = $this->createPaymentGateway();
+        $billingUser = $this->createTenantUserWithPermissions(['settings.manage']);
+
+        Sanctum::actingAs($billingUser, ['*']);
+
+        $this->postJson('/api/tenant/subscription/upgrade', [
+            'plan_code' => $paidPlan->slug,
+            'payment_gateway_id' => $gateway->id,
+            'mock_payment_confirmed' => true,
+            'payment_reference' => 'TEST-PAID-001',
+        ], $this->tenantHeaders())->assertOk();
+
+        $this->assertDatabaseHas('payments', [
+            'tenant_id' => $this->tenant->id,
+            'plan_id' => $paidPlan->id,
+            'payment_gateway_id' => $gateway->id,
+            'reference' => 'TEST-PAID-001',
+            'status' => Payment::STATUS_PAID,
+        ], 'central');
+    }
+
     private function prepareSqliteDatabases(): void
     {
         $this->centralDatabasePath = database_path('testing-central-plan-features.sqlite');
@@ -203,6 +252,30 @@ class TenantPlanFeatureTest extends TestCase
             'plan_id' => $plan->id,
             'subscription_starts_at' => CarbonImmutable::now()->subDay(),
             'subscription_ends_at' => CarbonImmutable::now()->addDays(10),
+        ]);
+    }
+
+    private function createPaidPlan(): Plan
+    {
+        return Plan::query()->create([
+            'name' => 'Paid Plan '.uniqid(),
+            'slug' => 'paid-plan-'.uniqid(),
+            'price' => 99,
+            'billing_cycle' => 'monthly',
+            'duration_days' => 30,
+            'status' => 'active',
+        ]);
+    }
+
+    private function createPaymentGateway(): PaymentGateway
+    {
+        return PaymentGateway::query()->create([
+            'name' => 'Test Gateway',
+            'type' => 'bank_transfer',
+            'account_holder' => 'DressnMore',
+            'account_number' => '123456',
+            'is_active' => true,
+            'display_order' => 1,
         ]);
     }
 

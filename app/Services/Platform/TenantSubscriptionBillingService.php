@@ -12,7 +12,6 @@ use App\Support\TenantSubscriptionPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 class TenantSubscriptionBillingService
@@ -20,6 +19,7 @@ class TenantSubscriptionBillingService
     public function __construct(
         private readonly TenantProvisioningService $tenantProvisioningService,
         private readonly TenantSubscriptionPresenter $subscriptionPresenter,
+        private readonly SubscriptionPaymentVerifier $paymentVerifier,
     ) {}
 
     /**
@@ -89,11 +89,11 @@ class TenantSubscriptionBillingService
         $isPaid = (float) $plan->price > 0;
 
         if ($isPaid) {
-            $this->assertMockPaymentConfirmed($data);
             $gateway = PaymentGateway::query()
                 ->where('id', (int) $data['payment_gateway_id'])
                 ->where('is_active', true)
                 ->firstOrFail();
+            $verification = $this->paymentVerifier->verify($tenant, $plan, $gateway, $data);
 
             $payment = Payment::query()->create([
                 'tenant_id' => $tenant->id,
@@ -102,11 +102,15 @@ class TenantSubscriptionBillingService
                 'purpose' => 'subscription_upgrade',
                 'amount' => $plan->price,
                 'method' => $gateway->type,
-                'reference' => 'MOCK-'.Str::upper(Str::random(10)),
-                'status' => 'paid',
-                'paid_at' => CarbonImmutable::now(),
-                'notes' => 'Mock payment until gateway integration',
+                'reference' => $verification->reference,
+                'status' => $verification->status,
+                'paid_at' => $verification->paidAt,
+                'notes' => $verification->notes,
             ]);
+
+            if ($payment->status !== Payment::STATUS_PAID) {
+                throw new RuntimeException('Payment was not completed');
+            }
 
             $gateway->increment('usage_count');
         }
@@ -199,17 +203,4 @@ class TenantSubscriptionBillingService
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function assertMockPaymentConfirmed(array $data): void
-    {
-        if (! filter_var($data['mock_payment_confirmed'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-            throw new RuntimeException('Payment confirmation is required');
-        }
-
-        if (empty($data['payment_gateway_id'])) {
-            throw new RuntimeException('Payment gateway is required');
-        }
-    }
 }

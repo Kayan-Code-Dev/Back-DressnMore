@@ -10,6 +10,7 @@ use App\Models\Tenant\SecurityDepositTransaction;
 use App\Models\Tenant\SupplierPayment;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -301,8 +302,45 @@ class CashMovementService
 
     private function createMovement(array $payload): CashMovement
     {
+        $referenceType = $payload['reference_type'] ?? null;
+        $referenceId = $payload['reference_id'] ?? null;
+        if ($referenceType !== null && $referenceId !== null) {
+            $existing = CashMovement::withTrashed()
+                ->where('reference_type', $referenceType)
+                ->where('reference_id', $referenceId)
+                ->first();
+
+            if ($existing instanceof CashMovement) {
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+
+                return $existing->refresh();
+            }
+        }
+
         /** @var CashMovement $movement */
-        $movement = CashMovement::query()->create($payload);
+        try {
+            $movement = CashMovement::query()->create($payload);
+        } catch (QueryException $exception) {
+            if ($this->isUniqueReferenceViolation($exception) && $referenceType !== null && $referenceId !== null) {
+                /** @var CashMovement|null $existing */
+                $existing = CashMovement::withTrashed()
+                    ->where('reference_type', $referenceType)
+                    ->where('reference_id', $referenceId)
+                    ->first();
+
+                if ($existing instanceof CashMovement) {
+                    if ($existing->trashed()) {
+                        $existing->restore();
+                    }
+
+                    return $existing->refresh();
+                }
+            }
+
+            throw $exception;
+        }
 
         if ($movement->cashbox_id !== null) {
             $movement->balance_after = $this->syncCashboxBalance((int) $movement->cashbox_id);
@@ -315,6 +353,15 @@ class CashMovementService
         );
 
         return $movement;
+    }
+
+    private function isUniqueReferenceViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? '');
+        $driverCode = (string) ($exception->errorInfo[1] ?? '');
+
+        return in_array($sqlState, ['23000', '23505'], true)
+            || in_array($driverCode, ['1062', '1555', '2067'], true);
     }
 
     private function syncCashboxBalance(int $cashboxId): float

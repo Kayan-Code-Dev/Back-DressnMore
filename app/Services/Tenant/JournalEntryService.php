@@ -6,6 +6,7 @@ use App\Models\Tenant\Account;
 use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\JournalEntryLine;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -284,30 +285,41 @@ class JournalEntryService
             throw new HttpException(422, 'Generated journal entries must be balanced.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($header, $lines, $totals, $actorId): JournalEntry {
-            $entry = JournalEntry::query()->create([
-                'entry_number' => $this->generateEntryNumber(Carbon::parse($header['entry_date'] ?? now())),
-                'entry_date' => $header['entry_date'] ?? now()->toDateString(),
-                'type' => $header['type'] ?? JournalEntry::TYPE_NORMAL,
-                'source_type' => $header['source_type'] ?? JournalEntry::SOURCE_SYSTEM,
-                'source_id' => $header['source_id'] ?? null,
-                'reference_number' => $header['reference_number'] ?? null,
-                'description' => $header['description'] ?? null,
-                'status' => JournalEntry::STATUS_APPROVED,
-                'total_debit' => $totals['total_debit'],
-                'total_credit' => $totals['total_credit'],
-                'difference' => $totals['difference'],
-                'is_balanced' => true,
-                'branch_id' => $header['branch_id'] ?? null,
-                'created_by' => $actorId,
-                'approved_by' => $actorId,
-                'approved_at' => now(),
-            ]);
+        try {
+            return DB::connection('tenant')->transaction(function () use ($header, $lines, $totals, $actorId): JournalEntry {
+                $entry = JournalEntry::query()->create([
+                    'entry_number' => $this->generateEntryNumber(Carbon::parse($header['entry_date'] ?? now())),
+                    'entry_date' => $header['entry_date'] ?? now()->toDateString(),
+                    'type' => $header['type'] ?? JournalEntry::TYPE_NORMAL,
+                    'source_type' => $header['source_type'] ?? JournalEntry::SOURCE_SYSTEM,
+                    'source_id' => $header['source_id'] ?? null,
+                    'reference_number' => $header['reference_number'] ?? null,
+                    'description' => $header['description'] ?? null,
+                    'status' => JournalEntry::STATUS_APPROVED,
+                    'total_debit' => $totals['total_debit'],
+                    'total_credit' => $totals['total_credit'],
+                    'difference' => $totals['difference'],
+                    'is_balanced' => true,
+                    'branch_id' => $header['branch_id'] ?? null,
+                    'created_by' => $actorId,
+                    'approved_by' => $actorId,
+                    'approved_at' => now(),
+                ]);
 
-            $this->syncLines($entry, $lines);
+                $this->syncLines($entry, $lines);
 
-            return $this->findOrFail($entry->id);
-        });
+                return $this->findOrFail($entry->id);
+            });
+        } catch (QueryException $exception) {
+            if ($sourceId !== null && $this->isUniqueSourceViolation($exception)) {
+                $existing = $this->findBySource($sourceType, $sourceId);
+                if ($existing instanceof JournalEntry) {
+                    return $this->findOrFail($existing->id);
+                }
+            }
+
+            throw $exception;
+        }
     }
 
     public function findBySource(string $sourceType, int $sourceId): ?JournalEntry
@@ -317,6 +329,15 @@ class JournalEntryService
             ->where('source_id', $sourceId)
             ->where('status', '!=', JournalEntry::STATUS_CANCELLED)
             ->first();
+    }
+
+    private function isUniqueSourceViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? '');
+        $driverCode = (string) ($exception->errorInfo[1] ?? '');
+
+        return in_array($sqlState, ['23000', '23505'], true)
+            || in_array($driverCode, ['1062', '1555', '2067'], true);
     }
 
     public function cancelBySource(string $sourceType, int $sourceId, ?int $actorId): ?JournalEntry
