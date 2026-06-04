@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\PurchaseOrder\ReceivePurchaseOrderRequest;
 use App\Http\Requests\Tenant\PurchaseOrder\ReturnPurchaseOrderRequest;
 use App\Http\Requests\Tenant\PurchaseOrder\StorePurchaseOrderRequest;
 use App\Http\Requests\Tenant\PurchaseOrder\UpdatePurchaseOrderRequest;
@@ -80,6 +81,18 @@ class PurchaseOrderController extends Controller
         $purchaseOrderModel = $this->purchaseOrderService->returnOrder($purchaseOrderModel, $request->validated());
 
         return ApiResponse::success(new PurchaseOrderResource($purchaseOrderModel), 'Purchase order returned');
+    }
+
+    public function receive(ReceivePurchaseOrderRequest $request, int $purchaseOrder): JsonResponse
+    {
+        $purchaseOrderModel = $this->purchaseOrderService->findOrFail($purchaseOrder);
+        $purchaseOrderModel = $this->purchaseOrderService->receive(
+            purchaseOrder: $purchaseOrderModel,
+            data: $request->validated(),
+            actorId: $request->user()?->id,
+        );
+
+        return ApiResponse::success(new PurchaseOrderResource($purchaseOrderModel), 'Purchase order received');
     }
 
     public function export(Request $request): StreamedResponse

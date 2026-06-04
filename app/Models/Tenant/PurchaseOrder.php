@@ -40,7 +40,12 @@ class PurchaseOrder extends BaseTenantModel
         'total',
         'paid_amount',
         'remaining_amount',
+        'deposit_amount',
+        'inventory_received',
+        'received_at',
+        'received_by',
         'order_date',
+        'expected_delivery_date',
         'notes',
         'created_by',
     ];
@@ -54,9 +59,13 @@ class PurchaseOrder extends BaseTenantModel
             'total' => 'decimal:2',
             'paid_amount' => 'decimal:2',
             'remaining_amount' => 'decimal:2',
+            'deposit_amount' => 'decimal:2',
             'order_date' => 'date',
+            'expected_delivery_date' => 'date',
             'is_returned' => 'boolean',
+            'inventory_received' => 'boolean',
             'returned_at' => 'datetime',
+            'received_at' => 'datetime',
         ];
     }
 
