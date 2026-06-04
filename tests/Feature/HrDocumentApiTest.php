@@ -18,6 +18,7 @@ class HrDocumentApiTest extends TenantHrTestCase
             'hr.employees.view',
             'hr.documents.view',
             'hr.documents.upload',
+            'hr.documents.download',
             'hr.documents.delete',
         ]);
         $headers = $this->authHeaders($user);
@@ -51,12 +52,6 @@ class HrDocumentApiTest extends TenantHrTestCase
         $download = $this->get('/api/tenant/hr/documents/'.$documentId.'/download', $headers);
         $download->assertOk();
         $this->assertStringContainsString('contract.pdf', (string) $download->headers->get('content-disposition'));
-
-        $viewOnlyUser = $this->createTenantUserWithPermissions([
-            'hr.documents.view',
-        ]);
-        $this->get('/api/tenant/hr/documents/'.$documentId.'/download', $this->authHeaders($viewOnlyUser))
-            ->assertForbidden();
 
         $this->post('/api/tenant/hr/documents', [
             'employee_id' => $employee->id,
@@ -99,5 +94,39 @@ class HrDocumentApiTest extends TenantHrTestCase
         $this->deleteJson('/api/tenant/hr/documents/'.$documentId, [], $headers)->assertOk();
         $this->assertDatabaseMissing('hr_documents', ['id' => $documentId], 'tenant');
         Storage::disk('local')->assertMissing($storedPath);
+    }
+
+    public function test_document_download_requires_download_permission(): void
+    {
+        Storage::fake('local');
+
+        $employee = HrEmployee::query()->create([
+            'employee_code' => 'EMP-DOC-2',
+            'full_name' => 'Limited Doc Employee',
+            'phone' => '+966500000088',
+            'employment_type' => 'full_time',
+            'status' => 'active',
+            'joining_date' => '2024-01-01',
+            'base_salary' => 3000,
+            'salary_type' => 'monthly',
+        ]);
+
+        $path = 'tenants/'.$this->tenant->id.'/hr/documents/'.$employee->id.'/contract.pdf';
+        Storage::disk('local')->put($path, 'contract');
+
+        $document = HrDocument::query()->create([
+            'employee_id' => $employee->id,
+            'document_type' => 'contract',
+            'file_name' => 'contract.pdf',
+            'file_path' => $path,
+            'status' => 'valid',
+        ]);
+
+        $viewOnlyUser = $this->createTenantUserWithPermissions([
+            'hr.documents.view',
+        ]);
+
+        $this->get('/api/tenant/hr/documents/'.$document->id.'/download', $this->authHeaders($viewOnlyUser))
+            ->assertForbidden();
     }
 }
