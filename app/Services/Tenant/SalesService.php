@@ -5,14 +5,10 @@ namespace App\Services\Tenant;
 use App\Enums\InvoiceStatus;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoiceItem;
-use App\Models\Tenant\PurchaseOrder;
-use App\Models\Tenant\Supplier;
-use App\Models\Tenant\SupplierPayment;
 use App\Support\ReportDateRange;
 use App\Support\Tenant\SaleInvoicePresenter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 
 class SalesService
 {

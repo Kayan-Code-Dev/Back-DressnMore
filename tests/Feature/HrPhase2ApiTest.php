@@ -3,10 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Tenant\Branch;
-use App\Models\Tenant\HrAttendanceRecord;
 use App\Models\Tenant\HrEmployee;
-use App\Models\Tenant\HrLeaveRequest;
-use App\Models\Tenant\HrShift;
 
 class HrPhase2ApiTest extends TenantHrTestCase
 {
@@ -117,4 +114,3 @@ class HrPhase2ApiTest extends TenantHrTestCase
         $this->assertDatabaseHas('hr_leave_requests', ['id' => $leaveId], 'tenant');
     }
 }
-

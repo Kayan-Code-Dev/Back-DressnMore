@@ -5,6 +5,8 @@ namespace App\Services\Tenant;
 use App\Enums\RentalReturnCondition;
 use App\Enums\RentalReturnSettlementStatus;
 use App\Enums\SecurityDepositStatus;
+use App\Models\Tenant\DeliveryRecord;
+use App\Models\Tenant\Dress;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\RentalReturnSettlement;
 use App\Models\Tenant\SecurityDepositTransaction;
@@ -113,9 +115,9 @@ class RentalReturnSettlementService
 
         $condition = RentalReturnCondition::GOOD->value;
         $dressStatus = (string) ($input['dress_status_after_return'] ?? '');
-        if ($dressStatus === \App\Models\Tenant\Dress::STATUS_MAINTENANCE) {
+        if ($dressStatus === Dress::STATUS_MAINTENANCE) {
             $condition = RentalReturnCondition::DAMAGED->value;
-        } elseif ($dressStatus === \App\Models\Tenant\Dress::STATUS_UNAVAILABLE) {
+        } elseif ($dressStatus === Dress::STATUS_UNAVAILABLE) {
             $condition = RentalReturnCondition::LOST->value;
         }
 
@@ -251,7 +253,7 @@ class RentalReturnSettlementService
         }
 
         $wasDelivered = $invoice->deliveryRecords()
-            ->where('type', \App\Models\Tenant\DeliveryRecord::TYPE_DELIVERED)
+            ->where('type', DeliveryRecord::TYPE_DELIVERED)
             ->exists();
 
         if (! $wasDelivered && $invoice->status !== Invoice::STATUS_DELIVERED) {

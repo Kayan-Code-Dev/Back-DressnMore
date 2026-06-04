@@ -11,7 +11,6 @@ use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\RentalReturnSettlement;
 use App\Models\Tenant\SecurityDepositTransaction;
 use App\Models\Tenant\SupplierPayment;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class JournalEntryPostingService
