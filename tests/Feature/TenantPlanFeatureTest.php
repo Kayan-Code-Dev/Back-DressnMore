@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\Central\Plan;
-use App\Models\Central\PlanFeature;
 use App\Models\Central\Payment;
 use App\Models\Central\PaymentGateway;
+use App\Models\Central\Plan;
+use App\Models\Central\PlanFeature;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\DressCategory;
 use App\Models\Tenant\Permission;

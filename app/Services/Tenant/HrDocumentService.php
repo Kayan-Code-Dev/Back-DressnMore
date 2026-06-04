@@ -6,6 +6,7 @@ use App\Enums\HrDocumentStatus;
 use App\Models\Tenant\HrDocument;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -113,7 +114,7 @@ class HrDocumentService
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<HrDocument>  $query
+     * @param  Builder<HrDocument>  $query
      * @param  array<string, mixed>  $filters
      */
     private function applyFilters($query, array $filters): void
