@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Central\SuperAdmin;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantUserDirectory;
-use App\Models\Central\SuperAdmin;
 use App\Models\Tenant\Customer;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
@@ -12,6 +12,7 @@ use App\Services\Tenant\TenantUserDirectoryService;
 use App\Support\TenantMessages;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Tenant\TenantRolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -155,7 +156,7 @@ class TenantDataIsolationTest extends TestCase
     {
         $this->seedTenantUser($this->tenantA, 'shared@test.com', 'secret123');
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
 
         TenantUserDirectory::query()->create([
             'email' => 'shared@test.com',

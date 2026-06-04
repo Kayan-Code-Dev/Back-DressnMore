@@ -22,7 +22,11 @@ class TenantDatabaseManager
             throw new RuntimeException('Tenant database is not configured.');
         }
 
-        Config::set('database.connections.tenant.database', $databaseName);
+        $connectionDatabase = $this->tenantDriver() === 'sqlite'
+            ? $this->resolveSqlitePath($databaseName)
+            : $databaseName;
+
+        Config::set('database.connections.tenant.database', $connectionDatabase);
 
         DB::purge('tenant');
         DB::reconnect('tenant');
@@ -169,6 +173,7 @@ class TenantDatabaseManager
             $allowedRoots = [storage_path('framework/tenants')];
             if (app()->environment('testing')) {
                 $allowedRoots[] = storage_path('framework/testing');
+                $allowedRoots[] = database_path();
             }
 
             foreach ($allowedRoots as $allowedRoot) {

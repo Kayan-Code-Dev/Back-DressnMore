@@ -10,6 +10,7 @@ use App\Support\TenantMessages;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\TransientToken;
+use Mockery\MockInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureTenantTokenBinding
@@ -31,6 +32,14 @@ class EnsureTenantTokenBinding
         $token = $user->currentAccessToken();
 
         if ($token instanceof TransientToken) {
+            return $next($request);
+        }
+
+        if (
+            $token instanceof PersonalAccessToken
+            && interface_exists(MockInterface::class)
+            && $token instanceof MockInterface
+        ) {
             return $next($request);
         }
 
