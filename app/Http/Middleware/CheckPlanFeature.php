@@ -4,8 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
-use App\Support\TenantMessages;
 use App\Support\PlanFeatureGate;
+use App\Support\TenantMessages;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

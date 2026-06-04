@@ -132,6 +132,7 @@ class TenantRolePermissionSeeder extends Seeder
             ['name' => 'HR Employees Status', 'key' => 'hr.employees.status'],
             ['name' => 'HR Documents View', 'key' => 'hr.documents.view'],
             ['name' => 'HR Documents Upload', 'key' => 'hr.documents.upload'],
+            ['name' => 'HR Documents Download', 'key' => 'hr.documents.download'],
             ['name' => 'HR Documents Delete', 'key' => 'hr.documents.delete'],
             ['name' => 'HR Settings View', 'key' => 'hr.settings.view'],
             ['name' => 'HR Settings Update', 'key' => 'hr.settings.update'],

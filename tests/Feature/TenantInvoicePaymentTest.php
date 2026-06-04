@@ -102,6 +102,29 @@ class TenantInvoicePaymentTest extends TestCase
             ->assertJsonPath('data.remaining_amount', '0.00');
     }
 
+    public function test_payment_cannot_exceed_remaining_amount_after_existing_payment(): void
+    {
+        $invoice = $this->createInvoice(total: 100);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/payments", [
+            'amount' => 80,
+        ], $this->tenantHeaders())->assertOk();
+
+        $response = $this->postJson("/api/tenant/invoices/{$invoice->id}/payments", [
+            'amount' => 30,
+        ], $this->tenantHeaders());
+
+        $response->assertStatus(422)
+            ->assertJsonPath('errors.amount.0', 'مبلغ الدفعة يتجاوز المبلغ المتبقي على الفاتورة');
+
+        $invoice->refresh();
+        $this->assertSame('80.00', (string) $invoice->paid_amount);
+        $this->assertSame('20.00', (string) $invoice->remaining_amount);
+        $this->assertSame(1, $invoice->payments()->count());
+    }
+
     public function test_user_without_permission_rejected(): void
     {
         $invoice = $this->createInvoice(total: 100);

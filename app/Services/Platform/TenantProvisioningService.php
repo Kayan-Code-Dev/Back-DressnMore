@@ -14,7 +14,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -129,7 +128,7 @@ class TenantProvisioningService
     }
 
     /**
-     * @return array{email: string, password: string, username: ?string, admin: array{email: string, password: string, username: ?string}}
+     * @return array{email: string, username: ?string, password_generated: bool, admin: array{email: string, username: ?string, password_generated: bool}}
      */
     public function seedAdmin(Tenant $tenant, array $data): array
     {
@@ -139,8 +138,10 @@ class TenantProvisioningService
         }
 
         $password = trim((string) ($data['admin_password'] ?? $data['password'] ?? ''));
+        $passwordGenerated = false;
         if ($password === '') {
             $password = Str::random(16);
+            $passwordGenerated = true;
         }
 
         $adminName = trim((string) ($data['admin_name'] ?? $data['username'] ?? $data['admin_username'] ?? ''));
@@ -159,7 +160,7 @@ class TenantProvisioningService
         if ($existingUser instanceof User) {
             $existingUser->forceFill([
                 'name' => $adminName,
-                'password' => Hash::make($password),
+                'password' => $password,
                 'phone' => $phone !== '' ? $phone : $existingUser->phone,
                 'status' => 'active',
             ])->save();
@@ -198,12 +199,12 @@ class TenantProvisioningService
 
         return [
             'email' => $email,
-            'password' => $password,
             'username' => $username !== '' ? $username : null,
+            'password_generated' => $passwordGenerated,
             'admin' => [
                 'email' => $email,
-                'password' => $password,
                 'username' => $username !== '' ? $username : null,
+                'password_generated' => $passwordGenerated,
             ],
         ];
     }
@@ -345,12 +346,10 @@ class TenantProvisioningService
 
         if ($driver === 'sqlite') {
             if ($providedName !== '') {
-                return $this->sqliteDatabasePath($providedName);
+                return $this->sqliteDatabaseName($providedName);
             }
 
-            $filename = $slug.'.sqlite';
-
-            return storage_path('framework/tenants/'.$filename);
+            return $slug.'.sqlite';
         }
 
         if ($providedName !== '') {
@@ -372,19 +371,19 @@ class TenantProvisioningService
         return $candidate;
     }
 
-    private function sqliteDatabasePath(string $providedName): string
+    private function sqliteDatabaseName(string $providedName): string
     {
-        if ($providedName === ':memory:') {
-            return $providedName;
-        }
-
-        if (str_starts_with($providedName, '/')) {
-            return $providedName;
+        if ($providedName === '' || $providedName === ':memory:' || str_contains($providedName, '/') || str_contains($providedName, '\\')) {
+            throw new RuntimeException('Unsafe tenant database name.');
         }
 
         $filename = str_ends_with($providedName, '.sqlite') ? $providedName : $providedName.'.sqlite';
 
-        return storage_path('framework/tenants/'.$filename);
+        if (! preg_match('/^[A-Za-z0-9_.-]+\.sqlite$/', $filename)) {
+            throw new RuntimeException('Unsafe tenant database name.');
+        }
+
+        return $filename;
     }
 
     private function log(

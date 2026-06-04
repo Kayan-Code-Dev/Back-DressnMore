@@ -5,9 +5,12 @@ namespace Tests\Feature;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\CashMovement;
 use App\Models\Tenant\Expense;
+use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\Permission;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
+use App\Services\Tenant\CashMovementService;
+use App\Services\Tenant\JournalEntryPostingService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Tenant\TenantRolePermissionSeeder;
 use Illuminate\Support\Facades\Artisan;
@@ -95,6 +98,68 @@ class TenantExpenseWorkflowTest extends TestCase
         $response = $this->get('/api/tenant/expenses/export', $this->tenantHeaders());
         $response->assertOk();
         $this->assertStringContainsString('expenses.csv', (string) $response->headers->get('content-disposition'));
+    }
+
+    public function test_paid_expense_cannot_be_paid_twice_or_change_payment_details(): void
+    {
+        $expense = Expense::query()->create([
+            'amount' => 250,
+            'status' => Expense::STATUS_APPROVED,
+            'expense_date' => '2026-05-26',
+            'description' => 'Approved expense',
+        ]);
+
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson("/api/tenant/expenses/{$expense->id}/pay", [
+            'method' => 'cash',
+            'transaction_id' => 'PAY-ONCE',
+        ], $this->tenantHeaders())->assertOk();
+
+        $this->postJson("/api/tenant/expenses/{$expense->id}/pay", [
+            'method' => 'bank_transfer',
+            'transaction_id' => 'PAY-TWICE',
+        ], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonPath('errors.expense.0', 'Expense is already paid. Reverse or cancel the posted payment before changing payment details.');
+
+        $expense->refresh();
+        $this->assertSame('cash', $expense->method);
+        $this->assertSame('PAY-ONCE', $expense->transaction_id);
+        $this->assertSame(1, CashMovement::query()
+            ->where('reference_type', CashMovement::REFERENCE_EXPENSE)
+            ->where('reference_id', $expense->id)
+            ->count());
+        $this->assertSame(1, JournalEntry::query()
+            ->where('source_type', JournalEntry::SOURCE_EXPENSE)
+            ->where('source_id', $expense->id)
+            ->count());
+    }
+
+    public function test_financial_source_posting_is_idempotent(): void
+    {
+        $expense = Expense::query()->create([
+            'amount' => 175,
+            'status' => Expense::STATUS_PAID,
+            'method' => 'cash',
+            'expense_date' => '2026-05-27',
+            'description' => 'Already paid expense',
+            'paid_at' => '2026-05-27 09:00:00',
+        ]);
+
+        app(CashMovementService::class)->syncExpenseMovement($expense);
+        app(CashMovementService::class)->syncExpenseMovement($expense->refresh());
+        app(JournalEntryPostingService::class)->postFromExpense($expense->refresh());
+        app(JournalEntryPostingService::class)->postFromExpense($expense->refresh());
+
+        $this->assertSame(1, CashMovement::query()
+            ->where('reference_type', CashMovement::REFERENCE_EXPENSE)
+            ->where('reference_id', $expense->id)
+            ->count());
+        $this->assertSame(1, JournalEntry::query()
+            ->where('source_type', JournalEntry::SOURCE_EXPENSE)
+            ->where('source_id', $expense->id)
+            ->count());
     }
 
     private function prepareSqliteDatabases(): void

@@ -8,6 +8,7 @@ use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\Permission;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\User;
+use App\Services\Tenant\JournalEntryService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Tenant\AccountSeeder;
 use Database\Seeders\Tenant\TenantRolePermissionSeeder;
@@ -277,7 +278,7 @@ class TenantJournalEntryTest extends TestCase
     {
         Sanctum::actingAs($this->user, ['*']);
 
-        $service = app(\App\Services\Tenant\JournalEntryService::class);
+        $service = app(JournalEntryService::class);
         $header = [
             'entry_date' => '2026-05-31',
             'source_type' => JournalEntry::SOURCE_PAYMENT,

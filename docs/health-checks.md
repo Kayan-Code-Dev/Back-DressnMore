@@ -56,10 +56,7 @@ No bearer token required for this endpoint (tenant is identified by workspace).
   "success": true,
   "message": "Success",
   "data": {
-    "tenant_name": "Demo Tenant",
-    "tenant_slug": "demo",
-    "tenant_database_name": "dressnmore_tenant_demo",
-    "tenant_database_connection": true,
+    "ok": true,
     "timestamp": "2026-05-26T23:30:00+00:00"
   },
   "meta": {}
@@ -75,7 +72,7 @@ No bearer token required for this endpoint (tenant is identified by workspace).
 
 ### Notes
 
-- Endpoint reports connection health only; it does not validate business-module readiness.
+- Endpoint reports connection health only and intentionally omits tenant/database identifiers.
 
 ---
 

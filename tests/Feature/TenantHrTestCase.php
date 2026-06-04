@@ -64,6 +64,7 @@ abstract class TenantHrTestCase extends TestCase
             'hr.employees.status',
             'hr.documents.view',
             'hr.documents.upload',
+            'hr.documents.download',
             'hr.documents.delete',
             'hr.settings.view',
             'hr.settings.update',

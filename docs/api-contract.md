@@ -115,10 +115,7 @@ This document freezes the current API contract for frontend integration.
 ### GET `/api/tenant/health`
 - Permission: tenant identified + subscribed
 - Response data:
-  - `tenant_name`
-  - `tenant_slug`
-  - `tenant_database_name`
-  - `tenant_database_connection`
+  - `ok`
   - `timestamp`
 
 ---

@@ -15,9 +15,9 @@ use App\Http\Controllers\Tenant\ExpenseCategoryController;
 use App\Http\Controllers\Tenant\ExpenseController;
 use App\Http\Controllers\Tenant\FactoryController;
 use App\Http\Controllers\Tenant\HealthController;
-use App\Http\Controllers\Tenant\HrDashboardController;
 use App\Http\Controllers\Tenant\HrAccessController;
 use App\Http\Controllers\Tenant\HrAttendanceController;
+use App\Http\Controllers\Tenant\HrDashboardController;
 use App\Http\Controllers\Tenant\HrDepartmentController;
 use App\Http\Controllers\Tenant\HrDocumentController;
 use App\Http\Controllers\Tenant\HrEmployeeController;
@@ -48,7 +48,7 @@ Route::prefix('tenant')->group(function (): void {
     Route::get('/health', [HealthController::class, 'index'])
         ->middleware(['identify.tenant', 'check.tenant.subscription', 'set.tenant.database']);
 
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
     Route::middleware([
         'identify.tenant',
@@ -58,8 +58,10 @@ Route::prefix('tenant')->group(function (): void {
     ])->group(function (): void {
         Route::get('/subscription/overview', [SubscriptionController::class, 'overview']);
         Route::get('/subscription/payment-gateways', [SubscriptionController::class, 'paymentGateways']);
-        Route::post('/subscription/renew', [SubscriptionController::class, 'renew']);
-        Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade']);
+        Route::post('/subscription/renew', [SubscriptionController::class, 'renew'])
+            ->middleware('tenant.permission:settings.manage');
+        Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])
+            ->middleware('tenant.permission:settings.manage');
         Route::put('/settings/password', [SettingsController::class, 'updatePassword']);
         Route::delete('/settings/account', [SettingsController::class, 'deleteAccount']);
     });
@@ -597,6 +599,9 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:hr.documents.view');
             Route::post('/documents', [HrDocumentController::class, 'store'])
                 ->middleware('tenant.permission:hr.documents.upload');
+            Route::get('/documents/{document}/download', [HrDocumentController::class, 'download'])
+                ->whereNumber('document')
+                ->middleware('tenant.permission:hr.documents.download');
             Route::get('/documents/{document}', [HrDocumentController::class, 'show'])
                 ->whereNumber('document')
                 ->middleware('tenant.permission:hr.documents.view');

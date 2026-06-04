@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('platform')->group(function (): void {
     Route::get('/health', [HealthController::class, 'index']);
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
     Route::middleware(['auth:sanctum', 'platform.admin'])->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);

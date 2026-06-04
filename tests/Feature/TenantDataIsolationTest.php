@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Central\SuperAdmin;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantUserDirectory;
 use App\Models\Tenant\Customer;
@@ -11,10 +12,12 @@ use App\Services\Tenant\TenantUserDirectoryService;
 use App\Support\TenantMessages;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Tenant\TenantRolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class TenantDataIsolationTest extends TestCase
@@ -93,6 +96,37 @@ class TenantDataIsolationTest extends TestCase
             ->assertJsonPath('message', TenantMessages::TOKEN_MISMATCH);
     }
 
+    public function test_platform_token_cannot_access_tenant_api(): void
+    {
+        $platformAdmin = SuperAdmin::query()->create([
+            'name' => 'Platform Admin',
+            'email' => 'platform-token@example.test',
+            'password' => Hash::make('password'),
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($platformAdmin, ['*']);
+
+        $this->getJson('/api/tenant/subscription/overview', [
+            'X-Tenant' => $this->tenantA->slug,
+            'Accept' => 'application/json',
+        ])->assertForbidden()
+            ->assertJsonPath('message', TenantMessages::TOKEN_MISMATCH);
+    }
+
+    public function test_tenant_health_does_not_expose_database_metadata(): void
+    {
+        $this->getJson('/api/tenant/health', [
+            'X-Tenant' => $this->tenantA->slug,
+            'Accept' => 'application/json',
+        ])->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.ok', true)
+            ->assertJsonMissingPath('data.tenant_database_name')
+            ->assertJsonMissingPath('data.tenant_slug')
+            ->assertJsonMissingPath('data.tenant_name');
+    }
+
     public function test_tenant_data_is_stored_in_separate_databases(): void
     {
         $this->connectTenant($this->tenantA);
@@ -122,7 +156,7 @@ class TenantDataIsolationTest extends TestCase
     {
         $this->seedTenantUser($this->tenantA, 'shared@test.com', 'secret123');
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
 
         TenantUserDirectory::query()->create([
             'email' => 'shared@test.com',

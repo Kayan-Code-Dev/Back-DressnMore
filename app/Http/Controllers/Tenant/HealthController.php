@@ -26,10 +26,7 @@ class HealthController extends Controller
         }
 
         return ApiResponse::success([
-            'tenant_name' => $tenant->name,
-            'tenant_slug' => $tenant->slug,
-            'tenant_database_name' => $tenant->database_name,
-            'tenant_database_connection' => $tenantConnection,
+            'ok' => $tenantConnection,
             'timestamp' => now()->toIso8601String(),
         ]);
     }

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Tenant\Returns\SettleRentalReturnRequest;
 use App\Http\Requests\Tenant\Returns\SettlementPreviewRequest;
+use App\Http\Requests\Tenant\Returns\SettleRentalReturnRequest;
 use App\Http\Resources\Tenant\InvoiceResource;
 use App\Http\Resources\Tenant\RentalReturnSettlementResource;
 use App\Services\Tenant\InvoiceService;

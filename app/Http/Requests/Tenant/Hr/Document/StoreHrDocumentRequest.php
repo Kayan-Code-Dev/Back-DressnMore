@@ -19,8 +19,9 @@ class StoreHrDocumentRequest extends FormRequest
         return [
             'employee_id' => ['required', 'integer', Rule::exists('tenant.hr_employees', 'id')],
             'document_type' => ['required', 'string', Rule::in(HrDocumentType::values())],
-            'file_name' => ['required', 'string', 'max:255'],
-            'file_path' => ['nullable', 'string', 'max:500'],
+            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
+            'file_name' => ['nullable', 'string', 'max:255'],
+            'file_path' => ['prohibited'],
             'issue_date' => ['nullable', 'date'],
             'expiry_date' => ['nullable', 'date', 'after_or_equal:issue_date'],
             'status' => ['nullable', 'string', Rule::in(HrDocumentStatus::values())],

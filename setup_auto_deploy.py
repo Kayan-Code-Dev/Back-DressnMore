@@ -22,19 +22,29 @@ try:
 except ImportError:
     public = None
 
-HOST = "159.198.74.223"
-USER = "root"
-PASSWORD = "RBZ4cjZE184wOx37ip"
+HOST = os.environ.get("DRESSNMORE_VPS_HOST", "").strip()
+USER = os.environ.get("DRESSNMORE_VPS_USER", "root").strip()
+PASSWORD = os.environ.get("DRESSNMORE_VPS_PASSWORD", "").strip()
 OWNER = "Kayan-Code-Dev"
 REPOS = ["Back-DressnMore", "Admin-DressnMore", "Front-DressnMore"]
 BASE = Path(__file__).resolve().parent
 SCRIPTS_DIR = BASE / "deploy" / "server"
 
 
-def upload_deploy_scripts() -> None:
+def connect_ssh() -> paramiko.SSHClient:
+    if HOST == "" or USER == "" or PASSWORD == "":
+        raise RuntimeError("DRESSNMORE_VPS_HOST, DRESSNMORE_VPS_USER, and DRESSNMORE_VPS_PASSWORD are required.")
+
     ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.load_system_host_keys()
+    ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
     ssh.connect(HOST, username=USER, password=PASSWORD, timeout=30)
+
+    return ssh
+
+
+def upload_deploy_scripts() -> None:
+    ssh = connect_ssh()
     sftp = ssh.open_sftp()
 
     ssh.exec_command("mkdir -p /opt/dressnmore/deploy")
@@ -50,9 +60,7 @@ def upload_deploy_scripts() -> None:
 
 
 def read_ssh_private_key() -> str:
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(HOST, username=USER, password=PASSWORD, timeout=30)
+    ssh = connect_ssh()
     _, stdout, _ = ssh.exec_command("cat /root/.ssh/github_actions_admin", timeout=30)
     key = stdout.read().decode("utf-8").strip()
     ssh.close()

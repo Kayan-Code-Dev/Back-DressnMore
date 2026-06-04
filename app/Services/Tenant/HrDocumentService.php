@@ -6,10 +6,17 @@ use App\Enums\HrDocumentStatus;
 use App\Models\Tenant\HrDocument;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HrDocumentService
 {
-    public function __construct(private readonly HrSettingService $hrSettingService) {}
+    public function __construct(
+        private readonly HrSettingService $hrSettingService,
+        private readonly TenantContext $tenantContext,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $filters
@@ -25,6 +32,8 @@ class HrDocumentService
 
     public function create(array $data, ?int $uploadedBy = null): HrDocument
     {
+        $data = $this->storeUploadedFile($data);
+
         if ($uploadedBy !== null) {
             $data['uploaded_by'] = $uploadedBy;
         }
@@ -46,6 +55,8 @@ class HrDocumentService
 
     public function update(HrDocument $document, array $data): HrDocument
     {
+        $data = $this->storeUploadedFile($data, $document);
+
         $document->fill($data);
         $document->status = $this->resolveStatus(
             $document->status,
@@ -58,7 +69,28 @@ class HrDocumentService
 
     public function delete(HrDocument $document): void
     {
+        if (is_string($document->file_path) && $document->file_path !== '') {
+            Storage::disk('local')->delete($document->file_path);
+        }
+
         $document->delete();
+    }
+
+    public function download(HrDocument $document): ?StreamedResponse
+    {
+        if (! is_string($document->file_path) || $document->file_path === '') {
+            return null;
+        }
+
+        if (! Storage::disk('local')->exists($document->file_path)) {
+            return null;
+        }
+
+        $downloadName = trim((string) $document->file_name) !== ''
+            ? (string) $document->file_name
+            : basename($document->file_path);
+
+        return Storage::disk('local')->download($document->file_path, $downloadName);
     }
 
     /**
@@ -100,7 +132,7 @@ class HrDocumentService
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<HrDocument>  $query
+     * @param  Builder<HrDocument>  $query
      * @param  array<string, mixed>  $filters
      */
     private function applyFilters($query, array $filters): void
@@ -145,5 +177,37 @@ class HrDocumentService
         }
 
         return HrDocumentStatus::VALID->value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function storeUploadedFile(array $data, ?HrDocument $existingDocument = null): array
+    {
+        $file = $data['file'] ?? null;
+        unset($data['file']);
+
+        if (! $file instanceof UploadedFile) {
+            return $data;
+        }
+
+        $tenant = $this->tenantContext->requireTenant();
+        $employeeId = (int) ($data['employee_id'] ?? $existingDocument?->employee_id);
+        $directory = 'tenants/'.$tenant->id.'/hr/documents/'.$employeeId;
+        $path = $file->store($directory, 'local');
+
+        if ($existingDocument instanceof HrDocument
+            && is_string($existingDocument->file_path)
+            && $existingDocument->file_path !== '') {
+            Storage::disk('local')->delete($existingDocument->file_path);
+        }
+
+        $data['file_path'] = $path;
+        $data['file_name'] = trim((string) ($data['file_name'] ?? '')) !== ''
+            ? $data['file_name']
+            : $file->getClientOriginalName();
+
+        return $data;
     }
 }

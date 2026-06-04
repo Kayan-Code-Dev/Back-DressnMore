@@ -30,8 +30,7 @@ class CreateTestTenantCommand extends Command
     public function __construct(
         private readonly TenantDatabaseManager $tenantDatabaseManager,
         private readonly TenantUserDirectoryService $tenantUserDirectoryService,
-    )
-    {
+    ) {
         parent::__construct();
     }
 

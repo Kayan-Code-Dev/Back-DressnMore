@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Tenant\Tailoring;
 
 use App\Enums\TailoringPriority;
-use App\Enums\TailoringProductionStatus;
 use App\Models\Tenant\Invoice;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;

@@ -10,6 +10,7 @@ use App\Services\Tenant\HrDocumentService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HrDocumentController extends Controller
 {
@@ -56,6 +57,16 @@ class HrDocumentController extends Controller
         $this->hrDocumentService->delete($this->hrDocumentService->findOrFail($document));
 
         return ApiResponse::success(null, 'Document deleted');
+    }
+
+    public function download(int $document): JsonResponse|StreamedResponse
+    {
+        $download = $this->hrDocumentService->download($this->hrDocumentService->findOrFail($document));
+        if ($download === null) {
+            return ApiResponse::notFound('Document file not found');
+        }
+
+        return $download;
     }
 
     public function expiryAlerts(Request $request): JsonResponse

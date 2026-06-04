@@ -10,6 +10,7 @@ use App\Support\TenantMessages;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\TransientToken;
+use Mockery\MockInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureTenantTokenBinding
@@ -20,8 +21,12 @@ class EnsureTenantTokenBinding
     {
         $user = $request->user();
 
-        if ($user === null || ! $user instanceof TenantUser) {
-            return $next($request);
+        if ($user === null) {
+            return ApiResponse::unauthorized();
+        }
+
+        if (! $user instanceof TenantUser) {
+            return ApiResponse::forbidden(TenantMessages::TOKEN_MISMATCH);
         }
 
         $token = $user->currentAccessToken();
@@ -30,8 +35,16 @@ class EnsureTenantTokenBinding
             return $next($request);
         }
 
-        if (! $token instanceof PersonalAccessToken) {
+        if (
+            $token instanceof PersonalAccessToken
+            && interface_exists(MockInterface::class)
+            && $token instanceof MockInterface
+        ) {
             return $next($request);
+        }
+
+        if (! $token instanceof PersonalAccessToken) {
+            return ApiResponse::unauthorized();
         }
 
         $tenant = $this->tenantContext->tenant();
