@@ -3,6 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Central\Tenant;
+use App\Models\Tenant\Branch;
+use App\Models\Tenant\Dress;
+use App\Models\Tenant\DressCategory;
+use App\Models\Tenant\InventoryMovement;
 use App\Models\Tenant\Permission;
 use App\Models\Tenant\PurchaseOrder;
 use App\Models\Tenant\Role;
@@ -164,6 +168,54 @@ class TenantPurchaseOrderTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', PurchaseOrder::STATUS_PAID)
             ->assertJsonPath('data.remaining_amount', '0.00');
+    }
+
+    public function test_receiving_purchase_order_creates_stock_in_branch(): void
+    {
+        $supplier = $this->createSupplier();
+        $branch = Branch::query()->create(['name' => 'Main Branch', 'status' => 'active']);
+        $category = DressCategory::query()->create(['name' => 'Evening', 'status' => 'active']);
+        $subcategory = DressCategory::query()->create([
+            'name' => 'Mermaid',
+            'parent_id' => $category->id,
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $purchaseOrderResponse = $this->postJson('/api/tenant/purchase-orders', [
+            'supplier_id' => $supplier->id,
+            'branch_id' => $branch->id,
+            'category_id' => $category->id,
+            'subcategory_id' => $subcategory->id,
+            'status' => PurchaseOrder::STATUS_CONFIRMED,
+            'order_date' => '2026-05-26',
+            'items' => [
+                ['item_name' => 'Mermaid Dress', 'quantity' => 2, 'unit_price' => 300],
+            ],
+        ], $this->tenantHeaders());
+        $purchaseOrderResponse->assertCreated();
+        $purchaseOrderId = (int) $purchaseOrderResponse->json('data.id');
+
+        $this->postJson("/api/tenant/purchase-orders/{$purchaseOrderId}/receive", [
+            'receive_notes' => 'Received in branch stock',
+        ], $this->tenantHeaders())
+            ->assertOk()
+            ->assertJsonPath('data.is_received', true)
+            ->assertJsonPath('data.branch_id', $branch->id);
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $purchaseOrderId,
+            'is_received' => 1,
+        ], 'tenant');
+
+        $this->assertSame(2, Dress::query()->where('branch_id', $branch->id)->count());
+        $this->assertDatabaseCount('inventory_movements', 2, 'tenant');
+        $this->assertDatabaseHas('inventory_movements', [
+            'type' => InventoryMovement::TYPE_CREATED,
+            'reference_type' => 'purchase_order',
+            'reference_id' => $purchaseOrderId,
+            'to_branch_id' => $branch->id,
+        ], 'tenant');
     }
 
     public function test_tenant_user_can_delete_purchase_order(): void

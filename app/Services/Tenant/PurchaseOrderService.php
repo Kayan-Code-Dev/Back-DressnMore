@@ -2,15 +2,21 @@
 
 namespace App\Services\Tenant;
 
+use App\Models\Tenant\Dress;
+use App\Models\Tenant\InventoryMovement;
 use App\Models\Tenant\PurchaseOrder;
 use App\Models\Tenant\SupplierPayment;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderService
 {
-    public function __construct(private readonly SupplierService $supplierService) {}
+    public function __construct(
+        private readonly SupplierService $supplierService,
+        private readonly InventoryService $inventoryService,
+    ) {}
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
@@ -173,6 +179,99 @@ class PurchaseOrderService
         return $purchaseOrder->refresh()->load(['supplier', 'items', 'branch', 'category', 'subcategory']);
     }
 
+    public function receiveOrder(PurchaseOrder $purchaseOrder, array $data = [], ?int $actorId = null): PurchaseOrder
+    {
+        if ($purchaseOrder->is_received) {
+            return $this->findOrFail($purchaseOrder->id);
+        }
+
+        if ($purchaseOrder->status === PurchaseOrder::STATUS_CANCELLED) {
+            throw ValidationException::withMessages([
+                'purchase_order' => ['Cancelled purchase order cannot be received'],
+            ]);
+        }
+
+        if ($purchaseOrder->is_returned) {
+            throw ValidationException::withMessages([
+                'purchase_order' => ['Returned purchase order cannot be received'],
+            ]);
+        }
+
+        if ($purchaseOrder->branch_id === null) {
+            throw ValidationException::withMessages([
+                'branch_id' => ['Purchase order branch is required before receiving'],
+            ]);
+        }
+
+        if ($purchaseOrder->category_id === null || $purchaseOrder->subcategory_id === null) {
+            throw ValidationException::withMessages([
+                'category_id' => ['Purchase order category and subcategory are required before receiving'],
+            ]);
+        }
+
+        $purchaseOrder->loadMissing(['items', 'category', 'subcategory']);
+        if ($purchaseOrder->items->isEmpty()) {
+            throw ValidationException::withMessages([
+                'items' => ['Purchase order must contain at least one item before receiving'],
+            ]);
+        }
+
+        DB::connection('tenant')->transaction(function () use ($purchaseOrder, $data, $actorId): void {
+            foreach ($purchaseOrder->items as $item) {
+                $quantity = (float) $item->quantity;
+                $units = (int) round($quantity);
+                if ($units < 1 || abs($quantity - $units) > 0.00001) {
+                    throw ValidationException::withMessages([
+                        'items' => [sprintf('Item [%s] quantity must be a whole number to receive into stock', $item->item_name)],
+                    ]);
+                }
+
+                for ($unit = 1; $unit <= $units; $unit++) {
+                    $dressCode = $this->generateReceivedDressCode(
+                        purchaseOrder: $purchaseOrder,
+                        itemId: (int) $item->id,
+                        unitSequence: $unit,
+                    );
+
+                    $dress = Dress::query()->create([
+                        'dress_category_id' => $purchaseOrder->category_id,
+                        'dress_subcategory_id' => $purchaseOrder->subcategory_id,
+                        'branch_id' => $purchaseOrder->branch_id,
+                        'code' => $dressCode,
+                        'name' => $this->buildReceivedDressName($dressCode, $purchaseOrder),
+                        'description' => $item->description ?: $item->item_name,
+                        'purchase_price' => $this->money((float) $item->unit_price),
+                        'status' => Dress::STATUS_AVAILABLE,
+                        'notes' => $data['receive_notes'] ?? $purchaseOrder->notes,
+                    ]);
+
+                    $this->inventoryService->recordMovement(
+                        dress: $dress,
+                        type: InventoryMovement::TYPE_CREATED,
+                        reason: 'Received from purchase order '.$purchaseOrder->purchase_order_number,
+                        referenceType: 'purchase_order',
+                        referenceId: (int) $purchaseOrder->id,
+                        notes: $data['receive_notes'] ?? $purchaseOrder->notes,
+                        createdBy: $actorId,
+                        fromBranchId: null,
+                        toBranchId: $purchaseOrder->branch_id,
+                    );
+                }
+            }
+
+            $purchaseOrder->is_received = true;
+            $purchaseOrder->received_at = $data['received_at'] ?? now();
+            $purchaseOrder->receive_notes = $data['receive_notes'] ?? $purchaseOrder->receive_notes;
+            $purchaseOrder->received_by = $purchaseOrder->received_by ?? $actorId;
+            if ($purchaseOrder->status === PurchaseOrder::STATUS_DRAFT) {
+                $purchaseOrder->status = PurchaseOrder::STATUS_CONFIRMED;
+            }
+            $purchaseOrder->save();
+        });
+
+        return $this->findOrFail($purchaseOrder->id);
+    }
+
     public function syncFinancials(PurchaseOrder $purchaseOrder, ?string $preferredStatus = null): PurchaseOrder
     {
         $paidAmount = $this->money((float) SupplierPayment::query()
@@ -328,5 +427,32 @@ class PurchaseOrderService
     private function money(float $value): float
     {
         return round($value, 2);
+    }
+
+    private function generateReceivedDressCode(PurchaseOrder $purchaseOrder, int $itemId, int $unitSequence): string
+    {
+        $baseCode = sprintf('PO%d-%d-%03d', $purchaseOrder->id, $itemId, $unitSequence);
+        $code = $baseCode;
+
+        for ($attempt = 1; $attempt <= 100; $attempt++) {
+            if (! Dress::withTrashed()->where('code', $code)->exists()) {
+                return $code;
+            }
+
+            $code = sprintf('%s-%02d', $baseCode, $attempt);
+        }
+
+        return sprintf('PO%d-%s', $purchaseOrder->id, strtoupper(substr(md5((string) microtime(true)), 0, 8)));
+    }
+
+    private function buildReceivedDressName(string $dressCode, PurchaseOrder $purchaseOrder): string
+    {
+        $parts = array_values(array_filter([
+            $dressCode,
+            $purchaseOrder->category?->name,
+            $purchaseOrder->subcategory?->name,
+        ], static fn (?string $value): bool => is_string($value) && trim($value) !== ''));
+
+        return implode('-', $parts);
     }
 }

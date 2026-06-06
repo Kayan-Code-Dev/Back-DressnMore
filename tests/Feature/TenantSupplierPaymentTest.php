@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Central\Tenant;
+use App\Models\Tenant\Branch;
+use App\Models\Tenant\Cashbox;
 use App\Models\Tenant\CashMovement;
+use App\Models\Tenant\Expense;
+use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\Permission;
 use App\Models\Tenant\PurchaseOrder;
 use App\Models\Tenant\Role;
@@ -142,6 +146,63 @@ class TenantSupplierPaymentTest extends TestCase
         ], 'tenant');
     }
 
+    public function test_supplier_payment_deducts_branch_cashbox_and_creates_expense_and_journal_entry(): void
+    {
+        $supplier = $this->createSupplier(0);
+        $branch = Branch::query()->create(['name' => 'Branch A', 'status' => 'active']);
+        $cashbox = Cashbox::query()->create([
+            'name' => 'Branch A Cashbox',
+            'branch_id' => $branch->id,
+            'initial_balance' => 1000,
+            'current_balance' => 1000,
+            'is_active' => true,
+        ]);
+
+        $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 300, $branch->id);
+        Sanctum::actingAs($this->paymentUser, ['*']);
+
+        $response = $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
+            'purchase_order_id' => $purchaseOrderId,
+            'amount' => 250,
+            'method' => 'cash',
+            'cashbox_id' => $cashbox->id,
+            'reference' => 'SP-CASHBOX-001',
+        ], $this->tenantHeaders());
+        $response->assertCreated();
+        $paymentId = (int) $response->json('data.id');
+
+        $this->assertDatabaseHas('supplier_payments', [
+            'id' => $paymentId,
+            'branch_id' => $branch->id,
+            'cashbox_id' => $cashbox->id,
+        ], 'tenant');
+
+        $this->assertDatabaseHas('cash_movements', [
+            'reference_type' => CashMovement::REFERENCE_SUPPLIER_PAYMENT,
+            'reference_id' => $paymentId,
+            'cashbox_id' => $cashbox->id,
+            'direction' => CashMovement::DIRECTION_OUT,
+            'amount' => 250,
+        ], 'tenant');
+
+        $cashbox->refresh();
+        $this->assertSame('750.00', $cashbox->current_balance);
+
+        $this->assertDatabaseHas('expenses', [
+            'status' => Expense::STATUS_PAID,
+            'branch_id' => $branch->id,
+            'cashbox_id' => $cashbox->id,
+            'amount' => 250,
+            'reference' => 'SP-CASHBOX-001',
+        ], 'tenant');
+
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => JournalEntry::SOURCE_SUPPLIER_PAYMENT,
+            'source_id' => $paymentId,
+            'branch_id' => $branch->id,
+        ], 'tenant');
+    }
+
     public function test_supplier_current_balance_updates_correctly(): void
     {
         $supplier = $this->createSupplier(100);
@@ -202,11 +263,11 @@ class TenantSupplierPaymentTest extends TestCase
         ]);
     }
 
-    private function createPurchaseOrderViaApi(int $supplierId, float $total): int
+    private function createPurchaseOrderViaApi(int $supplierId, float $total, ?int $branchId = null): int
     {
         Sanctum::actingAs($this->paymentUser, ['*']);
 
-        $response = $this->postJson('/api/tenant/purchase-orders', [
+        $payload = [
             'supplier_id' => $supplierId,
             'status' => PurchaseOrder::STATUS_CONFIRMED,
             'order_date' => '2026-05-26',
@@ -215,7 +276,12 @@ class TenantSupplierPaymentTest extends TestCase
             ],
             'discount' => 0,
             'tax' => 0,
-        ], $this->tenantHeaders());
+        ];
+        if ($branchId !== null) {
+            $payload['branch_id'] = $branchId;
+        }
+
+        $response = $this->postJson('/api/tenant/purchase-orders', $payload, $this->tenantHeaders());
 
         $response->assertCreated();
 

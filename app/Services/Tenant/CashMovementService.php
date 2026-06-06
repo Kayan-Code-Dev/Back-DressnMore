@@ -236,17 +236,21 @@ class CashMovementService
 
     public function recordSupplierPayment(SupplierPayment $payment, ?int $actorId = null): CashMovement
     {
+        $payment->loadMissing('purchaseOrder');
+
         return $this->createMovement([
             'type' => CashMovement::TYPE_SUPPLIER_PAYMENT,
             'direction' => CashMovement::DIRECTION_OUT,
             'amount' => round((float) $payment->amount, 2),
             'method' => $payment->method,
-            'cashbox_id' => null,
+            'cashbox_id' => $payment->cashbox_id,
             'reference_type' => CashMovement::REFERENCE_SUPPLIER_PAYMENT,
             'reference_id' => $payment->id,
             'reference' => $payment->reference,
             'movement_date' => $payment->paid_at ?? Carbon::now(),
-            'description' => 'Supplier payment',
+            'description' => $payment->purchaseOrder?->purchase_order_number !== null
+                ? 'Supplier payment for '.$payment->purchaseOrder->purchase_order_number
+                : 'Supplier payment',
             'notes' => $payment->notes,
             'is_reversed' => false,
             'created_by' => $actorId ?? $payment->created_by,

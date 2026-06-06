@@ -32,8 +32,11 @@ class PurchaseOrder extends BaseTenantModel
         'status',
         'type',
         'is_returned',
+        'is_received',
         'returned_at',
+        'received_at',
         'return_notes',
+        'receive_notes',
         'subtotal',
         'discount',
         'tax',
@@ -43,6 +46,7 @@ class PurchaseOrder extends BaseTenantModel
         'order_date',
         'notes',
         'created_by',
+        'received_by',
     ];
 
     protected function casts(): array
@@ -56,7 +60,9 @@ class PurchaseOrder extends BaseTenantModel
             'remaining_amount' => 'decimal:2',
             'order_date' => 'date',
             'is_returned' => 'boolean',
+            'is_received' => 'boolean',
             'returned_at' => 'datetime',
+            'received_at' => 'datetime',
         ];
     }
 

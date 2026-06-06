@@ -17,6 +17,8 @@ class StoreSupplierPaymentRequest extends FormRequest
     {
         return [
             'purchase_order_id' => ['nullable', 'integer', Rule::exists('tenant.purchase_orders', 'id')->whereNull('deleted_at')],
+            'branch_id' => ['nullable', 'integer', Rule::exists('tenant.branches', 'id')->whereNull('deleted_at')],
+            'cashbox_id' => ['nullable', 'integer', Rule::exists('tenant.cashboxes', 'id')->whereNull('deleted_at')],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'string', Rule::in(PaymentMethod::values())],
             'reference' => ['nullable', 'string', 'max:255'],

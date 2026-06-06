@@ -330,6 +330,9 @@ Route::prefix('tenant')->group(function (): void {
             Route::post('/{purchaseOrder}/return', [PurchaseOrderController::class, 'returnOrder'])
                 ->whereNumber('purchaseOrder')
                 ->middleware('tenant.permission:purchase_orders.return');
+            Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])
+                ->whereNumber('purchaseOrder')
+                ->middleware('tenant.permission:purchase_orders.update');
             Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
                 ->whereNumber('purchaseOrder')
                 ->middleware('tenant.permission:purchase_orders.view');
