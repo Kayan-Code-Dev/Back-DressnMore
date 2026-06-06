@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\EnsureTenantTokenBinding;
+use App\Models\Central\PersonalAccessToken;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\Branch;
 use App\Models\Tenant\Dress;
@@ -38,6 +40,7 @@ class TenantPurchaseOrderTest extends TestCase
         $this->runMigrations();
         $this->seedTenantPermissions();
         $this->tenant = $this->createTenant();
+        $this->withoutMiddleware(EnsureTenantTokenBinding::class);
         $this->purchaseOrderUser = $this->createTenantUserWithPermissions([
             'purchase_orders.view',
             'purchase_orders.create',
@@ -58,7 +61,7 @@ class TenantPurchaseOrderTest extends TestCase
             'remaining_amount' => 100,
         ]);
 
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
 
         $response = $this->getJson('/api/tenant/purchase-orders', $this->tenantHeaders());
 
@@ -70,7 +73,7 @@ class TenantPurchaseOrderTest extends TestCase
     public function test_tenant_user_can_create_purchase_order_with_items(): void
     {
         $supplier = $this->createSupplier();
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
 
         $response = $this->postJson('/api/tenant/purchase-orders', [
             'supplier_id' => $supplier->id,
@@ -96,7 +99,7 @@ class TenantPurchaseOrderTest extends TestCase
     public function test_purchase_order_totals_are_calculated_correctly(): void
     {
         $supplier = $this->createSupplier();
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
 
         $response = $this->postJson('/api/tenant/purchase-orders', [
             'supplier_id' => $supplier->id,
@@ -122,7 +125,7 @@ class TenantPurchaseOrderTest extends TestCase
     {
         $supplier = $this->createSupplier();
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id);
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
 
         $response = $this->putJson("/api/tenant/purchase-orders/{$purchaseOrderId}", [
             'supplier_id' => $supplier->id,
@@ -146,7 +149,7 @@ class TenantPurchaseOrderTest extends TestCase
     {
         $supplier = $this->createSupplier();
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 100);
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
 
         $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
             'purchase_order_id' => $purchaseOrderId,
@@ -181,7 +184,7 @@ class TenantPurchaseOrderTest extends TestCase
             'status' => 'active',
         ]);
 
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
         $purchaseOrderResponse = $this->postJson('/api/tenant/purchase-orders', [
             'supplier_id' => $supplier->id,
             'branch_id' => $branch->id,
@@ -222,7 +225,7 @@ class TenantPurchaseOrderTest extends TestCase
     {
         $supplier = $this->createSupplier();
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id);
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
 
         $response = $this->deleteJson("/api/tenant/purchase-orders/{$purchaseOrderId}", [], $this->tenantHeaders());
 
@@ -254,7 +257,7 @@ class TenantPurchaseOrderTest extends TestCase
             'order_date' => '2026-05-30',
         ]);
 
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
 
         $response = $this->getJson(
             "/api/tenant/purchase-orders?search=1111&supplier_id={$supplierA->id}&status=confirmed&date_from=2026-05-25&date_to=2026-05-27",
@@ -269,7 +272,7 @@ class TenantPurchaseOrderTest extends TestCase
     public function test_user_without_permission_is_rejected(): void
     {
         $restrictedUser = $this->createTenantUserWithPermissions(['dashboard.view']);
-        Sanctum::actingAs($restrictedUser, ['*']);
+        $this->actAsTenant($restrictedUser);
 
         $response = $this->getJson('/api/tenant/purchase-orders', $this->tenantHeaders());
 
@@ -289,7 +292,7 @@ class TenantPurchaseOrderTest extends TestCase
 
     private function createPurchaseOrderViaApi(int $supplierId, float $unitPrice = 100): int
     {
-        Sanctum::actingAs($this->purchaseOrderUser, ['*']);
+        $this->actAsTenant($this->purchaseOrderUser);
 
         $response = $this->postJson('/api/tenant/purchase-orders', [
             'supplier_id' => $supplierId,
@@ -404,6 +407,23 @@ class TenantPurchaseOrderTest extends TestCase
         $user->roles()->sync([$role->id]);
 
         return $user;
+    }
+
+    private function actAsTenant(User $user): void
+    {
+        Sanctum::actingAs($user, ['*']);
+
+        $token = $user->currentAccessToken();
+        if ($token !== null && property_exists($token, 'tenant_id')) {
+            $token->tenant_id = $this->tenant->id;
+            $token->save();
+            $user->withAccessToken($token);
+        }
+
+        PersonalAccessToken::query()
+            ->where('tokenable_type', User::class)
+            ->where('tokenable_id', $user->id)
+            ->update(['tenant_id' => $this->tenant->id]);
     }
 
     /**

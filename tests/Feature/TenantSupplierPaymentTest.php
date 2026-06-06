@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\EnsureTenantTokenBinding;
 use App\Models\Central\Tenant;
+use App\Models\Central\PersonalAccessToken;
 use App\Models\Tenant\Branch;
 use App\Models\Tenant\Cashbox;
 use App\Models\Tenant\CashMovement;
@@ -40,6 +42,7 @@ class TenantSupplierPaymentTest extends TestCase
         $this->runMigrations();
         $this->seedTenantPermissions();
         $this->tenant = $this->createTenant();
+        $this->withoutMiddleware(EnsureTenantTokenBinding::class);
         $this->paymentUser = $this->createTenantUserWithPermissions([
             'supplier_payments.view',
             'supplier_payments.create',
@@ -51,7 +54,7 @@ class TenantSupplierPaymentTest extends TestCase
     {
         $supplier = $this->createSupplier(0);
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 300);
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $response = $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
             'purchase_order_id' => $purchaseOrderId,
@@ -69,7 +72,7 @@ class TenantSupplierPaymentTest extends TestCase
     {
         $supplier = $this->createSupplier(0);
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 300);
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
             'purchase_order_id' => $purchaseOrderId,
@@ -88,7 +91,7 @@ class TenantSupplierPaymentTest extends TestCase
     {
         $supplier = $this->createSupplier(0);
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 300);
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
             'purchase_order_id' => $purchaseOrderId,
@@ -106,7 +109,7 @@ class TenantSupplierPaymentTest extends TestCase
     {
         $supplier = $this->createSupplier(0);
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 300);
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
             'purchase_order_id' => $purchaseOrderId,
@@ -125,7 +128,7 @@ class TenantSupplierPaymentTest extends TestCase
     {
         $supplier = $this->createSupplier(0);
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 300);
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
             'purchase_order_id' => $purchaseOrderId,
@@ -159,7 +162,7 @@ class TenantSupplierPaymentTest extends TestCase
         ]);
 
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 300, $branch->id);
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $response = $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
             'purchase_order_id' => $purchaseOrderId,
@@ -207,7 +210,7 @@ class TenantSupplierPaymentTest extends TestCase
     {
         $supplier = $this->createSupplier(100);
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplier->id, 500);
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $supplier->refresh();
         $this->assertSame('600.00', $supplier->current_balance);
@@ -227,7 +230,7 @@ class TenantSupplierPaymentTest extends TestCase
         $supplierA = $this->createSupplier(0);
         $supplierB = $this->createSupplier(0);
         $purchaseOrderId = $this->createPurchaseOrderViaApi($supplierB->id, 250);
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $response = $this->postJson("/api/tenant/suppliers/{$supplierA->id}/payments", [
             'purchase_order_id' => $purchaseOrderId,
@@ -243,7 +246,7 @@ class TenantSupplierPaymentTest extends TestCase
     {
         $supplier = $this->createSupplier(0);
         $restrictedUser = $this->createTenantUserWithPermissions(['dashboard.view']);
-        Sanctum::actingAs($restrictedUser, ['*']);
+        $this->actAsTenant($restrictedUser);
 
         $response = $this->postJson("/api/tenant/suppliers/{$supplier->id}/payments", [
             'amount' => 50,
@@ -265,7 +268,7 @@ class TenantSupplierPaymentTest extends TestCase
 
     private function createPurchaseOrderViaApi(int $supplierId, float $total, ?int $branchId = null): int
     {
-        Sanctum::actingAs($this->paymentUser, ['*']);
+        $this->actAsTenant($this->paymentUser);
 
         $payload = [
             'supplier_id' => $supplierId,
@@ -385,6 +388,23 @@ class TenantSupplierPaymentTest extends TestCase
         $user->roles()->sync([$role->id]);
 
         return $user;
+    }
+
+    private function actAsTenant(User $user): void
+    {
+        Sanctum::actingAs($user, ['*']);
+
+        $token = $user->currentAccessToken();
+        if ($token !== null && property_exists($token, 'tenant_id')) {
+            $token->tenant_id = $this->tenant->id;
+            $token->save();
+            $user->withAccessToken($token);
+        }
+
+        PersonalAccessToken::query()
+            ->where('tokenable_type', User::class)
+            ->where('tokenable_id', $user->id)
+            ->update(['tenant_id' => $this->tenant->id]);
     }
 
     /**
