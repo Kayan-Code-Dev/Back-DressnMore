@@ -20,15 +20,25 @@ class InvoiceService
             ->with(['branch', 'items.dress.category', 'items.dress.subcategory'])
             ->latest('id');
 
-        $search = trim((string) ($filters['search'] ?? ''));
+        $search = trim((string) ($filters['search'] ?? ($filters['client_name'] ?? '')));
         if ($search !== '') {
-            $query->whereRaw('LOWER(invoice_number) LIKE ?', ['%'.mb_strtolower($search).'%']);
+            $needle = '%'.mb_strtolower($search).'%';
+            $query->where(function (Builder $builder) use ($needle): void {
+                $builder->whereRaw('LOWER(invoice_number) LIKE ?', [$needle])
+                    ->orWhereHas('customer', function (Builder $customerQuery) use ($needle): void {
+                        $customerQuery->whereRaw('LOWER(name) LIKE ?', [$needle])
+                            ->orWhereRaw('LOWER(COALESCE(phone, \'\')) LIKE ?', [$needle])
+                            ->orWhereRaw('LOWER(COALESCE(national_id, \'\')) LIKE ?', [$needle]);
+                    });
+            });
         }
 
         $this->applyExactFilter($query, 'customer_id', $filters['customer_id'] ?? ($filters['client_id'] ?? null));
         $this->applyExactFilter($query, 'branch_id', $filters['branch_id'] ?? null);
-        $this->applyExactFilter($query, 'type', $filters['type'] ?? null);
-        $this->applyExactFilter($query, 'status', $filters['status'] ?? null);
+        $typeFilter = $this->normalizeInvoiceTypeFilter($filters['type'] ?? null);
+        $this->applyExactFilter($query, 'type', $typeFilter);
+        $this->applyStatusFilter($query, $filters['status'] ?? ($filters['invoice_status'] ?? null));
+        $this->applyPaymentStatusFilter($query, $filters['payment_status'] ?? null);
 
         $dateFrom = trim((string) ($filters['date_from'] ?? ''));
         if ($dateFrom !== '') {
@@ -499,6 +509,78 @@ class InvoiceService
         }
 
         $query->where($column, $normalized);
+    }
+
+    private function normalizeInvoiceTypeFilter(mixed $value): mixed
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        return match ($normalized) {
+            'sale' => Invoice::TYPE_SELL,
+            'rental' => Invoice::TYPE_RENT,
+            default => $normalized,
+        };
+    }
+
+    private function applyStatusFilter(Builder $query, mixed $value): void
+    {
+        if ($value === null) {
+            return;
+        }
+
+        $status = strtolower(trim((string) $value));
+        if ($status === '') {
+            return;
+        }
+
+        if (in_array($status, Invoice::statuses(), true)) {
+            $query->where('status', $status);
+
+            return;
+        }
+
+        $query->where(function (Builder $builder) use ($status): void {
+            match ($status) {
+                'cancelled' => $builder->where('status', Invoice::STATUS_CANCELLED),
+                'completed' => $builder->whereIn('status', [Invoice::STATUS_DELIVERED, Invoice::STATUS_RETURNED]),
+                'pending' => $builder->where('status', Invoice::STATUS_DRAFT),
+                'in_progress' => $builder->whereIn('status', [
+                    Invoice::STATUS_CONFIRMED,
+                    Invoice::STATUS_PARTIALLY_PAID,
+                    Invoice::STATUS_PAID,
+                ]),
+                default => null,
+            };
+        });
+    }
+
+    private function applyPaymentStatusFilter(Builder $query, mixed $value): void
+    {
+        if ($value === null) {
+            return;
+        }
+
+        $paymentStatus = strtolower(trim((string) $value));
+        if ($paymentStatus === '') {
+            return;
+        }
+
+        $query->where(function (Builder $builder) use ($paymentStatus): void {
+            match ($paymentStatus) {
+                'paid' => $builder
+                    ->where('remaining_amount', '<=', 0)
+                    ->where('paid_amount', '>', 0),
+                'partially_paid' => $builder
+                    ->where('paid_amount', '>', 0)
+                    ->where('remaining_amount', '>', 0),
+                'unpaid' => $builder->where('paid_amount', '<=', 0),
+                default => null,
+            };
+        });
     }
 
     private function money(float $value): float

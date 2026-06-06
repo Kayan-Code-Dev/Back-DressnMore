@@ -70,6 +70,21 @@ class Branch extends BaseTenantModel
         return $this->hasMany(Cashbox::class);
     }
 
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    public function outgoingProductTransfers(): HasMany
+    {
+        return $this->hasMany(ProductTransfer::class, 'from_branch_id');
+    }
+
+    public function incomingProductTransfers(): HasMany
+    {
+        return $this->hasMany(ProductTransfer::class, 'to_branch_id');
+    }
+
     /**
      * @return list<string>
      */
