@@ -15,6 +15,8 @@ class PurchaseOrderItem extends BaseTenantModel
         'quantity',
         'unit_price',
         'total',
+        'dress_category_id',
+        'dress_subcategory_id',
     ];
 
     protected function casts(): array
