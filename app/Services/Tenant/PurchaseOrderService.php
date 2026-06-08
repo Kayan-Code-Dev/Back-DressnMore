@@ -3,6 +3,7 @@
 namespace App\Services\Tenant;
 
 use App\Models\Tenant\Account;
+use App\Models\Tenant\Dress;
 use App\Models\Tenant\InventoryMovement;
 use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\PurchaseOrder;
@@ -192,9 +193,23 @@ class PurchaseOrderService
             $purchaseOrder->status = 'received';
             $purchaseOrder->save();
 
-            // 2. Create inventory movement for each item
-            foreach ($purchaseOrder->items as $item) {
+            // 2. Create Dress records for each item and link to inventory
+            foreach ($purchaseOrder->items as $index => $item) {
+                $dress = Dress::query()->create([
+                    'name' => $item->item_name,
+                    'code' => $purchaseOrder->purchase_order_number . '-ITEM-' . ($index + 1),
+                    'purchase_price' => $item->unit_price,
+                    'branch_id' => $purchaseOrder->branch_id,
+                    'dress_category_id' => $purchaseOrder->category_id,
+                    'dress_subcategory_id' => $purchaseOrder->subcategory_id,
+                    'entity_type' => 'purchase_order',
+                    'entity_id' => $purchaseOrder->id,
+                    'status' => Dress::STATUS_AVAILABLE,
+                    'notes' => 'مضاف من طلبية شراء: ' . $purchaseOrder->purchase_order_number,
+                ]);
+
                 InventoryMovement::query()->create([
+                    'dress_id' => $dress->id,
                     'type' => InventoryMovement::TYPE_CREATED,
                     'quantity' => $item->quantity,
                     'reason' => 'purchase_order_received',
