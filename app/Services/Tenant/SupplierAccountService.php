@@ -31,6 +31,9 @@ class SupplierAccountService
                 'paid_amount' => (float) $order->paid_amount,
                 'remaining_amount' => (float) $order->remaining_amount,
                 'order_date' => $order->order_date?->toDateString() ?? '',
+                'expected_delivery_date' => $order->expected_delivery_date?->toDateString() ?? '',
+                'inventory_received' => (bool) $order->inventory_received,
+                'received_at' => $order->received_at?->toDateTimeString() ?? '',
             ])
             ->values()
             ->all();

@@ -15,9 +15,9 @@ use App\Http\Controllers\Tenant\ExpenseCategoryController;
 use App\Http\Controllers\Tenant\ExpenseController;
 use App\Http\Controllers\Tenant\FactoryController;
 use App\Http\Controllers\Tenant\HealthController;
-use App\Http\Controllers\Tenant\HrDashboardController;
 use App\Http\Controllers\Tenant\HrAccessController;
 use App\Http\Controllers\Tenant\HrAttendanceController;
+use App\Http\Controllers\Tenant\HrDashboardController;
 use App\Http\Controllers\Tenant\HrDepartmentController;
 use App\Http\Controllers\Tenant\HrDocumentController;
 use App\Http\Controllers\Tenant\HrEmployeeController;
@@ -330,6 +330,9 @@ Route::prefix('tenant')->group(function (): void {
             Route::post('/{purchaseOrder}/return', [PurchaseOrderController::class, 'returnOrder'])
                 ->whereNumber('purchaseOrder')
                 ->middleware('tenant.permission:purchase_orders.return');
+            Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])
+                ->whereNumber('purchaseOrder')
+                ->middleware('tenant.permission:purchase_orders.update');
             Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
                 ->whereNumber('purchaseOrder')
                 ->middleware('tenant.permission:purchase_orders.view');
