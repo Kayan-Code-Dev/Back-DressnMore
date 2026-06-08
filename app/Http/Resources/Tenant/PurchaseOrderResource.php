@@ -31,6 +31,7 @@ class PurchaseOrderResource extends JsonResource
             'payment_amount' => $this->paid_amount,
             'remaining_amount' => $this->remaining_amount,
             'remaining_payment' => $this->remaining_amount,
+            'deposit_amount' => $this->deposit_amount,
             'order_date' => $this->order_date?->toDateString(),
             'notes' => $this->notes,
             'created_by' => $this->created_by,

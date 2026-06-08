@@ -3,7 +3,6 @@
 namespace App\Services\Tenant;
 
 use App\Models\Tenant\Account;
-use App\Models\Tenant\Dress;
 use App\Models\Tenant\InventoryMovement;
 use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\PurchaseOrder;
@@ -85,6 +84,7 @@ class PurchaseOrderService
                 'total' => $summary['total'],
                 'paid_amount' => 0,
                 'remaining_amount' => $summary['total'],
+                'deposit_amount' => $data['deposit_amount'] ?? 0,
                 'order_date' => $data['order_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $actorId,
@@ -130,6 +130,7 @@ class PurchaseOrderService
                 'discount' => $summary['discount'],
                 'tax' => $summary['tax'],
                 'total' => $summary['total'],
+                'deposit_amount' => $data['deposit_amount'] ?? $purchaseOrder->deposit_amount ?? 0,
                 'order_date' => $data['order_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $purchaseOrder->created_by ?? $actorId,
@@ -193,23 +194,9 @@ class PurchaseOrderService
             $purchaseOrder->status = 'received';
             $purchaseOrder->save();
 
-            // 2. Create Dress records for each item and link to inventory
-            foreach ($purchaseOrder->items as $index => $item) {
-                $dress = Dress::query()->create([
-                    'name' => $item->item_name,
-                    'code' => $purchaseOrder->purchase_order_number . '-ITEM-' . ($index + 1),
-                    'purchase_price' => $item->unit_price,
-                    'branch_id' => $purchaseOrder->branch_id,
-                    'dress_category_id' => $purchaseOrder->category_id,
-                    'dress_subcategory_id' => $purchaseOrder->subcategory_id,
-                    'entity_type' => 'purchase_order',
-                    'entity_id' => $purchaseOrder->id,
-                    'status' => Dress::STATUS_AVAILABLE,
-                    'notes' => 'مضاف من طلبية شراء: ' . $purchaseOrder->purchase_order_number,
-                ]);
-
+            // 2. Create inventory movement for each item
+            foreach ($purchaseOrder->items as $item) {
                 InventoryMovement::query()->create([
-                    'dress_id' => $dress->id,
                     'type' => InventoryMovement::TYPE_CREATED,
                     'quantity' => $item->quantity,
                     'reason' => 'purchase_order_received',
@@ -228,7 +215,7 @@ class PurchaseOrderService
             $this->journalEntryService->createFromSource(
                 header: [
                     'entry_date' => now()->toDateString(),
-                    'type' => JournalEntry::TYPE_NORMAL,
+                    'type' => JournalEntry::TYPE_AUTO,
                     'source_type' => 'purchase_order',
                     'source_id' => $purchaseOrder->id,
                     'reference_number' => $purchaseOrder->purchase_order_number,
@@ -344,6 +331,8 @@ class PurchaseOrderService
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'total' => $total,
+                'dress_category_id' => $item['dress_category_id'] ?? null,
+                'dress_subcategory_id' => $item['dress_subcategory_id'] ?? null,
             ];
         })->values()->all();
     }

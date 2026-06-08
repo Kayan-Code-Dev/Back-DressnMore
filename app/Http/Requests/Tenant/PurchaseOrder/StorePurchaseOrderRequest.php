@@ -24,6 +24,8 @@ class StorePurchaseOrderRequest extends FormRequest
             'type' => ['nullable', 'string', 'max:100'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'tax' => ['nullable', 'numeric', 'min:0'],
+            'deposit_amount' => ['nullable', 'numeric', 'min:0'],
+            'deposit_method' => ['nullable', 'string', 'in:cash,bank_transfer,check'],
             'order_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -31,6 +33,8 @@ class StorePurchaseOrderRequest extends FormRequest
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity' => ['nullable', 'numeric', 'gt:0'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.dress_category_id' => ['nullable', 'integer'],
+            'items.*.dress_subcategory_id' => ['nullable', 'integer'],
         ];
     }
 }
