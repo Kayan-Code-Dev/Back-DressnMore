@@ -199,9 +199,15 @@ class PurchaseOrderService
 
             // 2. Create Dress records for each item + inventory movement
             foreach ($purchaseOrder->items as $index => $item) {
+                $poNumber = $purchaseOrder->purchase_order_number;
+                $poShortId = substr($poNumber, strrpos($poNumber, '-') + 1);
+                $categoryName = $purchaseOrder->category?->name ?? 'غير مصنف';
+                $subcategoryName = $purchaseOrder->subcategory?->name ?? '';
+                $displayName = $item->item_name . ' — ' . $categoryName . ($subcategoryName ? ' — ' . $subcategoryName : '');
+
                 $dress = Dress::query()->create([
-                    'name' => $item->item_name,
-                    'code' => $purchaseOrder->purchase_order_number . '-ITEM-' . ($index + 1),
+                    'name' => $displayName,
+                    'code' => 'PO-' . $poShortId . '-' . ($index + 1),
                     'purchase_price' => $item->unit_price,
                     'branch_id' => $purchaseOrder->branch_id,
                     'dress_category_id' => $item->dress_category_id ?? $purchaseOrder->category_id,
