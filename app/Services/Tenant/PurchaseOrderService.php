@@ -83,8 +83,8 @@ class PurchaseOrderService
                 'discount' => $summary['discount'],
                 'tax' => $summary['tax'],
                 'total' => $summary['total'],
-                'paid_amount' => 0,
-                'remaining_amount' => $summary['total'],
+                'paid_amount' => (float)($data['deposit_amount'] ?? 0),
+                'remaining_amount' => $summary['total'] - (float)($data['deposit_amount'] ?? 0),
                 'deposit_amount' => $data['deposit_amount'] ?? 0,
                 'order_date' => $data['order_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
@@ -131,6 +131,8 @@ class PurchaseOrderService
                 'discount' => $summary['discount'],
                 'tax' => $summary['tax'],
                 'total' => $summary['total'],
+                'paid_amount' => (float)($data['deposit_amount'] ?? $purchaseOrder->deposit_amount ?? 0),
+                'remaining_amount' => $summary['total'] - (float)($data['deposit_amount'] ?? $purchaseOrder->deposit_amount ?? 0),
                 'deposit_amount' => $data['deposit_amount'] ?? $purchaseOrder->deposit_amount ?? 0,
                 'order_date' => $data['order_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
@@ -284,9 +286,11 @@ class PurchaseOrderService
 
     public function syncFinancials(PurchaseOrder $purchaseOrder, ?string $preferredStatus = null): PurchaseOrder
     {
-        $paidAmount = $this->money((float) SupplierPayment::query()
+        $supplierPaymentsSum = $this->money((float) SupplierPayment::query()
             ->where('purchase_order_id', $purchaseOrder->id)
             ->sum('amount'));
+        $depositAmount = $this->money((float) $purchaseOrder->deposit_amount);
+        $paidAmount = $this->money(max($supplierPaymentsSum, $depositAmount));
         $total = $this->money((float) $purchaseOrder->total);
         $remainingAmount = $this->money(max(0, $total - $paidAmount));
 
