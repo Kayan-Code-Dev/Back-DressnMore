@@ -18,6 +18,7 @@ class PlanFeatureCatalog
             ['key' => 'inventory.enabled', 'label' => 'Inventory movements', 'group' => 'catalog', 'type' => 'boolean', 'description' => 'Stock transfers and movements'],
             ['key' => 'branches.enabled', 'label' => 'Branches', 'group' => 'operations', 'type' => 'boolean', 'description' => 'Multi-branch support'],
             ['key' => 'invoices.enabled', 'label' => 'Invoices', 'group' => 'sales', 'type' => 'boolean', 'description' => 'Rent, sale, tailoring invoices'],
+            ['key' => 'orders.enabled', 'label' => 'Rental orders', 'group' => 'sales', 'type' => 'boolean', 'description' => 'Rental order management'],
             ['key' => 'payments.enabled', 'label' => 'Payments', 'group' => 'sales', 'type' => 'boolean', 'description' => 'Invoice payments'],
             ['key' => 'deliveries.enabled', 'label' => 'Deliveries', 'group' => 'sales', 'type' => 'boolean', 'description' => 'Rent delivery workflow'],
             ['key' => 'returns.enabled', 'label' => 'Returns', 'group' => 'sales', 'type' => 'boolean', 'description' => 'Rent return workflow'],
