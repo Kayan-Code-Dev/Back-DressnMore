@@ -23,6 +23,7 @@ use App\Enums\SecurityDepositStatus;
 use App\Enums\SecurityDepositTransactionType;
 use App\Enums\SupplierStatus;
 use App\Enums\VatType;
+use App\Models\Tenant\ProductTransfer;
 
 class LookupService
 {
@@ -55,6 +56,10 @@ class LookupService
             'report_periods' => ReportPeriod::options(),
             'cash_movement_types' => CashMovementType::options(),
             'cash_movement_directions' => CashMovementDirection::options(),
+            'product_transfer_statuses' => collect(ProductTransfer::statuses())
+                ->map(fn (string $status): array => ['value' => $status, 'label' => str_replace('_', ' ', ucfirst($status))])
+                ->values()
+                ->all(),
             'dress_status_after_return' => [
                 ['value' => DressStatus::AVAILABLE->value, 'label' => DressStatus::AVAILABLE->label()],
                 ['value' => DressStatus::MAINTENANCE->value, 'label' => DressStatus::MAINTENANCE->label()],

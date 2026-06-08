@@ -12,6 +12,16 @@ class UpdateInvoiceRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
+        $type = $this->input('type');
+        if (is_string($type)) {
+            $normalized = strtolower(trim($type));
+            if ($normalized === 'sale') {
+                $this->merge(['type' => Invoice::TYPE_SELL]);
+            } elseif ($normalized === 'rental') {
+                $this->merge(['type' => Invoice::TYPE_RENT]);
+            }
+        }
+
         if (! $this->has('customer_id') && $this->has('client_id')) {
             $this->merge(['customer_id' => $this->input('client_id')]);
         }

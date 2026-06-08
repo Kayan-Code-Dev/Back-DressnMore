@@ -31,6 +31,8 @@ use App\Http\Controllers\Tenant\JournalEntryController;
 use App\Http\Controllers\Tenant\LookupController;
 use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\PaymentController;
+use App\Http\Controllers\Tenant\ProductController;
+use App\Http\Controllers\Tenant\ProductTransferController;
 use App\Http\Controllers\Tenant\PurchaseOrderController;
 use App\Http\Controllers\Tenant\RentalOrderController;
 use App\Http\Controllers\Tenant\RentalReturnSettlementController;
@@ -330,6 +332,9 @@ Route::prefix('tenant')->group(function (): void {
             Route::post('/{purchaseOrder}/return', [PurchaseOrderController::class, 'returnOrder'])
                 ->whereNumber('purchaseOrder')
                 ->middleware('tenant.permission:purchase_orders.return');
+            Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])
+                ->whereNumber('purchaseOrder')
+                ->middleware('tenant.permission:purchase_orders.update');
             Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])
                 ->whereNumber('purchaseOrder')
                 ->middleware('tenant.permission:purchase_orders.view');
@@ -484,6 +489,38 @@ Route::prefix('tenant')->group(function (): void {
             Route::get('/{dress}/inventory-movements', [DressController::class, 'inventoryMovements'])
                 ->whereNumber('dress')
                 ->middleware(['tenant.permission:inventory.view', 'plan.feature:inventory.enabled']);
+        });
+
+        Route::prefix('/products')->middleware('plan.feature:inventory.enabled')->group(function (): void {
+            Route::get('/', [ProductController::class, 'index'])
+                ->middleware('tenant.permission:products.view');
+            Route::post('/', [ProductController::class, 'store'])
+                ->middleware('tenant.permission:products.create');
+            Route::get('/{product}', [ProductController::class, 'show'])
+                ->whereNumber('product')
+                ->middleware('tenant.permission:products.view');
+            Route::put('/{product}', [ProductController::class, 'update'])
+                ->whereNumber('product')
+                ->middleware('tenant.permission:products.update');
+            Route::delete('/{product}', [ProductController::class, 'destroy'])
+                ->whereNumber('product')
+                ->middleware('tenant.permission:products.delete');
+
+            Route::prefix('/transfers')->group(function (): void {
+                Route::get('/', [ProductTransferController::class, 'index'])
+                    ->middleware('tenant.permission:product_transfers.view');
+                Route::post('/', [ProductTransferController::class, 'store'])
+                    ->middleware('tenant.permission:product_transfers.create');
+                Route::post('/{productTransfer}/confirm', [ProductTransferController::class, 'confirm'])
+                    ->whereNumber('productTransfer')
+                    ->middleware('tenant.permission:product_transfers.confirm');
+                Route::post('/{productTransfer}/reject', [ProductTransferController::class, 'reject'])
+                    ->whereNumber('productTransfer')
+                    ->middleware('tenant.permission:product_transfers.reject');
+                Route::delete('/{productTransfer}', [ProductTransferController::class, 'destroy'])
+                    ->whereNumber('productTransfer')
+                    ->middleware('tenant.permission:product_transfers.delete');
+            });
         });
 
         Route::prefix('/invoices')->middleware('plan.feature:invoices.enabled')->group(function (): void {

@@ -11,6 +11,9 @@ class SupplierPayment extends BaseTenantModel
     protected $fillable = [
         'supplier_id',
         'purchase_order_id',
+        'branch_id',
+        'cashbox_id',
+        'expense_id',
         'amount',
         'method',
         'reference',
@@ -35,5 +38,20 @@ class SupplierPayment extends BaseTenantModel
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function cashbox(): BelongsTo
+    {
+        return $this->belongsTo(Cashbox::class);
+    }
+
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(Expense::class);
     }
 }

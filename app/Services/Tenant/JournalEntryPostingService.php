@@ -212,13 +212,19 @@ class JournalEntryPostingService
             return null;
         }
 
+        $payment->loadMissing(['purchaseOrder', 'cashbox']);
+        $branchId = $payment->branch_id ?? $payment->cashbox?->branch_id ?? $payment->purchaseOrder?->branch_id;
+        $description = $payment->purchaseOrder?->purchase_order_number !== null
+            ? 'قيد دفعة مورد لطلبية '.$payment->purchaseOrder->purchase_order_number
+            : 'قيد دفعة مورد';
+
         return $this->safePost([
             'entry_date' => ($payment->paid_at ?? now())->toDateString(),
             'source_type' => JournalEntry::SOURCE_SUPPLIER_PAYMENT,
             'source_id' => $payment->id,
             'reference_number' => $payment->reference,
-            'description' => 'قيد دفعة مورد',
-            'branch_id' => null,
+            'description' => $description,
+            'branch_id' => $branchId,
         ], [
             ['code' => '2000', 'debit' => $amount, 'credit' => 0, 'description' => 'سداد مورد'],
             ['code' => '1000', 'debit' => 0, 'credit' => $amount, 'description' => 'صرف نقدي'],
