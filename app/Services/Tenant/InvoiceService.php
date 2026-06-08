@@ -17,7 +17,7 @@ class InvoiceService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = Invoice::query()
-            ->with(['branch', 'items.dress.category', 'items.dress.subcategory'])
+            ->with(['customer', 'branch', 'items.dress.category', 'items.dress.subcategory'])
             ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -145,13 +145,13 @@ class InvoiceService
             }
         }
 
-        return $invoice->refresh()->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
+        return $invoice->refresh()->load(['customer', 'branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function findOrFail(int $invoiceId): Invoice
     {
         return Invoice::query()
-            ->with(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments'])
+            ->with(['customer', 'branch', 'items.dress.category', 'items.dress.subcategory', 'payments'])
             ->findOrFail($invoiceId);
     }
 
@@ -235,7 +235,7 @@ class InvoiceService
             return $this->refreshFinancials($invoice, $newStatus);
         });
 
-        return $updatedInvoice->refresh()->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
+        return $updatedInvoice->refresh()->load(['customer', 'branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function delete(Invoice $invoice): void
@@ -267,7 +267,7 @@ class InvoiceService
         $invoice->save();
 
         return $this->refreshFinancials($invoice->refresh(), Invoice::STATUS_CANCELLED)
-            ->load(['branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
+            ->load(['customer', 'branch', 'items.dress.category', 'items.dress.subcategory', 'payments']);
     }
 
     public function refreshFinancials(Invoice $invoice, ?string $preferredStatus = null): Invoice
