@@ -209,6 +209,7 @@ class PurchaseOrderService
                     'name' => $displayName,
                     'code' => 'PO-' . $poShortId . '-' . ($index + 1),
                     'purchase_price' => $item->unit_price,
+                    'rental_price' => $item->unit_price * 1.5,
                     'branch_id' => $purchaseOrder->branch_id,
                     'dress_category_id' => $item->dress_category_id ?? $purchaseOrder->category_id,
                     'dress_subcategory_id' => $item->dress_subcategory_id ?? $purchaseOrder->subcategory_id,
