@@ -27,6 +27,8 @@ class BranchResource extends JsonResource
             'notes' => $this->notes,
             'inventory_name' => $this->inventory_name,
             'image' => $this->image,
+            'logo' => $this->logo,
+            'cover' => $this->cover,
             'status' => $this->status,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

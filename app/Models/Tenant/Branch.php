@@ -34,6 +34,8 @@ class Branch extends BaseTenantModel
         'notes',
         'inventory_name',
         'image',
+        'logo',
+        'cover',
         'status',
     ];
 

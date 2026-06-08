@@ -99,6 +99,8 @@ class BranchService
             'notes' => array_key_exists('notes', $data) ? $data['notes'] : $branch?->notes,
             'inventory_name' => array_key_exists('inventory_name', $data) ? $data['inventory_name'] : $branch?->inventory_name,
             'image' => array_key_exists('image', $data) ? $data['image'] : $branch?->image,
+            'logo' => array_key_exists('logo', $data) ? $data['logo'] : $branch?->logo,
+            'cover' => array_key_exists('cover', $data) ? $data['cover'] : $branch?->cover,
             'status' => array_key_exists('status', $data) ? $data['status'] : ($branch?->status ?? Branch::STATUS_ACTIVE),
         ];
     }

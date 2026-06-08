@@ -318,16 +318,27 @@ class DressService
      */
     private function prepareDressInput(array $data): array
     {
-        $filtered = array_intersect_key($data, array_flip([
+        $allowed = [
             'code',
             'dress_category_id',
             'dress_subcategory_id',
             'branch_id',
             'description',
             'status',
-        ]));
+            'size',
+            'color',
+            'breast_size',
+            'waist_size',
+            'sleeve_size',
+            'measurements',
+            'purchase_price',
+            'rental_price',
+            'sale_price',
+            'notes',
+        ];
 
-        $filtered['name'] = $this->buildDisplayName($filtered);
+        $filtered = array_intersect_key($data, array_flip($allowed));
+        $filtered['name'] = $this->buildDisplayName(array_merge($data, $filtered));
 
         return $filtered;
     }

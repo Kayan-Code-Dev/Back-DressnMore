@@ -37,6 +37,8 @@ class StoreBranchRequest extends FormRequest
             'notes' => ['nullable', 'string'],
             'inventory_name' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'string', 'max:255'],
+            'logo' => ['nullable', 'string', 'max:1024'],
+            'cover' => ['nullable', 'string', 'max:1024'],
             'status' => ['nullable', 'string', Rule::in(CustomerStatus::values())],
         ];
     }
