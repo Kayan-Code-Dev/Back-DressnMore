@@ -26,3 +26,14 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Staging/smoke test scripts (not part of codebase)
+/*_smoke.sh
+/*_verify*.php
+/*_verify*.sh
+/staging_*.sh
+/staging_*.php
+/hr_smoke_quick.sh
+/run_hr_smoke.sh
+/tmp_check_*.php
+/scripts/_*.py
+
