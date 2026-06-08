@@ -21,6 +21,8 @@ class PurchaseOrderResource extends JsonResource
             'is_returned' => (bool) $this->is_returned,
             'returned_at' => $this->returned_at?->toISOString(),
             'return_notes' => $this->return_notes,
+            'received_at' => $this->received_at?->toISOString(),
+            'inventory_received' => $this->received_at !== null,
             'subtotal' => $this->subtotal,
             'discount' => $this->discount,
             'tax' => $this->tax,

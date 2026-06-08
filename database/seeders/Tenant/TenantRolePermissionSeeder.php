@@ -40,6 +40,7 @@ class TenantRolePermissionSeeder extends Seeder
             ['name' => 'Purchase Orders Update', 'key' => 'purchase_orders.update'],
             ['name' => 'Purchase Orders Delete', 'key' => 'purchase_orders.delete'],
             ['name' => 'Purchase Orders Export', 'key' => 'purchase_orders.export'],
+            ['name' => 'Purchase Orders Receive', 'key' => 'purchase_orders.receive'],
             ['name' => 'Purchase Orders Return', 'key' => 'purchase_orders.return'],
             ['name' => 'Supplier Payments View', 'key' => 'supplier_payments.view'],
             ['name' => 'Supplier Payments Create', 'key' => 'supplier_payments.create'],

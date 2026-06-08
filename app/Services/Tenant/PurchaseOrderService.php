@@ -2,15 +2,22 @@
 
 namespace App\Services\Tenant;
 
+use App\Models\Tenant\Account;
+use App\Models\Tenant\InventoryMovement;
+use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\PurchaseOrder;
 use App\Models\Tenant\SupplierPayment;
+use App\Services\Tenant\JournalEntryService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderService
 {
-    public function __construct(private readonly SupplierService $supplierService) {}
+    public function __construct(
+        private readonly SupplierService $supplierService,
+        private readonly JournalEntryService $journalEntryService,
+    ) {}
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
@@ -171,6 +178,91 @@ class PurchaseOrderService
         $this->supplierService->recalculateCurrentBalance($purchaseOrder->supplier()->firstOrFail());
 
         return $purchaseOrder->refresh()->load(['supplier', 'items', 'branch', 'category', 'subcategory']);
+    }
+
+    public function receive(PurchaseOrder $purchaseOrder, ?int $actorId = null): PurchaseOrder
+    {
+        if ($purchaseOrder->received_at !== null) {
+            return $purchaseOrder->refresh()->load(['supplier', 'items', 'branch', 'category', 'subcategory']);
+        }
+
+        $purchaseOrder = DB::connection('tenant')->transaction(function () use ($purchaseOrder, $actorId): PurchaseOrder {
+            // 1. Mark as received
+            $purchaseOrder->received_at = now();
+            $purchaseOrder->status = 'received';
+            $purchaseOrder->save();
+
+            // 2. Create inventory movement for each item
+            foreach ($purchaseOrder->items as $item) {
+                InventoryMovement::query()->create([
+                    'type' => InventoryMovement::TYPE_CREATED,
+                    'quantity' => $item->quantity,
+                    'reason' => 'purchase_order_received',
+                    'reference_type' => 'purchase_order',
+                    'reference_id' => $purchaseOrder->id,
+                    'notes' => 'استلام طلبية شراء: ' . $purchaseOrder->purchase_order_number . ' — ' . $item->item_name,
+                    'to_branch_id' => $purchaseOrder->branch_id,
+                    'created_by' => $actorId,
+                ]);
+            }
+
+            // 3. Create journal entry: Debit Inventory / Credit Suppliers
+            $inventoryAccount = $this->findOrCreateAccount('1200', 'المخزون', 'asset');
+            $suppliersAccount = $this->findOrCreateAccount('2100', 'الموردين', 'liability');
+
+            $this->journalEntryService->createFromSource(
+                header: [
+                    'entry_date' => now()->toDateString(),
+                    'type' => JournalEntry::TYPE_AUTO,
+                    'source_type' => 'purchase_order',
+                    'source_id' => $purchaseOrder->id,
+                    'reference_number' => $purchaseOrder->purchase_order_number,
+                    'description' => 'استلام طلبية شراء: ' . $purchaseOrder->purchase_order_number,
+                    'branch_id' => $purchaseOrder->branch_id,
+                ],
+                lines: [
+                    [
+                        'account_id' => $inventoryAccount->id,
+                        'code' => $inventoryAccount->code,
+                        'debit' => (float) $purchaseOrder->total,
+                        'credit' => 0,
+                        'description' => 'زيادة المخزون — استلام ' . $purchaseOrder->purchase_order_number,
+                        'branch_id' => $purchaseOrder->branch_id,
+                    ],
+                    [
+                        'account_id' => $suppliersAccount->id,
+                        'code' => $suppliersAccount->code,
+                        'debit' => 0,
+                        'credit' => (float) $purchaseOrder->total,
+                        'description' => 'التزام تجاه المورد — ' . ($purchaseOrder->supplier->name ?? ''),
+                        'branch_id' => $purchaseOrder->branch_id,
+                    ],
+                ],
+                actorId: $actorId,
+            );
+
+            return $purchaseOrder->refresh();
+        });
+
+        // Recalculate supplier balance
+        $this->supplierService->recalculateCurrentBalance($purchaseOrder->supplier()->firstOrFail());
+
+        return $purchaseOrder->load(['supplier', 'items', 'branch', 'category', 'subcategory']);
+    }
+
+    private function findOrCreateAccount(string $code, string $name, string $type): Account
+    {
+        $account = Account::query()->where('code', $code)->first();
+        if ($account !== null) {
+            return $account;
+        }
+
+        return Account::query()->create([
+            'code' => $code,
+            'name' => $name,
+            'type' => $type,
+            'is_active' => true,
+        ]);
     }
 
     public function syncFinancials(PurchaseOrder $purchaseOrder, ?string $preferredStatus = null): PurchaseOrder

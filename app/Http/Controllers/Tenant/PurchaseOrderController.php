@@ -74,6 +74,17 @@ class PurchaseOrderController extends Controller
         return ApiResponse::success(null, 'Purchase order deleted');
     }
 
+    public function receive(Request $request, int $purchaseOrder): JsonResponse
+    {
+        $purchaseOrderModel = $this->purchaseOrderService->findOrFail($purchaseOrder);
+        $purchaseOrderModel = $this->purchaseOrderService->receive(
+            purchaseOrder: $purchaseOrderModel,
+            actorId: $request->user()?->id,
+        );
+
+        return ApiResponse::success(new PurchaseOrderResource($purchaseOrderModel), 'Purchase order received and inventory updated');
+    }
+
     public function returnOrder(ReturnPurchaseOrderRequest $request, int $purchaseOrder): JsonResponse
     {
         $purchaseOrderModel = $this->purchaseOrderService->findOrFail($purchaseOrder);

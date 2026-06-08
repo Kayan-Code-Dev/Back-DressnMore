@@ -327,6 +327,9 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:purchase_orders.view');
             Route::post('/', [PurchaseOrderController::class, 'store'])
                 ->middleware('tenant.permission:purchase_orders.create');
+            Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])
+                ->whereNumber('purchaseOrder')
+                ->middleware('tenant.permission:purchase_orders.receive');
             Route::post('/{purchaseOrder}/return', [PurchaseOrderController::class, 'returnOrder'])
                 ->whereNumber('purchaseOrder')
                 ->middleware('tenant.permission:purchase_orders.return');

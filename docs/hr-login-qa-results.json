@@ -1,0 +1,171 @@
+{
+  "role_id": 3,
+  "employee_id": 12,
+  "user_id": 6,
+  "login_email": "qa-full-sales-20260602212645@phase1-qa.dressnmore.test",
+  "login_result": "PASS",
+  "login_http": 200,
+  "permissions_tested": [
+    "POST /login (HR staff)",
+    "GET /dashboard/overview (staff)",
+    "GET /hr/dashboard (staff)",
+    "GET /hr/settings (staff)",
+    "DELETE /hr/employees/{id}",
+    "POST /sales/invoices (staff)",
+    "UI pages (manual)"
+  ],
+  "permissions_sample": [
+    "customers.create",
+    "customers.view",
+    "invoices.create",
+    "invoices.view",
+    "tailoring.change_stage",
+    "tailoring.update",
+    "tailoring.view",
+    "tailoring.view_schedule",
+    "tailoring.view_workshop"
+  ],
+  "page_access": {
+    "GET /dashboard/overview (staff)": {
+      "result": "PASS",
+      "http": 403,
+      "notes": "no dashboard.view → blocked HTTP 403"
+    },
+    "GET /hr/dashboard (staff)": {
+      "result": "PASS",
+      "http": 403,
+      "notes": "no hr.dashboard.view → blocked HTTP 403"
+    },
+    "GET /hr/settings (staff)": {
+      "result": "PASS",
+      "http": 403,
+      "notes": "no hr.settings.view → blocked HTTP 403"
+    },
+    "DELETE /hr/employees/{id}": {
+      "result": "PASS",
+      "http": 403,
+      "notes": "no hr.employees.delete → blocked HTTP 403"
+    },
+    "POST /sales/invoices (staff)": {
+      "result": "PASS",
+      "http": 201,
+      "notes": "has invoices.create → HTTP 201"
+    }
+  },
+  "auth_errors_401_403_422": [
+    {
+      "method": "GET",
+      "path": "/dashboard/overview",
+      "status": 403,
+      "success": false
+    },
+    {
+      "method": "GET",
+      "path": "/hr/dashboard",
+      "status": 403,
+      "success": false
+    },
+    {
+      "method": "GET",
+      "path": "/hr/settings",
+      "status": 403,
+      "success": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/hr/employees/12",
+      "status": 403,
+      "success": false
+    }
+  ],
+  "steps": [
+    {
+      "module": "Auth",
+      "scenario": "Owner login",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"success\": true, \"message\": \"Tenant login successful\", \"data\": {\"token\": \"166|8GP9vMlpKufvywUWExzPBnialTA4yyEkS8uOGHbpb8520f56\", \"user\": {\"id\": 1, \"name\": \"QA User\", \"email\": \"phase1.qa@dressnmore.test\", \"phone\": null, \"status\": \"active\", \"avatar_path\": null, \"avatar_url\": null}, \"tenant\": {\"id\": 13, \"name\": \"Phase1 QA\", \"slug\": \"phase1-qa\"}, \"per"
+    },
+    {
+      "module": "HR",
+      "scenario": "GET /hr/access/roles",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 3, \"name\": \"Manager\", \"slug\": \"manager\", \"permission_ids\": [6, 5, 66, 65, 94, 93, 91, 97, 96]}, {\"id\": 4, \"name\": \"QA Full No Perms\", \"slug\": \"qa-full-noperms-202606021907\", \"permission_ids\": []}, {\"id\": 2, \"name\": \"QA No Perms\", \"slug\": \"qa-no-perms\", \"permission_ids\": []}], \"meta\": {}}"
+    },
+    {
+      "module": "HR",
+      "scenario": "POST /hr/employees with user_account",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "employee_id=12 user_id=6 role_id=3",
+      "evidence": "{\"success\": true, \"message\": \"Employee created\", \"data\": {\"id\": 12, \"user_id\": 6, \"user_account\": {\"user_id\": 6, \"email\": \"qa-full-sales-20260602212645@phase1-qa.dressnmore.test\", \"status\": \"active\", \"role_id\": 3, \"role_name\": \"Manager\", \"role_slug\": \"manager\", \"permission_ids\": [6, 5, 66, 65, 94, 93, 91, 97, 96]}, \"employee_code\": \"QA-FULL-EMP-SAL"
+    },
+    {
+      "module": "HR",
+      "scenario": "Directory register for HR login",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "qa-full-sales-20260602212645@phase1-qa.dressnmore.test",
+      "evidence": "{\"success\": true, \"stdout\": \"ok\\n\", \"stderr\": \"\"}"
+    },
+    {
+      "module": "Permissions",
+      "scenario": "POST /login (HR staff)",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "perms_count=9 sample=['customers.create', 'customers.view', 'invoices.create', 'invoices.view', 'tailoring.change_stage', 'tailoring.update']",
+      "evidence": "{\"success\": true, \"message\": \"Tenant login successful\", \"data\": {\"token\": \"167|YDQmp9GafrQSmIEepjFcWV9MAa78tzDxxrT1g96X1ca03c5d\", \"user\": {\"id\": 6, \"name\": \"QA-FULL-Employee-Sales\", \"email\": \"qa-full-sales-20260602212645@phase1-qa.dressnmore.test\", \"phone\": \"0500777666\", \"status\": \"active\", \"avatar_path\": null, \"avatar_url\": null}, \"tenant\": {\"id\":"
+    },
+    {
+      "module": "Permissions",
+      "scenario": "GET /dashboard/overview (staff)",
+      "result": "PASS",
+      "http_status": 403,
+      "notes": "no dashboard.view → blocked HTTP 403",
+      "evidence": "{\"success\": false, \"message\": \"Forbidden\", \"errors\": {}}"
+    },
+    {
+      "module": "Permissions",
+      "scenario": "GET /hr/dashboard (staff)",
+      "result": "PASS",
+      "http_status": 403,
+      "notes": "no hr.dashboard.view → blocked HTTP 403",
+      "evidence": "{\"success\": false, \"message\": \"Forbidden\", \"errors\": {}}"
+    },
+    {
+      "module": "Permissions",
+      "scenario": "GET /hr/settings (staff)",
+      "result": "PASS",
+      "http_status": 403,
+      "notes": "no hr.settings.view → blocked HTTP 403",
+      "evidence": "{\"success\": false, \"message\": \"Forbidden\", \"errors\": {}}"
+    },
+    {
+      "module": "Permissions",
+      "scenario": "DELETE /hr/employees/{id}",
+      "result": "PASS",
+      "http_status": 403,
+      "notes": "no hr.employees.delete → blocked HTTP 403",
+      "evidence": "{\"success\": false, \"message\": \"Forbidden\", \"errors\": {}}"
+    },
+    {
+      "module": "Permissions",
+      "scenario": "POST /sales/invoices (staff)",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "has invoices.create → HTTP 201",
+      "evidence": "{\"success\": true, \"message\": \"Sale invoice created\", \"data\": {\"id\": 57, \"invoice_number\": \"INV-20260602-0029\", \"branch_id\": 6, \"status\": \"confirmed\", \"client_name\": \"QA-FULL-Customer-Perm\", \"client_phone\": \"0500333444\", \"customer\": {\"name\": \"QA-FULL-Customer-Perm\", \"national_id\": \"\", \"phone\": \"05003"
+    },
+    {
+      "module": "Permissions",
+      "scenario": "UI pages (manual)",
+      "result": "NOT TESTED",
+      "http_status": null,
+      "notes": "API-only run; verify sidebar routes in browser for staff user",
+      "evidence": ""
+    }
+  ]
+}
