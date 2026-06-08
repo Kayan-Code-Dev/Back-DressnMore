@@ -32,6 +32,7 @@ class PurchaseOrder extends BaseTenantModel
         'status',
         'type',
         'is_returned',
+        'received_at',
         'returned_at',
         'return_notes',
         'subtotal',

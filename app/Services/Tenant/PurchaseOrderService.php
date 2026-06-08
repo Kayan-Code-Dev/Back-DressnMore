@@ -213,7 +213,7 @@ class PurchaseOrderService
             $this->journalEntryService->createFromSource(
                 header: [
                     'entry_date' => now()->toDateString(),
-                    'type' => JournalEntry::TYPE_AUTO,
+                    'type' => JournalEntry::TYPE_NORMAL,
                     'source_type' => 'purchase_order',
                     'source_id' => $purchaseOrder->id,
                     'reference_number' => $purchaseOrder->purchase_order_number,
