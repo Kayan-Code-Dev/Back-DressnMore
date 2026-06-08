@@ -26,6 +26,18 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Debug, test, and deploy scratch scripts (not official deployment)
+/debug_*.py
+/test_*.py
+/inspect_*.py
+/redeploy_*.py
+/setup_auto_deploy.py
+/deploy_subscription_fix.py
+/deploy_workspace_removal.py
+*.pyc
+__pycache__/
+
 # Staging/smoke test scripts (not part of codebase)
 /*_smoke.sh
 /*_verify*.php
@@ -36,4 +48,3 @@ Thumbs.db
 /run_hr_smoke.sh
 /tmp_check_*.php
 /scripts/_*.py
-
