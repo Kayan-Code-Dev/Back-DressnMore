@@ -115,6 +115,48 @@ class PlatformPlanRequestTest extends TestCase
             ->assertJsonPath('data.request_id', $planRequest->id);
     }
 
+    public function test_public_can_complete_payment_for_existing_pending_request(): void
+    {
+        $gateway = $this->createPaymentGateway();
+        PlanRequest::query()->create([
+            'plan_id' => $this->plan->id,
+            'name' => 'Pending Owner',
+            'email' => 'pending-complete@example.com',
+            'phone' => '0500000020',
+            'password' => Hash::make('SecurePass1'),
+            'provision_password' => Crypt::encryptString('SecurePass1'),
+            'company_name' => 'Pending Atelier',
+            'payment_gateway_id' => $gateway->id,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->post('/api/v1/order-plans', [
+            'plan_id' => $this->plan->id,
+            'name' => 'Pending Owner',
+            'email' => 'pending-complete@example.com',
+            'password' => 'SecurePass1',
+            'phone' => '0500000020',
+            'company_name' => 'Pending Atelier',
+            'payment_gateway_id' => $gateway->id,
+            'payment_reference' => '0935027218',
+            'payment_proof' => UploadedFile::fake()->image('transfer-proof.jpg'),
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertStatus(202)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'payment_submitted');
+
+        $this->assertDatabaseHas('plan_requests', [
+            'email' => 'pending-complete@example.com',
+            'status' => 'payment_submitted',
+            'payment_reference' => '0935027218',
+        ], 'central');
+
+        $this->assertSame(1, PlanRequest::query()->where('email', 'pending-complete@example.com')->count());
+    }
+
     public function test_public_free_plan_request_is_auto_provisioned(): void
     {
         $tenantDatabasePath = storage_path('framework/testing/free-plan-tenant.sqlite');

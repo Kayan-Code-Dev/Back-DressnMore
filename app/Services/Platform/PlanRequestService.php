@@ -52,22 +52,15 @@ class PlanRequestService
     {
         $plan = Plan::query()->findOrFail((int) $data['plan_id']);
         $isFreePlan = (float) $plan->price <= 0;
+        $email = strtolower(trim((string) $data['email']));
 
-        if (! $isFreePlan && empty($data['payment_gateway_id'])) {
-            throw new RuntimeException('Payment gateway is required for paid plans');
+        $existing = PlanRequest::query()->where('email', $email)->first();
+        if ($existing !== null) {
+            return $this->handleExistingRequest($existing, $data, $plan, $isFreePlan);
         }
 
         if (! $isFreePlan) {
-            $paymentReference = trim((string) ($data['payment_reference'] ?? ''));
-            $paymentProof = $data['payment_proof'] ?? null;
-
-            if ($paymentReference === '') {
-                throw new RuntimeException('Payment reference is required for paid plans');
-            }
-
-            if (! $paymentProof instanceof UploadedFile) {
-                throw new RuntimeException('Payment proof image is required for paid plans');
-            }
+            $this->assertPaidPlanPaymentPayload($data);
         }
 
         $plainPassword = (string) $data['password'];
@@ -75,7 +68,7 @@ class PlanRequestService
         $planRequest = PlanRequest::query()->create([
             'plan_id' => $plan->id,
             'name' => $data['name'],
-            'email' => strtolower(trim((string) $data['email'])),
+            'email' => $email,
             'phone' => $data['phone'],
             'password' => Hash::make($plainPassword),
             'provision_password' => Crypt::encryptString($plainPassword),
@@ -85,15 +78,7 @@ class PlanRequestService
         ]);
 
         if (! $isFreePlan) {
-            /** @var UploadedFile $paymentProof */
-            $paymentProof = $data['payment_proof'];
-            $proofPath = $this->planRequestPaymentProofService->store($paymentProof, $planRequest->id);
-
-            $planRequest->update([
-                'payment_reference' => trim((string) $data['payment_reference']),
-                'payment_proof_path' => $proofPath,
-                'payment_submitted_at' => CarbonImmutable::now(),
-            ]);
+            $this->attachPaymentProof($planRequest, $data);
         }
 
         if ($isFreePlan) {
@@ -116,8 +101,101 @@ class PlanRequestService
             ];
         }
 
+        return $this->paymentSubmittedResponse($planRequest->id);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function handleExistingRequest(PlanRequest $existing, array $data, Plan $plan, bool $isFreePlan): array
+    {
+        if ($existing->status === 'approved') {
+            throw new RuntimeException('البريد الإلكتروني مستخدم بالفعل. يمكنك تسجيل الدخول.');
+        }
+
+        if ($existing->status === 'payment_submitted') {
+            return [
+                'request_id' => $existing->id,
+                'status' => 'payment_submitted',
+                'auto_provisioned' => false,
+                'already_submitted' => true,
+                'message' => 'طلبك قيد المراجعة بالفعل. يمكنك متابعة حالة الطلب.',
+            ];
+        }
+
+        if ($isFreePlan) {
+            throw new RuntimeException('يوجد طلب سابق لهذا البريد الإلكتروني.');
+        }
+
+        if (in_array($existing->status, ['pending', 'rejected'], true)) {
+            $this->assertPaidPlanPaymentPayload($data);
+
+            $plainPassword = (string) $data['password'];
+
+            $existing->update([
+                'plan_id' => $plan->id,
+                'name' => $data['name'],
+                'phone' => $data['phone'],
+                'password' => Hash::make($plainPassword),
+                'provision_password' => Crypt::encryptString($plainPassword),
+                'company_name' => $data['company_name'] ?? null,
+                'payment_gateway_id' => $data['payment_gateway_id'] ?? null,
+                'status' => 'payment_submitted',
+                'admin_notes' => $existing->status === 'rejected' ? null : $existing->admin_notes,
+                'approved_at' => null,
+                'approved_by' => null,
+            ]);
+
+            $this->attachPaymentProof($existing, $data);
+
+            return $this->paymentSubmittedResponse($existing->id);
+        }
+
+        throw new RuntimeException('لا يمكن معالجة هذا الطلب حالياً.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function assertPaidPlanPaymentPayload(array $data): void
+    {
+        if (empty($data['payment_gateway_id'])) {
+            throw new RuntimeException('Payment gateway is required for paid plans');
+        }
+
+        if (trim((string) ($data['payment_reference'] ?? '')) === '') {
+            throw new RuntimeException('Payment reference is required for paid plans');
+        }
+
+        if (! ($data['payment_proof'] ?? null) instanceof UploadedFile) {
+            throw new RuntimeException('Payment proof image is required for paid plans');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function attachPaymentProof(PlanRequest $planRequest, array $data): void
+    {
+        /** @var UploadedFile $paymentProof */
+        $paymentProof = $data['payment_proof'];
+        $proofPath = $this->planRequestPaymentProofService->store($paymentProof, $planRequest->id);
+
+        $planRequest->update([
+            'payment_reference' => trim((string) $data['payment_reference']),
+            'payment_proof_path' => $proofPath,
+            'payment_submitted_at' => CarbonImmutable::now(),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function paymentSubmittedResponse(int $requestId): array
+    {
         return [
-            'request_id' => $planRequest->id,
+            'request_id' => $requestId,
             'status' => 'payment_submitted',
             'auto_provisioned' => false,
             'message' => 'تم إرسال إثبات الدفع بنجاح. سيتم مراجعة طلبك وتفعيل حسابك بعد التأكد من التحويل.',

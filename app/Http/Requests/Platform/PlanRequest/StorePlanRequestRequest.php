@@ -25,7 +25,7 @@ class StorePlanRequestRequest extends FormRequest
         return [
             'plan_id' => ['required', 'integer', 'exists:central.plans,id'],
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:central.plan_requests,email'],
+            'email' => ['required', 'email', 'max:255'],
             'password' => ['required', 'string', Password::min(8)],
             'phone' => ['required', 'string', 'max:50'],
             'company_name' => ['nullable', 'string', 'max:255'],
@@ -33,7 +33,7 @@ class StorePlanRequestRequest extends FormRequest
             'payment_reference' => [$isPaidPlan ? 'required' : 'nullable', 'string', 'max:100'],
             'payment_proof' => array_merge(
                 $isPaidPlan ? ['required'] : ['nullable'],
-                ['file', 'image', 'max:5120'],
+                ['file', 'mimes:jpg,jpeg,png,webp,gif', 'max:5120'],
             ),
         ];
     }
@@ -46,7 +46,8 @@ class StorePlanRequestRequest extends FormRequest
         return [
             'payment_reference.required' => 'يرجى إدخال رقم المحفظة أو الحساب الذي دفعت منه.',
             'payment_proof.required' => 'يرجى إرفاق صورة إيصال التحويل.',
-            'payment_proof.image' => 'يجب أن يكون إيصال الدفع صورة.',
+            'payment_proof.image' => 'يجب أن يكون إيصال الدفع صورة (JPG أو PNG).',
+            'payment_proof.mimes' => 'يجب أن يكون إيصال الدفع صورة (JPG أو PNG).',
             'payment_gateway_id.required' => 'يرجى اختيار بوابة الدفع.',
         ];
     }
