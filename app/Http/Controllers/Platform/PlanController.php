@@ -68,4 +68,50 @@ class PlanController extends Controller
 
         return ApiResponse::success(null, 'Plan deleted');
     }
+
+    public function publicIndex(Request $request): JsonResponse
+    {
+        $perPage = max(1, min(50, $request->integer('per_page', 15)));
+        $page = max(1, $request->integer('page', 1));
+
+        $plans = Plan::query()
+            ->where('status', 'active')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        $items = collect($plans->items())->map(function (Plan $plan): array {
+            return [
+                'id' => $plan->id,
+                'title' => $plan->name,
+                'description' => $plan->description ?? '',
+                'price' => number_format((float) $plan->price, 2, '.', ''),
+                'days' => (int) ($plan->duration_days ?? 30),
+                'is_active' => $plan->status === 'active',
+                'max_branches' => 1,
+                'max_employees' => 999,
+                'max_dresses' => 999,
+                'max_invoices_monthly' => 999,
+                'created_at' => $plan->created_at?->toIso8601String(),
+                'updated_at' => $plan->updated_at?->toIso8601String(),
+            ];
+        })->all();
+
+        return response()->json([
+            'success' => true,
+            'current_page' => $plans->currentPage(),
+            'data' => $items,
+            'first_page_url' => $plans->url(1),
+            'from' => $plans->firstItem(),
+            'last_page' => $plans->lastPage(),
+            'last_page_url' => $plans->url($plans->lastPage()),
+            'links' => $plans->linkCollection()->toArray(),
+            'next_page_url' => $plans->nextPageUrl(),
+            'path' => $plans->path(),
+            'per_page' => $plans->perPage(),
+            'prev_page_url' => $plans->previousPageUrl(),
+            'to' => $plans->lastItem(),
+            'total' => $plans->total(),
+        ]);
+    }
 }

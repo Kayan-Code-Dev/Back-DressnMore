@@ -4,12 +4,19 @@ use App\Http\Controllers\Platform\AuthController;
 use App\Http\Controllers\Platform\HealthController;
 use App\Http\Controllers\Platform\PaymentGatewayController;
 use App\Http\Controllers\Platform\PlanController;
+use App\Http\Controllers\Platform\PlanRequestController;
+use App\Http\Controllers\Platform\SubscriptionController;
 use App\Http\Controllers\Platform\TenantController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('platform')->group(function (): void {
     Route::get('/health', [HealthController::class, 'index']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::get('/plans/public', [PlanController::class, 'publicIndex']);
+
+    // PUBLIC: Payment gateways & plan requests
+    Route::get('/payment-gateways/public', [PlanRequestController::class, 'paymentGateways']);
+    Route::post('/plan-requests', [PlanRequestController::class, 'store']);
 
     Route::middleware(['auth:sanctum', 'platform.admin'])->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -47,6 +54,8 @@ Route::prefix('platform')->group(function (): void {
             ->whereNumber('tenant');
         Route::post('/tenants/{tenant}/renew', [TenantController::class, 'renew'])
             ->whereNumber('tenant');
+        Route::post('/tenants/{tenant}/seed', [TenantController::class, 'seed'])
+            ->whereNumber('tenant');
 
         Route::get('/payment-gateways', [PaymentGatewayController::class, 'index']);
         Route::post('/payment-gateways', [PaymentGatewayController::class, 'store']);
@@ -56,5 +65,19 @@ Route::prefix('platform')->group(function (): void {
             ->whereNumber('paymentGateway');
         Route::delete('/payment-gateways/{paymentGateway}', [PaymentGatewayController::class, 'destroy'])
             ->whereNumber('paymentGateway');
+
+        // Subscriptions
+        Route::get('/subscriptions', [SubscriptionController::class, 'index']);
+        Route::get('/subscriptions/{id}', [SubscriptionController::class, 'show']);
+        Route::patch('/subscriptions/{id}', [SubscriptionController::class, 'update']);
+
+        // Order Plans (Plan Requests)
+        Route::get('/order-plans', [PlanRequestController::class, 'index']);
+        Route::get('/order-plans/{id}', [PlanRequestController::class, 'show']);
+        Route::patch('/order-plans/{id}', [PlanRequestController::class, 'update']);
+        Route::post('/order-plans/{id}/approve', [PlanRequestController::class, 'approve']);
+        Route::post('/order-plans/{id}/reject', [PlanRequestController::class, 'reject']);
+        Route::delete('/order-plans/{id}', [PlanRequestController::class, 'destroy']);
     });
 });
+
