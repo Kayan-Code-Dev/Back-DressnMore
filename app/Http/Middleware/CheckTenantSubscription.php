@@ -54,6 +54,8 @@ class CheckTenantSubscription
         return $request->is('api/tenant/me')
             || $request->is('api/tenant/subscription')
             || $request->is('api/tenant/subscription/*')
+            || $request->is('api/tenant/settings/profile')
+            || $request->is('api/tenant/settings/profile/*')
             || $request->is('api/tenant/settings/password')
             || $request->is('api/tenant/settings/account')
             || $request->is('api/tenant/logout');
