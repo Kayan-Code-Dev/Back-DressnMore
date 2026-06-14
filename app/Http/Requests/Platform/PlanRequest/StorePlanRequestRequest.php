@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Platform\PlanRequest;
 
+use App\Models\Central\Plan;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
@@ -17,6 +18,10 @@ class StorePlanRequestRequest extends FormRequest
      */
     public function rules(): array
     {
+        $planId = (int) $this->input('plan_id');
+        $plan = $planId > 0 ? Plan::query()->find($planId) : null;
+        $isPaidPlan = $plan !== null && (float) $plan->price > 0;
+
         return [
             'plan_id' => ['required', 'integer', 'exists:central.plans,id'],
             'name' => ['required', 'string', 'max:255'],
@@ -24,7 +29,25 @@ class StorePlanRequestRequest extends FormRequest
             'password' => ['required', 'string', Password::min(8)],
             'phone' => ['required', 'string', 'max:50'],
             'company_name' => ['nullable', 'string', 'max:255'],
-            'payment_gateway_id' => ['nullable', 'integer', 'exists:central.payment_gateways,id'],
+            'payment_gateway_id' => [$isPaidPlan ? 'required' : 'nullable', 'integer', 'exists:central.payment_gateways,id'],
+            'payment_reference' => [$isPaidPlan ? 'required' : 'nullable', 'string', 'max:100'],
+            'payment_proof' => array_merge(
+                $isPaidPlan ? ['required'] : ['nullable'],
+                ['file', 'image', 'max:5120'],
+            ),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'payment_reference.required' => 'يرجى إدخال رقم المحفظة أو الحساب الذي دفعت منه.',
+            'payment_proof.required' => 'يرجى إرفاق صورة إيصال التحويل.',
+            'payment_proof.image' => 'يجب أن يكون إيصال الدفع صورة.',
+            'payment_gateway_id.required' => 'يرجى اختيار بوابة الدفع.',
         ];
     }
 }

@@ -18,6 +18,9 @@ class PlanRequest extends Model
         'provision_password',
         'company_name',
         'payment_gateway_id',
+        'payment_reference',
+        'payment_proof_path',
+        'payment_submitted_at',
         'status',
         'tenant_id',
         'subscription_id',
@@ -35,6 +38,7 @@ class PlanRequest extends Model
     {
         return [
             'approved_at' => 'datetime',
+            'payment_submitted_at' => 'datetime',
         ];
     }
 

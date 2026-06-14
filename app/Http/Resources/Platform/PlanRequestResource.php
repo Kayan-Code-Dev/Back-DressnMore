@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Platform;
 
+use App\Services\Platform\PlanRequestPaymentProofService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,6 +12,7 @@ class PlanRequestResource extends JsonResource
     {
         $plan = $this->relationLoaded('plan') ? $this->plan : null;
         $tenant = $this->relationLoaded('tenant') ? $this->tenant : null;
+        $proofService = app(PlanRequestPaymentProofService::class);
 
         return [
             'id' => $this->id,
@@ -20,6 +22,9 @@ class PlanRequestResource extends JsonResource
             'company_name' => $this->company_name,
             'plan_id' => $this->plan_id,
             'payment_gateway_id' => $this->payment_gateway_id,
+            'payment_reference' => $this->payment_reference,
+            'payment_proof_url' => $proofService->url($this->payment_proof_path),
+            'payment_submitted_at' => $this->payment_submitted_at?->toISOString(),
             'status' => $this->status,
             'tenant_id' => $tenant?->slug ?? ($this->tenant_id ? (string) $this->tenant_id : null),
             'tenant_ref_id' => $this->tenant_id,

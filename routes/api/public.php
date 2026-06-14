@@ -8,4 +8,5 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/plans', [PlanController::class, 'publicIndex']);
     Route::get('/payment-gateways', [PlanRequestController::class, 'paymentGateways']);
     Route::post('/order-plans', [PlanRequestController::class, 'store']);
+    Route::get('/order-plans/{id}', [PlanRequestController::class, 'publicShow']);
 });

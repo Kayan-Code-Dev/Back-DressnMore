@@ -9,6 +9,7 @@ use App\Models\Central\SuperAdmin;
 use App\Models\Central\Tenant;
 use Database\Seeders\Central\PlanSeeder;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Crypt;
@@ -60,7 +61,7 @@ class PlatformPlanRequestTest extends TestCase
     {
         $gateway = $this->createPaymentGateway();
 
-        $response = $this->postJson('/api/v1/order-plans', [
+        $response = $this->post('/api/v1/order-plans', [
             'plan_id' => $this->plan->id,
             'name' => 'Atelier Owner',
             'email' => 'owner@example.com',
@@ -68,20 +69,50 @@ class PlatformPlanRequestTest extends TestCase
             'phone' => '0500000000',
             'company_name' => 'Atelier One',
             'payment_gateway_id' => $gateway->id,
+            'payment_reference' => '0935027218',
+            'payment_proof' => UploadedFile::fake()->image('transfer-proof.jpg'),
         ], [
             'Accept' => 'application/json',
         ]);
 
         $response->assertStatus(202)
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.status', 'payment_submitted')
             ->assertJsonPath('data.auto_provisioned', false);
 
         $this->assertDatabaseHas('plan_requests', [
             'email' => 'owner@example.com',
-            'status' => 'pending',
+            'status' => 'payment_submitted',
+            'payment_reference' => '0935027218',
             'plan_id' => $this->plan->id,
         ], 'central');
+    }
+
+    public function test_public_can_check_plan_request_status_by_email(): void
+    {
+        $gateway = $this->createPaymentGateway();
+        $planRequest = PlanRequest::query()->create([
+            'plan_id' => $this->plan->id,
+            'name' => 'Status Owner',
+            'email' => 'status-owner@example.com',
+            'phone' => '0500000010',
+            'password' => Hash::make('SecurePass1'),
+            'company_name' => 'Status Atelier',
+            'payment_gateway_id' => $gateway->id,
+            'payment_reference' => '0999999999',
+            'payment_proof_path' => 'plan-requests/payment-proofs/test.jpg',
+            'payment_submitted_at' => CarbonImmutable::now(),
+            'status' => 'payment_submitted',
+        ]);
+
+        $response = $this->getJson('/api/v1/order-plans/'.$planRequest->id.'?email=status-owner@example.com', [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'payment_submitted')
+            ->assertJsonPath('data.request_id', $planRequest->id);
     }
 
     public function test_public_free_plan_request_is_auto_provisioned(): void
@@ -131,7 +162,10 @@ class PlatformPlanRequestTest extends TestCase
             'provision_password' => Crypt::encryptString('SecurePass1'),
             'company_name' => 'Pending Atelier',
             'payment_gateway_id' => $gateway->id,
-            'status' => 'pending',
+            'payment_reference' => '0935027218',
+            'payment_proof_path' => 'plan-requests/payment-proofs/pending.jpg',
+            'payment_submitted_at' => CarbonImmutable::now(),
+            'status' => 'payment_submitted',
         ]);
 
         $response = $this->patchJson("/api/platform/order-plans/{$planRequest->id}", [

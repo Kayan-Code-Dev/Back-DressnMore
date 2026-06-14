@@ -33,7 +33,11 @@ class PlanRequestController extends Controller
     public function store(StorePlanRequestRequest $request): JsonResponse
     {
         try {
-            $result = $this->planRequestService->store($request->validated());
+            $payload = $request->validated();
+            if ($request->hasFile('payment_proof')) {
+                $payload['payment_proof'] = $request->file('payment_proof');
+            }
+            $result = $this->planRequestService->store($payload);
         } catch (RuntimeException $exception) {
             return ApiResponse::error($exception->getMessage(), 422);
         }
@@ -41,6 +45,25 @@ class PlanRequestController extends Controller
         $status = ($result['status'] ?? 'pending') === 'approved' ? 201 : 202;
 
         return ApiResponse::success($result, (string) ($result['message'] ?? 'Plan request submitted'), $status);
+    }
+
+    public function publicShow(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $planRequest = PlanRequest::query()
+            ->with(['plan', 'paymentGateway'])
+            ->findOrFail($id);
+
+        try {
+            $result = $this->planRequestService->publicStatus($planRequest, (string) $validated['email']);
+        } catch (RuntimeException $exception) {
+            return ApiResponse::error($exception->getMessage(), 404);
+        }
+
+        return ApiResponse::success($result);
     }
 
     public function index(Request $request): JsonResponse
@@ -75,7 +98,7 @@ class PlanRequestController extends Controller
 
         $validated = $request->validate([
             'admin_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:pending,approved,rejected'],
+            'status' => ['nullable', 'in:pending,payment_submitted,approved,rejected'],
         ]);
 
         if (! array_key_exists('status', $validated) && ! array_key_exists('admin_notes', $validated)) {

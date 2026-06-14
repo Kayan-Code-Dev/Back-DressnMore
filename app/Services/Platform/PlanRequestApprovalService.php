@@ -44,6 +44,14 @@ class PlanRequestApprovalService
             throw new RuntimeException('Plan not found for request');
         }
 
+        if ((float) $plan->price > 0 && $planRequest->payment_proof_path === null) {
+            throw new RuntimeException('Cannot approve paid request before payment proof is submitted');
+        }
+
+        if ((float) $plan->price > 0 && $planRequest->status !== 'payment_submitted') {
+            throw new RuntimeException('Paid request must be in payment_submitted status before approval');
+        }
+
         $plainPassword = $this->resolveProvisionPassword($planRequest);
         $startsAt = CarbonImmutable::now();
         $endsAt = $startsAt->addDays(max(1, (int) ($plan->duration_days ?? 30)));
