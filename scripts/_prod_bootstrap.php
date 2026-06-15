@@ -15,6 +15,7 @@ use App\Models\Central\Plan;
 use App\Models\Central\SuperAdmin;
 use App\Models\Central\Tenant;
 use App\Services\Platform\TenantProvisioningService;
+use App\Services\Tenant\TenantDatabaseManager;
 use Database\Seeders\Central\PlanFeatureSeeder;
 use Database\Seeders\Central\PlanSeeder;
 use Illuminate\Support\Facades\Artisan;
@@ -101,6 +102,10 @@ $provisioning->seedAdmin($tenant, [
     'admin_password' => $secrets['TENANT_OWNER_PASSWORD'],
     'admin_name' => $secrets['TENANT_OWNER_NAME'],
 ]);
+
+$tenantDb = app(TenantDatabaseManager::class);
+$tenantDb->connect($tenant->refresh());
+$tenantDb->runTenantMigrations();
 
 $tenant->refresh()->load('plan');
 

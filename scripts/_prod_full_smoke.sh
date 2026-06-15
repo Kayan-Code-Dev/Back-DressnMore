@@ -120,14 +120,15 @@ CBG=$(call GET "/api/tenant/cashboxes?search=Prod" "" "$TT" "$TENANT_SLUG")
 
 # Inventory chain for sale/rental (tolerate partial failures)
 set +e
-CAT=$(call POST /api/tenant/dress-categories "{\"name\":\"Prod Cat Smoke\"}" "$TT" "$TENANT_SLUG")
+SMOKE_TS=$(date +%s)
+CAT=$(call POST /api/tenant/dress-categories "{\"name\":\"Prod Cat Smoke $SMOKE_TS\"}" "$TT" "$TENANT_SLUG")
 CATID=$(echo "$CAT" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id',''))" 2>/dev/null || true)
-SCAT=$(call POST /api/tenant/dress-categories "{\"name\":\"Prod Sub Smoke\",\"parent_id\":${CATID:-0}}" "$TT" "$TENANT_SLUG")
+SCAT=$(call POST /api/tenant/dress-categories "{\"name\":\"Prod Sub Smoke $SMOKE_TS\",\"parent_id\":${CATID:-0}}" "$TT" "$TENANT_SLUG")
 SCATID=$(echo "$SCAT" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id',''))" 2>/dev/null || true)
-PO=$(call POST /api/tenant/purchase-orders "{\"supplier_id\":$SID,\"branch_id\":$BID,\"category_id\":$CATID,\"subcategory_id\":$SCATID,\"items\":[{\"item_name\":\"Smoke Dress\",\"quantity\":1,\"unit_price\":500,\"dress_category_id\":$CATID,\"dress_subcategory_id\":$SCATID}]}" "$TT" "$TENANT_SLUG")
+PO=$(call POST /api/tenant/purchase-orders "{\"supplier_id\":$SID,\"branch_id\":$BID,\"category_id\":$CATID,\"subcategory_id\":$SCATID,\"items\":[{\"item_name\":\"Smoke Dress $SMOKE_TS\",\"quantity\":1,\"unit_price\":500,\"dress_category_id\":$CATID,\"dress_subcategory_id\":$SCATID}]}" "$TT" "$TENANT_SLUG")
 POID=$(echo "$PO" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id',''))" 2>/dev/null || true)
 [ -n "$POID" ] && call POST "/api/tenant/purchase-orders/$POID/receive" "{}" "$TT" "$TENANT_SLUG" >/dev/null
-DRES=$(call GET "/api/tenant/dresses?search=Smoke" "" "$TT" "$TENANT_SLUG")
+DRES=$(call GET "/api/tenant/dresses?search=Smoke%20Dress%20$SMOKE_TS" "" "$TT" "$TENANT_SLUG")
 DID=$(echo "$DRES" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); data=d.get('data') or []; print(data[0]['id'] if data else '')" 2>/dev/null || true)
 DCODE=$(echo "$DRES" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); data=d.get('data') or []; print(data[0]['code'] if data else '')" 2>/dev/null || true)
 if [ -n "$DID" ] && [ -n "$DCODE" ] && [ -n "$CATID" ] && [ -n "$SCATID" ]; then
@@ -159,15 +160,17 @@ fi
 set -e
 
 TODAY=$(date -I)
-PDF=$(call GET "/api/tenant/reports/sales-daily?export=pdf&date_from=$TODAY&date_to=$TODAY" "" "$TT" "$TENANT_SLUG")
-PDFH=$(echo "$PDF" | grep '__HTTP__:' | tail -1 | sed 's/.*__HTTP__://')
-PDFB=$(echo "$PDF" | sed '/__HTTP__:/d' | head -c 20)
-[[ "$PDFH" = "200" && "$PDFB" == *PDF* ]] && record tenant "reports PDF" PASS "$PDFH" ok || record tenant "reports PDF" FAIL "$PDFH" "$PDFB"
+set +e
+PDFH=$(curl -sk -o /tmp/prod_smoke.pdf -w '%{http_code}' "$API/api/tenant/reports/sales-daily?export=pdf&date_from=$TODAY&date_to=$TODAY" \
+  -H "Authorization: Bearer $TT" -H "X-Tenant: $TENANT_SLUG" -H 'Accept: application/json')
+PDFB=$(head -c 4 /tmp/prod_smoke.pdf 2>/dev/null || true)
+[[ "$PDFH" = "200" && "$PDFB" == %PDF* ]] && record tenant "reports PDF" PASS "$PDFH" ok || record tenant "reports PDF" FAIL "$PDFH" "$PDFB"
 
-XLS=$(call GET "/api/tenant/reports/sales-daily?export=xlsx&date_from=$TODAY&date_to=$TODAY" "" "$TT" "$TENANT_SLUG")
-XLSH=$(echo "$XLS" | grep '__HTTP__:' | tail -1 | sed 's/.*__HTTP__://')
-XLSB=$(echo "$XLS" | sed '/__HTTP__:/d' | head -c 4)
-[[ "$XLSH" = "200" && "$XLSB" == PK* ]] && record tenant "reports Excel" PASS "$XLSH" ok || record tenant "reports Excel" FAIL "$XLSH" "$XLSB"
+XLSH=$(curl -sk -o /tmp/prod_smoke.xlsx -w '%{http_code}' "$API/api/tenant/reports/sales-daily?export=xlsx&date_from=$TODAY&date_to=$TODAY" \
+  -H "Authorization: Bearer $TT" -H "X-Tenant: $TENANT_SLUG" -H 'Accept: application/json')
+XLSB=$(head -c 2 /tmp/prod_smoke.xlsx 2>/dev/null | od -An -tx1 | tr -d ' \n')
+[[ "$XLSH" = "200" && "$XLSB" = "504b" ]] && record tenant "reports Excel" PASS "$XLSH" ok || record tenant "reports Excel" FAIL "$XLSH" "$XLSB"
+set -e
 
 # Mock payment / stack traces
 UPG=$(call POST /api/tenant/subscription/upgrade "{\"plan_code\":\"pro\",\"mock_payment_confirmed\":true,\"payment_gateway_id\":1}" "$TT" "$TENANT_SLUG")
