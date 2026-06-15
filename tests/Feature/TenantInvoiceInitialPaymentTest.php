@@ -51,6 +51,33 @@ class TenantInvoiceInitialPaymentTest extends TestCase
         ]);
     }
 
+    public function test_sale_rejects_non_positive_initial_payment_amount(): void
+    {
+        $customer = Customer::query()->create(['name' => 'Buyer', 'status' => 'active']);
+        Sanctum::actingAs($this->user, ['*']);
+
+        $payload = [
+            'customer_id' => $customer->id,
+            'items' => [
+                ['description' => 'Sale dress', 'quantity' => 1, 'unit_price' => 200],
+            ],
+            'initial_payment' => [
+                'amount' => -5,
+                'method' => 'cash',
+            ],
+        ];
+
+        $this->postJson('/api/tenant/sales/invoices', $payload, $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['initial_payment.amount']);
+
+        $payload['initial_payment']['amount'] = 0;
+
+        $this->postJson('/api/tenant/sales/invoices', $payload, $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['initial_payment.amount']);
+    }
+
     public function test_sale_initial_payment_creates_payment_cash_movement_and_balanced_journal(): void
     {
         $customer = Customer::query()->create(['name' => 'Buyer', 'status' => 'active']);

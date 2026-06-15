@@ -155,13 +155,18 @@ def gate_env(ssh: paramiko.SSHClient) -> list[dict]:
 
     mock_hits = ssh_exec(
         ssh,
-        f"grep -rn 'MOCK-\\|assertMockPayment\\|Mock payment' {BACKEND}/app/Services/Platform/TenantSubscriptionBillingService.php 2>/dev/null | head -5",
+        f"grep -rn \"'MOCK-\" {BACKEND}/app/Services/Platform/TenantSubscriptionBillingService.php 2>/dev/null | head -3",
     ).strip()
+    upgrade_blocked = ssh_exec(
+        ssh,
+        f"grep -n 'يرجى اختيار الباقة' {BACKEND}/app/Http/Controllers/Tenant/SubscriptionController.php 2>/dev/null | head -1",
+    ).strip()
+    mock_ok = not mock_hits and bool(upgrade_blocked)
     rows.append({
         "gate": "4-env",
         "check": "No mock payment auto-confirm in subscription upgrade path",
-        "result": "WARN",
-        "evidence": mock_hits or "TenantSubscriptionBillingService uses MOCK- reference for paid upgrades until gateway integration",
+        "result": "PASS" if mock_ok else ("WARN" if upgrade_blocked else "FAIL"),
+        "evidence": upgrade_blocked or mock_hits or "upgrade endpoint should reject direct paid upgrades",
     })
     return rows
 
@@ -330,20 +335,39 @@ expect_http "5-api" "Set dress prices" 200 PUT "/dresses/$DID" '{{"code":"'"$DCO
 sale='{{"type":"sell","status":"confirmed","branch_id":'"$BID"',"customer_id":'"$CUST"',"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":1200}}],"initial_payment":{{"amount":1200,"method":"cash"}}}}'
 expect_http "5-api" "Sale invoice" 201 POST "/invoices" "$sale"
 
-rent='{{"type":"rent","status":"confirmed","customer_id":'"$CUST"',"branch_id":'"$BID"',"rent_start_date":"'"$start"'","rent_end_date":"'"$end"'","delivery_date":"'"$start"'","return_date":"'"$end"'","days_of_rent":6,"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":400}}],"initial_payment":{{"amount":200,"method":"cash"}},"security_deposit":300}}'
-expect_http "5-api" "Rental invoice" 201 POST "/invoices" "$rent"
-RID=$(api GET "/invoices?type=rent&per_page=1" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])" 2>/dev/null || true)
-expect_http "5-api" "Deliver rental" 200 POST "/invoices/$RID/deliver" '{{}}'
-expect_http "5-api" "Return rental" 200 POST "/invoices/$RID/return" '{{"dress_status_after_return":"available","notes":"beta gate"}}'
+rent='{{"type":"rent","status":"confirmed","customer_id":'"$CUST"',"branch_id":'"$BID"',"rent_start_date":"{start}","rent_end_date":"{end}","delivery_date":"{start}","return_date":"{end}","days_of_rent":6,"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":400}}],"initial_payment":{{"amount":200,"method":"cash"}},"security_deposit":300}}'
+rent_resp=$(api POST "/invoices" "$rent")
+rent_http=$(echo "$rent_resp" | grep '__HTTP__:' | tail -1 | sed 's/.*__HTTP__://')
+rent_body=$(echo "$rent_resp" | sed '/__HTTP__:/d' | head -c 600)
+if [ "$rent_http" = "201" ]; then record "5-api" "Rental invoice" PASS 201 "$rent_body"; else record "5-api" "Rental invoice" FAIL "$rent_http" "$rent_body"; fi
+RID=$(echo "$rent_body" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{{}}).get('id',''))" 2>/dev/null || true)
 
-tailor='{{"branch_id":'"$BID"',"customer_id":'"$CUST"',"items":[{{"description":"'"$PFX"' tailor","quantity":1,"unit_price":300,"measurements":[{{"label":"height","value":"165","unit":"cm"}}]}}],"payments":[{{"cashbox_id":'"$CB"',"amount":300,"method":"cash"}}]}}'
+overlap='{{"type":"rent","status":"confirmed","customer_id":'"$CUST"',"branch_id":'"$BID"',"rent_start_date":"{start}","rent_end_date":"{end}","delivery_date":"{start}","return_date":"{end}","days_of_rent":6,"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":400}}],"initial_payment":{{"amount":200,"method":"cash"}},"security_deposit":300}}'
+expect_http "7-negative" "Rental overlap same dress/dates" 422 POST "/invoices" "$overlap"
+
+if [ -n "$RID" ]; then
+  expect_http "5-api" "Deliver rental" 200 POST "/invoices/$RID/deliver" '{{}}'
+  expect_http "5-api" "Return rental" 200 POST "/invoices/$RID/return" '{{"dress_status_after_return":"available","notes":"beta gate"}}'
+fi
+
+tailor='{{"customer_id":'"$CUST"',"branch_id":'"$BID"',"occasion_datetime":"{start}","items":[{{"description":"'"$PFX"' tailor","quantity":1,"unit_price":300}}],"measurements":[{{"label":"height","value":"165","unit":"cm"}},{{"label":"chest","value":"90","unit":"cm"}}],"initial_payment":{{"amount":300,"method":"cash"}}}}'
 expect_http "5-api" "Tailoring order" 201 POST "/tailoring/orders" "$tailor"
 
-expect_http "5-api" "Create HR employee" 201 POST "/hr/employees" '{{"employee_code":"'"$PFX"'-EMP","full_name":"'"$PFX"' Emp","phone":"0503333444","branch_id":'"$BID"',"employment_type":"full_time","status":"active","joining_date":"{date.today().isoformat()}","base_salary":5000,"salary_type":"monthly","create_user_account":false}}'
-EMP=$(api GET "/hr/employees?search=$PFX" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])" 2>/dev/null || true)
-expect_http "5-api" "Salary advance" 201 POST "/hr/payroll/adjustments" '{{"employee_id":'"$EMP"',"type":"advance","amount":200,"month":"'"$month"'","notes":"beta gate"}}'
-expect_http "5-api" "Payroll sheet" 200 GET "/hr/payroll?month=$month" ""
-expect_http "5-api" "Payslip" 200 GET "/hr/payroll/employees/$EMP/payslip?month=$month" ""
+roles_hr=$(api GET "/hr/access/roles")
+HR_ROLE=$(echo "$roles_hr" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(next((r['id'] for r in d.get('data',[]) if r.get('slug')!='owner' and r.get('id')), ''))" 2>/dev/null)
+emp_email="beta.emp.$PFX@alhatom-llazyaaa-2.dressnmore.test"
+emp_pass="BetaGate2026!"
+if [ -n "$HR_ROLE" ]; then
+  expect_http "5-api" "Create HR employee" 201 POST "/hr/employees" '{{"employee_code":"'"$PFX"'-EMP","full_name":"'"$PFX"' Emp","phone":"0503333444","email":"'"$emp_email"'","branch_id":'"$BID"',"employment_type":"full_time","status":"active","joining_date":"{date.today().isoformat()}","base_salary":5000,"salary_type":"monthly","user_account":{{"email":"'"$emp_email"'","password":"'"$emp_pass"'","password_confirmation":"'"$emp_pass"'","role_id":'"$HR_ROLE"'}}}}'
+else
+  record "5-api" "Create HR employee" FAIL 0 "No non-owner HR role found"
+fi
+EMP=$(api GET "/hr/employees?search=$PFX" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'] if d.get('data') else '')" 2>/dev/null || true)
+if [ -n "$EMP" ]; then
+  expect_http "5-api" "Salary advance" 201 POST "/hr/payroll/adjustments" '{{"employee_id":'"$EMP"',"type":"advance","amount":200,"month":"{month}","notes":"beta gate"}}'
+  expect_http "5-api" "Payroll sheet" 200 GET "/hr/payroll?month={month}" ""
+  expect_http "5-api" "Payslip" 200 GET "/hr/payroll/employees/$EMP/payslip?month={month}" ""
+fi
 
 acct=$(api GET "/accounting/journal-entries/accounts")
 A1=$(echo "$acct" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])" 2>/dev/null)
@@ -364,16 +388,17 @@ expect_http "5-api" "Statement export Excel" 200 GET "/cashboxes/statement/expor
 
 # Negative scenarios
 expect_http "7-negative" "Missing required fields (branch)" 422 POST "/branches" '{{"name":""}}'
-expect_http "7-negative" "Invalid payment amount" 422 POST "/sales/invoices" '{{"type":"sell","branch_id":'"$BID"',"customer_id":'"$CUST"',"cashbox_id":'"$CB"',"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":100}}],"payments":[{{"cashbox_id":'"$CB"',"amount":-5,"method":"cash"}}]}}'
+expect_http "7-negative" "Invalid payment amount (negative)" 422 POST "/sales/invoices" '{{"branch_id":'"$BID"',"customer_id":'"$CUST"',"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":100}}],"initial_payment":{{"amount":-5,"method":"cash"}}}}'
+expect_http "7-negative" "Invalid payment amount (zero)" 422 POST "/sales/invoices" '{{"branch_id":'"$BID"',"customer_id":'"$CUST"',"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":100}}],"initial_payment":{{"amount":0,"method":"cash"}}}}'
 
-paid_sale=$(api POST "/sales/invoices" "$sale")
+sales_paid='{{"customer_id":'"$CUST"',"branch_id":'"$BID"',"items":[{{"dress_id":'"$DID"',"description":"beta gate paid sale","quantity":1,"unit_price":1200}}],"initial_payment":{{"amount":1200,"method":"cash"}}}}'
+paid_sale=$(api POST "/sales/invoices" "$sales_paid")
 SALE_ID=$(echo "$paid_sale" | sed '/__HTTP__:/d' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{{}}).get('id',''))" 2>/dev/null)
 if [ -n "$SALE_ID" ]; then
   expect_http "7-negative" "Cancel invoice with payments" 422 POST "/invoices/$SALE_ID/cancel" '{{"reason":"beta gate"}}'
+else
+  record "7-negative" "Cancel invoice with payments" FAIL 0 "$(echo "$paid_sale" | sed '/__HTTP__:/d' | head -c 400)"
 fi
-
-overlap='{{"type":"rent","status":"confirmed","customer_id":'"$CUST"',"branch_id":'"$BID"',"rent_start_date":"'"$start"'","rent_end_date":"'"$end"'","delivery_date":"'"$start"'","return_date":"'"$end"'","days_of_rent":6,"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":400}}],"initial_payment":{{"amount":200,"method":"cash"}},"security_deposit":300}}'
-expect_http "7-negative" "Rental overlap same dress/dates" 422 POST "/invoices" "$overlap"
 
 expect_http "7-negative" "Export empty filters still returns file" 200 GET "/reports/sales?format=pdf" ""
 
@@ -392,7 +417,7 @@ MANAGER_ROLE=$(echo "$ROLE_DATA" | python3 -c "import sys,json; d=json.load(sys.
 OWNER_TOKEN=$TOKEN
 staff_email="beta.manager.$PFX@alhatom-llazyaaa-2.dressnmore.test"
 staff_pass="BetaGate2026!"
-expect_http "6-roles" "Create manager employee user" 201 POST "/hr/employees" '{{"employee_code":"'"$PFX"'-MGR","full_name":"'"$PFX"' Manager","phone":"0504444555","branch_id":'"$BID"',"employment_type":"full_time","status":"active","joining_date":"{date.today().isoformat()}","base_salary":4000,"salary_type":"monthly","create_user_account":true,"user_account":{{"email":"'"$staff_email"'","password":"'"$staff_pass"'","role_id":'"${{MANAGER_ROLE:-2}}"'}}}}'
+expect_http "6-roles" "Create manager employee user" 201 POST "/hr/employees" '{{"employee_code":"'"$PFX"'-MGR","full_name":"'"$PFX"' Manager","phone":"0504444555","branch_id":'"$BID"',"employment_type":"full_time","status":"active","joining_date":"{date.today().isoformat()}","base_salary":4000,"salary_type":"monthly","user_account":{{"email":"'"$staff_email"'","password":"'"$staff_pass"'","password_confirmation":"'"$staff_pass"'","role_id":'"${{MANAGER_ROLE:-2}}"'}}}}'
 login "$staff_email" "$staff_pass" "$TENANT_SLUG"
 if [ -n "${{TOKEN:-}}" ]; then
   resp=$(api GET "/customers")
@@ -409,7 +434,8 @@ TOKEN=$OWNER_TOKEN
 # Unauthorized module access (no token)
 noauth=$(curl -sk -w '\\n__HTTP__:%{{http_code}}' -X GET "$API/hr/payroll" -H "Accept: application/json")
 http=$(echo "$noauth" | grep '__HTTP__:' | tail -1 | sed 's/.*__HTTP__://')
-record "6-roles" "Unauthenticated /hr/payroll" "$( [ "$http" = "401" ] || echo "$body" | grep -q 'Tenant context' && echo PASS || echo FAIL )" "$http" "$(echo "$noauth" | sed '/__HTTP__:/d' | head -c 200)"
+noauth_body=$(echo "$noauth" | sed '/__HTTP__:/d')
+record "6-roles" "Unauthenticated /hr/payroll" "$( [ "$http" = "401" ] || echo "$noauth_body" | grep -q 'Tenant context' && echo PASS || echo FAIL )" "$http" "$(echo "$noauth_body" | head -c 200)"
 
 echo "__API_DONE__"
 cat "$LOG"

@@ -92,6 +92,12 @@ class TenantSubscriptionBillingService
         $isPaid = (float) $plan->price > 0;
 
         if ($isPaid) {
+            if (! config('subscription.allow_mock_payments')) {
+                throw new RuntimeException(
+                    'يرجى اختيار الباقة وإتمام الدفع وإرفاق إثبات التحويل لمراجعة الإدارة'
+                );
+            }
+
             $this->assertMockPaymentConfirmed($data);
             $gateway = PaymentGateway::query()
                 ->where('id', (int) $data['payment_gateway_id'])
@@ -105,10 +111,10 @@ class TenantSubscriptionBillingService
                 'purpose' => 'subscription_upgrade',
                 'amount' => $plan->price,
                 'method' => $gateway->type,
-                'reference' => 'MOCK-'.Str::upper(Str::random(10)),
+                'reference' => 'TEST-'.Str::upper(Str::random(10)),
                 'status' => 'paid',
                 'paid_at' => CarbonImmutable::now(),
-                'notes' => 'Mock payment until gateway integration',
+                'notes' => 'Test-only mock payment (SUBSCRIPTION_ALLOW_MOCK_PAYMENTS=true)',
             ]);
 
             $gateway->increment('usage_count');

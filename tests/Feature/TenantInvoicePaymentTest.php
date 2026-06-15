@@ -102,6 +102,27 @@ class TenantInvoicePaymentTest extends TestCase
             ->assertJsonPath('data.remaining_amount', '0.00');
     }
 
+    public function test_negative_payment_amount_rejected(): void
+    {
+        $invoice = $this->createInvoice(total: 100);
+
+        Sanctum::actingAs($this->ownerUser, ['*']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/payments", [
+            'amount' => -10,
+            'method' => 'cash',
+        ], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['amount']);
+
+        $this->postJson("/api/tenant/invoices/{$invoice->id}/payments", [
+            'amount' => 0,
+            'method' => 'cash',
+        ], $this->tenantHeaders())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['amount']);
+    }
+
     public function test_user_without_permission_rejected(): void
     {
         $invoice = $this->createInvoice(total: 100);
