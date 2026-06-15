@@ -338,9 +338,10 @@ expect_http "5-api" "Sale invoice" 201 POST "/invoices" "$sale"
 rent='{{"type":"rent","status":"confirmed","customer_id":'"$CUST"',"branch_id":'"$BID"',"rent_start_date":"{start}","rent_end_date":"{end}","delivery_date":"{start}","return_date":"{end}","days_of_rent":6,"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":400}}],"initial_payment":{{"amount":200,"method":"cash"}},"security_deposit":300}}'
 rent_resp=$(api POST "/invoices" "$rent")
 rent_http=$(echo "$rent_resp" | grep '__HTTP__:' | tail -1 | sed 's/.*__HTTP__://')
-rent_body=$(echo "$rent_resp" | sed '/__HTTP__:/d' | head -c 600)
+rent_body_full=$(echo "$rent_resp" | sed '/__HTTP__:/d')
+rent_body=$(echo "$rent_body_full" | head -c 600)
 if [ "$rent_http" = "201" ]; then record "5-api" "Rental invoice" PASS 201 "$rent_body"; else record "5-api" "Rental invoice" FAIL "$rent_http" "$rent_body"; fi
-RID=$(echo "$rent_body" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{{}}).get('id',''))" 2>/dev/null || true)
+RID=$(echo "$rent_body_full" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{{}}).get('id',''))" 2>/dev/null || true)
 
 overlap='{{"type":"rent","status":"confirmed","customer_id":'"$CUST"',"branch_id":'"$BID"',"rent_start_date":"{start}","rent_end_date":"{end}","delivery_date":"{start}","return_date":"{end}","days_of_rent":6,"items":[{{"dress_id":'"$DID"',"quantity":1,"unit_price":400}}],"initial_payment":{{"amount":200,"method":"cash"}},"security_deposit":300}}'
 expect_http "7-negative" "Rental overlap same dress/dates" 422 POST "/invoices" "$overlap"
