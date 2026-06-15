@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Subscription\RenewSubscriptionRequest;
+use App\Http\Requests\Tenant\Subscription\SubmitSubscriptionChangeRequest;
 use App\Http\Requests\Tenant\Subscription\UpgradeSubscriptionRequest;
+use App\Services\Platform\TenantPlanChangeRequestService;
 use App\Services\Platform\TenantSubscriptionBillingService;
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
@@ -16,6 +18,7 @@ class SubscriptionController extends Controller
 {
     public function __construct(
         private readonly TenantSubscriptionBillingService $billingService,
+        private readonly TenantPlanChangeRequestService $changeRequestService,
         private readonly TenantContext $tenantContext,
     ) {}
 
@@ -50,7 +53,7 @@ class SubscriptionController extends Controller
         }
     }
 
-    public function upgrade(UpgradeSubscriptionRequest $request): JsonResponse
+    public function submitChangeRequest(SubmitSubscriptionChangeRequest $request): JsonResponse
     {
         try {
             $tenant = $this->tenantContext->tenant();
@@ -58,11 +61,26 @@ class SubscriptionController extends Controller
                 return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
             }
 
-            $subscription = $this->billingService->upgrade($tenant, $request->validated());
+            $payload = $request->validated();
+            $payload['payment_proof'] = $request->file('payment_proof');
 
-            return ApiResponse::success($subscription, 'تم تحديث الباقة بنجاح');
+            $result = $this->changeRequestService->submit(
+                $tenant,
+                $request->user(),
+                $payload,
+            );
+
+            return ApiResponse::success($result, (string) ($result['message'] ?? 'تم إرسال الطلب'), 202);
         } catch (RuntimeException $exception) {
             return ApiResponse::error($exception->getMessage(), 422);
         }
+    }
+
+    public function upgrade(UpgradeSubscriptionRequest $request): JsonResponse
+    {
+        return ApiResponse::error(
+            'يرجى اختيار الباقة وإتمام الدفع وإرفاق إثبات التحويل لمراجعة الإدارة',
+            422,
+        );
     }
 }
