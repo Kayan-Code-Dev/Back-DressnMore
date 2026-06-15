@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Platform;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Platform\Tenant\ImpersonateTenantRequest;
 use App\Http\Requests\Platform\Tenant\AddDomainRequest;
 use App\Http\Requests\Platform\Tenant\RenewTenantRequest;
 use App\Http\Requests\Platform\Tenant\SeedTenantRequest;
@@ -10,8 +11,10 @@ use App\Http\Requests\Platform\Tenant\StoreTenantRequest;
 use App\Http\Requests\Platform\Tenant\UpdateTenantRequest;
 use App\Http\Resources\Platform\TenantDomainResource;
 use App\Http\Resources\Platform\TenantResource;
+use App\Models\Central\SuperAdmin;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantDomain;
+use App\Services\Platform\TenantImpersonationService;
 use App\Services\Platform\TenantProvisioningService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +24,10 @@ use Throwable;
 
 class TenantController extends Controller
 {
-    public function __construct(private readonly TenantProvisioningService $tenantProvisioningService) {}
+    public function __construct(
+        private readonly TenantProvisioningService $tenantProvisioningService,
+        private readonly TenantImpersonationService $tenantImpersonationService,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -127,5 +133,25 @@ class TenantController extends Controller
         $tenant = $this->tenantProvisioningService->renew($tenant, $request->validated());
 
         return ApiResponse::success(new TenantResource($tenant), 'Tenant renewed');
+    }
+
+    public function impersonate(ImpersonateTenantRequest $request, Tenant $tenant): JsonResponse
+    {
+        try {
+            $admin = $request->user();
+            if (! $admin instanceof SuperAdmin) {
+                return ApiResponse::unauthorized();
+            }
+
+            $payload = $this->tenantImpersonationService->impersonate(
+                $tenant,
+                $admin,
+                $request->validated('user_id'),
+            );
+
+            return ApiResponse::success($payload, 'Tenant impersonation token issued');
+        } catch (RuntimeException $exception) {
+            return ApiResponse::error($exception->getMessage(), 422);
+        }
     }
 }
