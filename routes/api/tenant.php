@@ -22,6 +22,7 @@ use App\Http\Controllers\Tenant\HrDepartmentController;
 use App\Http\Controllers\Tenant\HrDocumentController;
 use App\Http\Controllers\Tenant\HrEmployeeController;
 use App\Http\Controllers\Tenant\HrJobTitleController;
+use App\Http\Controllers\Tenant\HrLeaveController;
 use App\Http\Controllers\Tenant\HrPayrollAdjustmentController;
 use App\Http\Controllers\Tenant\HrPayrollController;
 use App\Http\Controllers\Tenant\HrSettingController;
