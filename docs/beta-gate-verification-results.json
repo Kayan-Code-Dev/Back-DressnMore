@@ -1,0 +1,447 @@
+{
+  "generated_at": "2026-06-15T15:50:22.427601",
+  "reference_run": "RUN=20260614214028",
+  "tenant": "alhatom-llazyaaa-2",
+  "counts": {
+    "PASS": 51,
+    "FAIL": 12,
+    "WARN": 2,
+    "PARTIAL": 0
+  },
+  "recommendation": "Not ready for beta — API workflow failures",
+  "rows": [
+    {
+      "gate": "1-git",
+      "check": "Local HEAD matches origin/main",
+      "result": "PASS",
+      "evidence": "HEAD=f09cb3f71c57 origin/main=f09cb3f71c57"
+    },
+    {
+      "gate": "1-git",
+      "check": "QA fixes committed (no pending HR/statement/export files)",
+      "result": "FAIL",
+      "evidence": "11 pending QA-related files; samples: ?? app/Http/Controllers/Tenant/HrPayrollAdjustmentController, ?? app/Http/Controllers/Tenant/HrPayrollController.php, ?? app/Http/Controllers/Tenant/TransactionStatementControlle, ?? app/Models/Tenant/HrPayrollAdjustment.php, ?? app/Services/Tenant/HrPayrollAdjustmentService.php"
+    },
+    {
+      "gate": "1-git",
+      "check": "Working tree clean",
+      "result": "FAIL",
+      "evidence": "86 uncommitted paths"
+    },
+    {
+      "gate": "2-server",
+      "check": "Staging backend is a git checkout",
+      "result": "PASS",
+      "evidence": "f09cb3f71c57041bf9bc78088c71840fdc736cb7\nf09cb3f fix(tenant): allow profile updates when subscription is expired"
+    },
+    {
+      "gate": "2-server",
+      "check": "Staging backend commit matches local origin/main",
+      "result": "PASS",
+      "evidence": "local=f09cb3f71c57 staging=f09cb3f71c57"
+    },
+    {
+      "gate": "2-server",
+      "check": "Deployed file present: HrPayrollController.php",
+      "result": "PASS",
+      "evidence": "YES"
+    },
+    {
+      "gate": "2-server",
+      "check": "Deployed file present: TransactionStatementController.php",
+      "result": "PASS",
+      "evidence": "YES"
+    },
+    {
+      "gate": "2-server",
+      "check": "Deployed file present: TabularExport.php",
+      "result": "PASS",
+      "evidence": "YES"
+    },
+    {
+      "gate": "2-server",
+      "check": "Deployed file present: HrPayrollService.php",
+      "result": "PASS",
+      "evidence": "YES"
+    },
+    {
+      "gate": "2-server",
+      "check": "Deployed file present: 2026_06_02_620000_create_hr_payroll_adjustments_table.php",
+      "result": "PASS",
+      "evidence": "YES"
+    },
+    {
+      "gate": "2-server",
+      "check": "Staging frontend git HEAD",
+      "result": "PASS",
+      "evidence": "c94bc3eb781921e23e12c690562f26cf1e5258c6\nc94bc3e fix: P3 UI - payments NaN, date format DD/MM/YYYY"
+    },
+    {
+      "gate": "4-env",
+      "check": "APP_DEBUG is false on staging",
+      "result": "FAIL",
+      "evidence": "APP_ENV=staging\nAPP_DEBUG=true\nLOG_LEVEL=debug"
+    },
+    {
+      "gate": "4-env",
+      "check": "APP_ENV is production or staging (not local)",
+      "result": "PASS",
+      "evidence": "APP_ENV=staging"
+    },
+    {
+      "gate": "4-env",
+      "check": "No mock payment auto-confirm in subscription upgrade path",
+      "result": "WARN",
+      "evidence": "95:            $this->assertMockPaymentConfirmed($data);\n108:                'reference' => 'MOCK-'.Str::upper(Str::random(10)),\n111:                'notes' => 'Mock payment until gateway integration',\n210:    private function assertMockPaymentConfirmed(array $data): void"
+    },
+    {
+      "gate": "3-migrations",
+      "check": "All active tenants migrated",
+      "result": "PASS",
+      "evidence": "3 tenants checked"
+    },
+    {
+      "gate": "3-migrations",
+      "check": "Tenant alhatom-llazyaaa-2: hr_payroll_adjustments + PO columns",
+      "result": "PASS",
+      "evidence": "{\"hr_payroll_adjustments\": true, \"po_category_cols\": true}"
+    },
+    {
+      "gate": "3-migrations",
+      "check": "Tenant yosf-llazyaaa: hr_payroll_adjustments + PO columns",
+      "result": "PASS",
+      "evidence": "{\"hr_payroll_adjustments\": true, \"po_category_cols\": true}"
+    },
+    {
+      "gate": "3-migrations",
+      "check": "Tenant alhatom-llazyaaa: hr_payroll_adjustments + PO columns",
+      "result": "PASS",
+      "evidence": "{\"hr_payroll_adjustments\": true, \"po_category_cols\": true}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Owner login",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Tenant login successful\",\"data\":{\"token\":\"359|8n7LTbs37rcmKC2GpGXC6WVNfBwLW5SnJgwZ0Lxf56fb0b02\",\"user\":{\"id\":2,\"name\":\"QA Staging Tester 20260614214028\",\"email\":\"qa-staging@dressnmore.test\",\"phone\":null,\"status\":\"active\",\"avatar_path\":null,\"avatar_url\":null},\"tenant\":{\"id\":20,\"name\":\"\\u0627\\u0644\\u062d\\u0627\\u0637\\u0648\\u0645 \\u0644\\u0644\\u0623\\u0632\\u064a\\u0627\\u0621\",\"slug\":\"alhatom-llazyaaa-2\"},\"permissions\":[\"accounting.journal_entries.approve\",\"accounting.journal_entries.cancel\",\"accounting.journal_entries.create\",\"accounting.journal_entries.export\",\"accounting.journal_entries.reverse\",\"accounting.journal_entries.update\",\"accounting.journal_entries.view\",\"accounting.view\",\"branches.create\",\"branches.delete\",\"branches.export\",\"branches.update\",\"branches.view\""
+    },
+    {
+      "gate": "8-subscription",
+      "check": "GET /subscription/overview",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "plan=? ? | {\"success\":true,\"message\":\"Success\",\"data\":{\"subscription\":{\"account_type\":\"paid\",\"lifecycle_status\":\"active\",\"plan_id\":2,\"plan_code\":\"pro\",\"plan_name\":\"Pro\",\"starts_at\":\"2026-06-13\",\"expires_at\":\"2027-06-13\",\"can_renew\":true,\"days_remaining\":363,\"features\":{\"dashboard.enabled\":\"true\",\"customers.enabled\":\"true\",\"categories.enabled\":\"true\",\"subcategories.enabled\":\"true\",\"dresses.enabled\":\"true\",\"inventory.enabled\":\"true\",\"branches.enabled\":\"true\",\"invoices.enabled\":\"true\",\"orders.enabled\":\"true\",\"payments.enabled\":\"true\",\"deliveries.enabled\":\"true\",\"returns.enabled\":\"true\",\"suppliers.enabled\":\"true\",\"purchase_orders.enabled\":\"true\",\"supplier_payments.enabled\":\"true\",\"expenses.enabled\":\"true\",\"cashboxes.enabled\":\"true\",\"cash_movements.enabled\":\"true\",\"reports.enabled\":\"true\",\"acco"
+    },
+    {
+      "gate": "8-subscription",
+      "check": "Plan limits/features present",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "features_count=22"
+    },
+    {
+      "gate": "8-subscription",
+      "check": "Payment gateways",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Success\",\"data\":[{\"id\":\"1\",\"name\":\"\\u0641\\u0648\\u062f\\u0627\\u0641\\u0648\\u0646 \\u0643\\u0627\\u0634\",\"type\":\"vodafone_cash\",\"account_holder\":\"\\u064a\\u0648\\u0633\\u0641\",\"account_number\":\"01070205189\",\"bank_name\":null,\"iban\":null,\"instructions\":\"\\u0627\\u0631\\u0633\\u0644 \\u0639\\u0644\\u0649 \\u0627\\u0644\\u0631\\u0642\\u0645 \\u0648\\u0627\\u0631\\u0641\\u0642 \\u0633\\u0643\\u0631\\u064a\\u"
+    },
+    {
+      "gate": "5-api",
+      "check": "Create branch",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Branch created\",\"data\":{\"id\":12,\"branch_code\":null,\"name\":\"BETA-GATE-20260615125014 Main\",\"code\":null,\"phone\":\"0500000099\",\"vat_enabled\":false,\"vat_type\":null,\"vat_value\":null,\"currency\":null,\"currency_id\":null,\"street\":null,\"building\":null,\"city_id\":null,\"address\":null,\"notes\":null,\"inventory_name\":null,\"image\":null,\"logo\":null,\"cover\":null,\"status\":\"active\",\"created_at\":\"2026-06-15T12:50:15.000000Z\",\"updated_at\":\"2026-06-15T12:50:15.000000Z\",\"deleted_at\":null},\"meta\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Create supplier",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Supplier created\",\"data\":{\"id\":11,\"code\":null,\"name\":\"BETA-GATE-20260615125014 Sup\",\"phone\":\"0501111222\",\"whatsapp\":null,\"email\":null,\"address\":null,\"tax_number\":null,\"opening_balance\":\"0.00\",\"current_balance\":\"0.00\",\"total_purchase_orders\":0,\"total_paid\":0,\"total_remaining\":0,\"notes\":null,\"status\":\"active\",\"created_at\":\"2026-06-15T12:50:15.000000Z\",\"updated_at\":\"2026-06-15T12:50:15.000000Z\",\"deleted_at\":null},\"meta\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Create category",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Dress category created\",\"data\":{\"id\":20,\"parent_id\":null,\"name\":\"BETA-GATE-20260615125014 Cat\",\"slug\":\"beta-gate-20260615125014-cat\",\"description\":null,\"status\":null,\"parent\":null,\"children\":[],\"created_at\":\"2026-06-15T12:50:16.000000Z\",\"updated_at\":\"2026-06-15T12:50:16.000000Z\",\"deleted_at\":null},\"meta\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Create subcategory",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Dress category created\",\"data\":{\"id\":21,\"parent_id\":20,\"name\":\"BETA-GATE-20260615125014 Sub\",\"slug\":\"beta-gate-20260615125014-sub\",\"description\":null,\"status\":null,\"parent\":{\"id\":20,\"parent_id\":null,\"name\":\"BETA-GATE-20260615125014 Cat\",\"slug\":\"beta-gate-20260615125014-cat\",\"status\":\"active\"},\"children\":[],\"created_at\":\"2026-06-15T12:50:16.000000Z\",\"updated_at\":\"2026-06-15T12:50:16.000000Z\",\"deleted_at\":null},\"meta\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Create customer",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Customer created\",\"data\":{\"id\":12,\"customer_code\":\"CUS-012\",\"name\":\"BETA-GATE-20260615125014 Cust\",\"date_of_birth\":null,\"wedding_date\":null,\"visit_date\":null,\"phone\":\"0502222333\",\"phone2\":null,\"whatsapp\":null,\"email\":null,\"address\":null,\"city_id\":null,\"city_name\":null,\"national_id\":null,\"source\":null,\"notes\":null,\"status\":null,\"is_vip\":false,\"orders_count\":0,\"total_spent\":0,\"created_at\":\"2026-06-15T12:50:16.000000Z\",\"updated_at\":\"2026-06-15T12:50:16.000000Z\",\"deleted_at\":null},\"meta\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Create cashbox",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Cashbox created\",\"data\":{\"id\":11,\"name\":\"BETA-GATE-20260615125014 Box\",\"branch_id\":12,\"manager_name\":null,\"initial_balance\":0,\"current_balance\":0,\"balance_change\":0,\"total_in\":0,\"total_out\":0,\"description\":null,\"is_active\":true,\"created_at\":\"2026-06-15T12:50:17.000000Z\",\"updated_at\":\"2026-06-15T12:50:17.000000Z\",\"deleted_at\":null},\"meta\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Create PO",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Purchase order created\",\"data\":{\"id\":11,\"supplier_id\":11,\"branch_id\":12,\"category_id\":20,\"subcategory_id\":21,\"purchase_order_number\":\"PO-20260615-0006\",\"status\":\"draft\",\"type\":null,\"is_returned\":false,\"returned_at\":null,\"return_notes\":null,\"received_at\":null,\"inventory_received\":false,\"subtotal\":\"500.00\",\"discount\":\"0.00\",\"tax\":\"0.00\",\"total\":\"500.00\",\"paid_amount\":\"0.00\",\"payment_amount\":\"0.00\",\"remaining_amount\":\"500.00\",\"remaining_payment\":\"500.00\",\"deposit_amount\":\"0.00\",\"order_date\":null,\"notes\":null,\"created_by\":2,\"supplier\":{\"id\":11,\"code\":null,\"name\":\"BETA-GA"
+    },
+    {
+      "gate": "5-api",
+      "check": "Receive PO",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Purchase order received and inventory updated\",\"data\":{\"id\":11,\"supplier_id\":11,\"branch_id\":12,\"category_id\":20,\"subcategory_id\":21,\"purchase_order_number\":\"PO-20260615-0006\",\"status\":\"received\",\"type\":null,\"is_returned\":false,\"returned_at\":null,\"return_notes\":null,\"received_at\":\"2026-06-15 12:50:17\",\"inventory_received\":true,\"subtotal\":\"500.00\",\"discount\":\"0.00\",\"tax\":\"0.00\",\"total\":\"500.00\",\"paid_amount\":\"0.00\",\"payment_amount\":\"0.00\",\"remaining_amount\":\"500.00\",\"remaining_payment\":\"500.00\",\"deposit_amount\":\"0.00\",\"order_date\":null,\"notes\":null,\"created_by\":2,\"supp"
+    },
+    {
+      "gate": "5-api",
+      "check": "Set dress prices",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Dress updated\",\"data\":{\"id\":9,\"dress_category_id\":20,\"dress_subcategory_id\":21,\"branch_id\":12,\"entity_type\":\"purchase_order\",\"entity_id\":11,\"code\":\"PO-0006-1\",\"name\":\"PO-0006-1-BETA-GATE-20260615125014 Cat-BETA-GATE-20260615125014 Sub\",\"description\":null,\"size\":null,\"breast_size\":null,\"waist_size\":null,\"sleeve_size\":null,\"measurements\":null,\"color\":null,\"purchase_price\":\"500.00\",\"rental_price\":null,\"sale_price\":null,\"delivery_date\":null,\"days_of_rent\":null,\"occasion_datetime\":null,\"visit_datetime\":null,\"status\":\"available\",\"notes\":\"\\u0645\\u0636\\u0627\\u0641 \\u0645\\u06"
+    },
+    {
+      "gate": "5-api",
+      "check": "Sale invoice",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Invoice created\",\"data\":{\"id\":15,\"invoice_number\":\"INV-20260615-0005\",\"customer_id\":12,\"client_id\":12,\"customer\":{\"id\":12,\"name\":\"BETA-GATE-20260615125014 Cust\",\"phone\":\"0502222333\",\"national_id\":null,\"whatsapp\":null,\"address\":null,\"city\":null},\"branch_id\":12,\"type\":\"sell\",\"status\":\"paid\",\"subtotal\":\"1200.00\",\"discount\":\"0.00\",\"discount_type\":\"fixed\",\"discount_value\":\"0.00\",\"tax\":\"0.00\",\"total\":\"1200.00\",\"grand_total\":\"1200.00\",\"paid_amount\":\"1200.00\",\"remaining_amount\":\"0.00\",\"rent_start_date\":null,\"rent_end_date\":null,\"delivery_date\":null,\"return_date\":null,\"securi"
+    },
+    {
+      "gate": "5-api",
+      "check": "Rental invoice",
+      "result": "FAIL",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"rent_start_date\":[\"The rent start date field is required when type is rent.\"],\"rent_end_date\":[\"The rent end date field is required when type is rent.\"]}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Deliver rental",
+      "result": "FAIL",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"invoice\":[\"Invoice is already delivered\"]}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Return rental",
+      "result": "FAIL",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"invoice\":[\"Invoice is already returned\"]}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Tailoring order",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Tailoring order created\",\"data\":{\"id\":16,\"order_number\":\"INV-20260615-0006\",\"client_name\":\"BETA-GATE-20260615125014 Cust\",\"client_phone\":\"0502222333\",\"customer_id\":12,\"branch_id\":12,\"employee_name\":\"QA Staging Tester 20260614214028\",\"tailor_name\":\"\",\"assigned_tailor_id\":null,\"branch_name\":\"BETA-GATE-20260615125014 Main\",\"garment_name\":\"BETA-GATE-20260615125014 tailor\",\"fabric_name\":\"BETA-GATE-20260615125014 tailor\",\"fabric_code\":\"\",\"fabric_type\":\"BETA-GATE-20260615125014 tailor\",\"fabric_color\":\"\",\"fabric_color_hex\":\"#94A3B8\",\"order_date\":\"2026-06-15\",\"due_date\":\"\",\"d"
+    },
+    {
+      "gate": "5-api",
+      "check": "Create HR employee",
+      "result": "FAIL",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"user_account\":[\"\\u062d\\u0633\\u0627\\u0628 \\u0627\\u0644\\u062f\\u062e\\u0648\\u0644 \\u0645\\u0637\\u0644\\u0648\\u0628 \\u0639\\u0646\\u062f \\u0625\\u0636\\u0627\\u0641\\u0629 \\u0645\\u0648\\u0638\\u0641.\"],\"user_account.email\":[\"\\u0628\\u0631\\u064a\\u062f \\u062a\\u0633\\u062c\\u064a\\u0644 \\u0627\\u0644\\u062f\\u062e\\u0648\\u0644 \\u0645\\u0637\\u0644\\u0648\\u0628.\"],\"user_account.password\":[\"\\u0643\\u0644\\u0645\\u0629 \\u0627\\u0644\\u0645\\u0631\\u0648\\u0631 \\u0645\\u0637\\u0644\\u0648\\u0628\\u0629.\"],\"user_account.role_id\":[\"\\u0627\\u062e\\u062a\\u0631 \\u062f\\u0648\\u063"
+    },
+    {
+      "gate": "5-api",
+      "check": "Salary advance",
+      "result": "FAIL",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"employee_id\":[\"The employee id field is required.\"],\"type\":[\"The type field is required.\"],\"amount\":[\"The amount field is required.\"]}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Payroll sheet",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Success\",\"data\":{\"summary\":{\"gross\":29000,\"deductions\":500,\"bonuses\":0,\"net\":28500,\"employee_count\":5},\"rows\":[{\"id\":2,\"employee_id\":2,\"employee_name\":\"QA-ATR-20260614211458 Employee\",\"employee_code\":\"QA-ATR-20260614211458-EMP\",\"branch_name\":\"QA-ATR-20260614211458-Main\",\"base_salary\":6000,\"attendance_days\":0,\"absent_days\":0,\"late_days\":0,\"overtime\":0,\"advances\":0,\"deductions\":0,\"bonuses\":0,\"commissions\":0,\"net_salary\":6000,\"status\":\"draft\",\"month\":\"2026-06\"},{\"id\":3,\"employee_id\":3,\"employee_name\":\"QA-ATR-20260614212801 Employee\",\"employee_code\":\"QA-ATR-2026061421280"
+    },
+    {
+      "gate": "5-api",
+      "check": "Payslip",
+      "result": "FAIL",
+      "http": 404,
+      "evidence": "{\"success\":false,\"message\":\"The route api\\/tenant\\/hr\\/payroll\\/employees\\/\\/payslip could not be found.\",\"errors\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Journal entry",
+      "result": "PASS",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Journal entry created\",\"data\":{\"id\":23,\"entry_number\":\"JE-20260615-0010\",\"entry_date\":\"2026-06-15\",\"date\":\"2026-06-15\",\"description\":\"BETA-GATE-20260615125014\",\"type\":\"normal\",\"entry_type\":\"normal\",\"source_type\":\"manual\",\"source_id\":null,\"reference_number\":null,\"total_debit\":100,\"total_credit\":100,\"difference\":0,\"is_balanced\":true,\"status\":\"draft\",\"branch_id\":12,\"branch\":{\"id\":12,\"name\":\"BETA-GATE-20260615125014 Main\"},\"branch_name\":\"BETA-GATE-20260615125014 Main\",\"created_by\":\"QA Staging Tester 20260614214028\",\"created_by_id\":2,\"approved_by\":null,\"approved_by_id\":nu"
+    },
+    {
+      "gate": "5-api",
+      "check": "Statement summaries",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Success\",\"data\":[{\"id\":\"all\",\"name\":\"\\u0627\\u0644\\u0643\\u0644\",\"branch_code\":null,\"icon\":\"all\",\"balance\":75,\"entry_count\":12,\"accounts\":[{\"id\":6,\"name\":\"BETA-GATE-20260615123900 Box\",\"account_number\":\"CB-0006\",\"branch_id\":7,\"current_balance\":0,\"initial_balance\":0,\"is_active\":true},{\"id\":7,\"name\":\"BETA-GATE-20260615124156 Box\",\"account_number\":\"CB-0007\",\"branch_id\":8,\"current_balance\":0,\"initial_balance\":0,\"is_active\":true},{\"id\":8,\"name\":\"BETA-GATE-20260615124335 Box\",\"account_number\":\"CB-0008\",\"branch_id\":9,\"current_balance\":0,\"initial_balance\":0,\"is_active\":true},{"
+    },
+    {
+      "gate": "5-api",
+      "check": "Statement ledger",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Success\",\"data\":[{\"id\":2,\"date\":\"2026-06-14\",\"reference\":\"MOV-2\",\"description\":\"Invoice payment received\",\"category\":\"\\u0645\\u062f\\u0641\\u0648\\u0639\\u0627\\u062a \\u0639\\u0645\\u0644\\u0627\\u0621\",\"branch_id\":null,\"branch_name\":\"\\u2014\",\"party\":\"\\u2014\",\"credit\":800,\"debit\":null,\"running_balance\":800,\"status\":\"completed\",\"direction\":\"in\"},{\"id\":3,\"date\":\"2026-06-14\",\"reference\":\"MOV-3\",\"description\":\"Invoice payment received\",\"category\":\"\\u0645\\u062f\\u0641\\u0648\\u0639\\u0627\\u062a \\u0639\\u0645\\u0644\\u0627\\u0621\",\"branch_id\":null,\"branch_name\":\"\\u2014\",\"party\":\"\\u2014\",\"cr"
+    },
+    {
+      "gate": "5-api",
+      "check": "Reports sales pdf",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Success\",\"data\":{\"total_sales\":10900,\"invoices_count\":6,\"average_invoice_value\":1816.67},\"meta\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Invoices export pdf",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "%PDF-1.7\n1 0 obj\n<< /Type /Catalog\n/Outlines 2 0 R\n/Pages 3 0 R >>\nendobj\n2 0 obj\n<< /Type /Outlines /Count 0 >>\nendobj\n3 0 obj\n<< /Type /Pages\n/Kids [6 0 R\n]\n/Count 1\n/Resources <<\n/ProcSet 4 0 R\n/Font << \n/F1 8 0 R\n/F2 13 0 R\n>>\n>>\n/MediaBox [0.000 0.000 841.890 595.280]\n >>\nendobj\n4 0 obj\n[/PDF /Text ]\nendobj\n5 0 obj\n<<\n/Producer (��dompdf 3.1.5 + CPDF)\n/CreationDate (D:20260615125021+00'00')\n/ModDate (D:20260615125021+00'00')\n>>\nendobj\n6 0 obj\n<< /Type /Page\n/MediaBox [0.000 0.000 841.890 595.280]\n/Parent 3 0 R\n/Contents 7 0 R\n>>\nendobj\n7 0 obj\n<< /Filter /FlateDecode\n/Length 5412 >>\nstrea"
+    },
+    {
+      "gate": "5-api",
+      "check": "Journal export pdf",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "%PDF-1.7\n1 0 obj\n<< /Type /Catalog\n/Outlines 2 0 R\n/Pages 3 0 R >>\nendobj\n2 0 obj\n<< /Type /Outlines /Count 0 >>\nendobj\n3 0 obj\n<< /Type /Pages\n/Kids [6 0 R\n18 0 R\n20 0 R\n]\n/Count 3\n/Resources <<\n/ProcSet 4 0 R\n/Font << \n/F1 8 0 R\n/F2 13 0 R\n>>\n>>\n/MediaBox [0.000 0.000 841.890 595.280]\n >>\nendobj\n4 0 obj\n[/PDF /Text ]\nendobj\n5 0 obj\n<<\n/Producer (��dompdf 3.1.5 + CPDF)\n/CreationDate (D:20260615125021+00'00')\n/ModDate (D:20260615125021+00'00')\n>>\nendobj\n6 0 obj\n<< /Type /Page\n/MediaBox [0.000 0.000 841.890 595.280]\n/Parent 3 0 R\n/Contents 7 0 R\n>>\nendobj\n7 0 obj\n<< /Filter /FlateDecode\n/Length"
+    },
+    {
+      "gate": "5-api",
+      "check": "Reports sales xlsx",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Success\",\"data\":{\"total_sales\":10900,\"invoices_count\":6,\"average_invoice_value\":1816.67},\"meta\":{}}"
+    },
+    {
+      "gate": "5-api",
+      "check": "Invoices export xlsx",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "PK\u0003\u0004\u0014\u0002\bKf�\\\u000e\u0013�v_\u0001\u0016\u0005\u0013[Content_Types].xml��Mn�0\u0010���\"�J\f]TUE`Q�e�Tzמ\u0010\u000b��c\u0002ܾ�\u0004$�R�\u0012%\u001b�y���8cO�{k�\u0006\"j�J6)�,\u0003'��n]���k��2L�)a���\u001d�|6��\u000e\u00010��\u000eKV�\u0014�8GY�\u0015X����G+\u0012M�\u0007!7b\r�~<~�һ\u0004.���f����\u0002*�5){��6�D\bFK��\u001c��,{ٓ�{m����\u001b�.l�GKE\u0004��`�\u0003�]RHū0���\u0004���Ғ��f\u0011Ŏ��\u0007�9+�~G�\n��`� \u0014�ɚ�\u001b\u000b+���[��ބ��|o���͗�����\u001b�[B��\u001b�\u0013�w��v>���W\u001c�q�z|v\u0013>���Az�\u001c+\u001fݤ\u0005D\u0004��\"uް��댜N��\u0011�\u0010I�I\u000f�MV��\"o\u0003��vhO�\u0002�':�>�\u001c﮵�7PK\u0003\u0004\u0014\u0002\bKf�\\\u001c\"� �9\u0001\u000fxl/workbook.xml���N�0\f��<E�;K�\u0001���.\bi��\u0003x��FK�*�\u0006�=\u001e�8�m������+'w��Q����\u0001G<J�|������\u0005�V�I�z�&����}J9\u001fE���Y{�k]Z�u�)�nd!��$%c����.�0�LTs�OM��3F��Ж�0d��H�2^2q]!�\u0012VS�s\\\u0014\u0006g��~�a͎1��íޚ�[�\u00073\u000b��ъ"
+    },
+    {
+      "gate": "5-api",
+      "check": "Journal export xlsx",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "PK\u0003\u0004\u0014\u0002\bKf�\\\u000e\u0013�v_\u0001\u0016\u0005\u0013[Content_Types].xml��Mn�0\u0010���\"�J\f]TUE`Q�e�Tzמ\u0010\u000b��c\u0002ܾ�\u0004$�R�\u0012%\u001b�y���8cO�{k�\u0006\"j�J6)�,\u0003'��n]���k��2L�)a���\u001d�|6��\u000e\u00010��\u000eKV�\u0014�8GY�\u0015X����G+\u0012M�\u0007!7b\r�~<~�һ\u0004.���f����\u0002*�5){��6�D\bFK��\u001c��,{ٓ�{m����\u001b�.l�GKE\u0004��`�\u0003�]RHū0���\u0004���Ғ��f\u0011Ŏ��\u0007�9+�~G�\n��`� \u0014�ɚ�\u001b\u000b+���[��ބ��|o���͗�����\u001b�[B��\u001b�\u0013�w��v>���W\u001c�q�z|v\u0013>���Az�\u001c+\u001fݤ\u0005D\u0004��\"uް��댜N��\u0011�\u0010I�I\u000f�MV��\"o\u0003��vhO�\u0002�':�>�\u001c﮵�7PK\u0003\u0004\u0014\u0002\bKf�\\\u001c\"� �9\u0001\u000fxl/workbook.xml���N�0\f��<E�;K�\u0001���.\bi��\u0003x��FK�*�\u0006�=\u001e�8�m������+'w��Q����\u0001G<J�|������\u0005�V�I�z�&����}J9\u001fE���Y{�k]Z�u�)�nd!��$%c����.�0�LTs�OM��3F��Ж�0d��H�2^2q]!�\u0012VS�s\\\u0014\u0006g��~�a͎1��íޚ�[�\u00073\u000b��ъ"
+    },
+    {
+      "gate": "5-api",
+      "check": "Statement export PDF",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "%PDF-1.7\n1 0 obj\n<< /Type /Catalog\n/Outlines 2 0 R\n/Pages 3 0 R >>\nendobj\n2 0 obj\n<< /Type /Outlines /Count 0 >>\nendobj\n3 0 obj\n<< /Type /Pages\n/Kids [6 0 R\n]\n/Count 1\n/Resources <<\n/ProcSet 4 0 R\n/Font << \n/F1 8 0 R\n/F2 13 0 R\n>>\n>>\n/MediaBox [0.000 0.000 841.890 595.280]\n >>\nendobj\n4 0 obj\n[/PDF /Text ]\nendobj\n5 0 obj\n<<\n/Producer (��dompdf 3.1.5 + CPDF)\n/CreationDate (D:20260615125022+00'00')\n/ModDate (D:20260615125022+00'00')\n>>\nendobj\n6 0 obj\n<< /Type /Page\n/MediaBox [0.000 0.000 841.890 595.280]\n/Parent 3 0 R\n/Contents 7 0 R\n>>\nendobj\n7 0 obj\n<< /Filter /FlateDecode\n/Length 698 >>\nstream"
+    },
+    {
+      "gate": "5-api",
+      "check": "Statement export Excel",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "PK\u0003\u0004\u0014\u0002\bKf�\\\u000e\u0013�v_\u0001\u0016\u0005\u0013[Content_Types].xml��Mn�0\u0010���\"�J\f]TUE`Q�e�Tzמ\u0010\u000b��c\u0002ܾ�\u0004$�R�\u0012%\u001b�y���8cO�{k�\u0006\"j�J6)�,\u0003'��n]���k��2L�)a���\u001d�|6��\u000e\u00010��\u000eKV�\u0014�8GY�\u0015X����G+\u0012M�\u0007!7b\r�~<~�һ\u0004.���f����\u0002*�5){��6�D\bFK��\u001c��,{ٓ�{m����\u001b�.l�GKE\u0004��`�\u0003�]RHū0���\u0004���Ғ��f\u0011Ŏ��\u0007�9+�~G�\n��`� \u0014�ɚ�\u001b\u000b+���[��ބ��|o���͗�����\u001b�[B��\u001b�\u0013�w��v>���W\u001c�q�z|v\u0013>���Az�\u001c+\u001fݤ\u0005D\u0004��\"uް��댜N��\u0011�\u0010I�I\u000f�MV��\"o\u0003��vhO�\u0002�':�>�\u001c﮵�7PK\u0003\u0004\u0014\u0002\bKf�\\\u001c\"� �9\u0001\u000fxl/workbook.xml���N�0\f��<E�;K�\u0001���.\bi��\u0003x��FK�*�\u0006�=\u001e�8�m������+'w��Q����\u0001G<J�|������\u0005�V�I�z�&����}J9\u001fE���Y{�k]Z�u�)�nd!��$%c����.�0�LTs�OM��3F��Ж�0d��H�2^2q]!�\u0012VS�s\\\u0014\u0006g��~�a͎1��íޚ�[�\u00073\u000b��ъ"
+    },
+    {
+      "gate": "7-negative",
+      "check": "Missing required fields (branch)",
+      "result": "PASS",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"name\":[\"The name field is required.\"]}}"
+    },
+    {
+      "gate": "7-negative",
+      "check": "Invalid payment amount",
+      "result": "FAIL",
+      "http": 201,
+      "evidence": "{\"success\":true,\"message\":\"Sale invoice created\",\"data\":{\"id\":17,\"invoice_number\":\"INV-20260615-0007\",\"branch_id\":12,\"status\":\"confirmed\",\"client_name\":\"BETA-GATE-20260615125014 Cust\",\"client_phone\":\"0502222333\",\"customer\":{\"name\":\"BETA-GATE-20260615125014 Cust\",\"national_id\":\"\",\"phone\":\"0502222333\",\"whatsapp\":\"\",\"address\":\"\"},\"employee_name\":\"QA Staging Tester 20260614214028\",\"branch_name\":\"BETA-GATE-20260615125014 Main\",\"branch\":{\"id\":12,\"name\":\"BETA-GATE-20260615125014 Main\",\"phone\":\"0500000099\",\"address\":\"\",\"logo_url\":\"\"},\"sale_date\":\"2026-06-15\",\"invoice_date\":\"2026-06-15\",\"delivery_date\""
+    },
+    {
+      "gate": "7-negative",
+      "check": "Cancel invoice with payments",
+      "result": "PASS",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"invoice\":[\"Cannot cancel invoice with recorded payments. Cancel or reverse payments first.\"]}}"
+    },
+    {
+      "gate": "7-negative",
+      "check": "Rental overlap same dress/dates",
+      "result": "PASS",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"rent_start_date\":[\"The rent start date field is required when type is rent.\"],\"rent_end_date\":[\"The rent end date field is required when type is rent.\"]}}"
+    },
+    {
+      "gate": "7-negative",
+      "check": "Export empty filters still returns file",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Success\",\"data\":{\"total_sales\":12200,\"invoices_count\":8,\"average_invoice_value\":1525},\"meta\":{}}"
+    },
+    {
+      "gate": "9-arabic",
+      "check": "Validation returns structured errors not stack trace",
+      "result": "PASS",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"name\":[\"The name field is required.\"]}}"
+    },
+    {
+      "gate": "6-roles",
+      "check": "Owner: list HR roles",
+      "result": "PASS",
+      "http": 200,
+      "evidence": "{\"success\":true,\"message\":\"Success\",\"data\":[{\"id\":2,\"name\":\"Manager\",\"slug\":\"manager\",\"permission_ids\":[8,7,67,66,75,74,72,78,77]},{\"id\":3,\"name\":\"QA FULL No Perms\",\"slug\":\"qa-full-noperms\",\"permission_ids\":[]}],\"meta\":{}}"
+    },
+    {
+      "gate": "6-roles",
+      "check": "Create manager employee user",
+      "result": "FAIL",
+      "http": 422,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"user_account.password\":[\"\\u062a\\u0623\\u0643\\u064a\\u062f \\u0643\\u0644\\u0645\\u0629 \\u0627\\u0644\\u0645\\u0631\\u0648\\u0631 \\u063a\\u064a\\u0631 \\u0645\\u062a\\u0637\\u0627\\u0628\\u0642.\"]}}"
+    },
+    {
+      "gate": "6-roles",
+      "check": "Manager staff login",
+      "result": "WARN",
+      "http": 0,
+      "evidence": "{\"success\":false,\"message\":\"The given data was invalid.\",\"errors\":{\"email\":[\"Invalid credentials.\"]}}"
+    },
+    {
+      "gate": "6-roles",
+      "check": "Unauthenticated /hr/payroll",
+      "result": "FAIL",
+      "http": 400,
+      "evidence": "{\"success\":false,\"message\":\"Tenant context is required\",\"errors\":{}}"
+    },
+    {
+      "gate": "5-ui",
+      "check": "Frontend GET /",
+      "result": "PASS",
+      "evidence": "HTTP 200"
+    },
+    {
+      "gate": "5-ui",
+      "check": "Frontend GET /login",
+      "result": "PASS",
+      "evidence": "HTTP 200"
+    },
+    {
+      "gate": "5-ui",
+      "check": "Frontend GET /subscription/overview",
+      "result": "PASS",
+      "evidence": "HTTP 200"
+    },
+    {
+      "gate": "5-ui",
+      "check": "Frontend index has no localhost API fallback",
+      "result": "PASS",
+      "evidence": "clean"
+    }
+  ]
+}

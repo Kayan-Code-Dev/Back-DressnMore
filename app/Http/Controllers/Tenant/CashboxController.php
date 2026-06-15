@@ -9,9 +9,10 @@ use App\Http\Resources\Tenant\CashboxResource;
 use App\Http\Resources\Tenant\CashMovementResource;
 use App\Services\Tenant\CashboxService;
 use App\Support\ApiResponse;
-use App\Support\CsvExporter;
+use App\Support\Reports\TabularExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CashboxController extends Controller
@@ -80,18 +81,21 @@ class CashboxController extends Controller
         return ApiResponse::success(new CashboxResource($cashboxModel), 'Cashbox recalculated');
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): StreamedResponse|Response
     {
         $rows = $this->cashboxService->exportRows([
             'search' => $request->query('search'),
             'branch_id' => $request->query('branch_id'),
             'is_active' => $request->query('is_active'),
         ]);
+        $headers = ['ID', 'Name', 'Branch ID', 'Initial Balance', 'Current Balance', 'Status'];
 
-        return CsvExporter::download(
-            filename: 'cashboxes.csv',
-            headers: ['ID', 'Name', 'Branch ID', 'Initial Balance', 'Current Balance', 'Status'],
-            rows: $rows
+        return TabularExport::download(
+            $request->query('format'),
+            'cashboxes',
+            'الخزائن',
+            $headers,
+            $rows,
         );
     }
 

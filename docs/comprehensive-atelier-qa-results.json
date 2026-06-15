@@ -1,0 +1,467 @@
+{
+  "run_at": "2026-06-15T00:40:36.059399",
+  "tenant_slug": "alhatom-llazyaaa-2",
+  "owner_email": "qa-staging@dressnmore.test",
+  "ids_line": "RUN=20260614214028 BMAIN=6 SUP=5 CAT=8 SUB=9 CUST=6 CBOX=5 PO=5 DRESS=3 SALE=8 RENT=9 TAIL=10 EMP=5",
+  "steps": [
+    {
+      "module": "Auth",
+      "scenario": "Owner login",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Tenant login successful",
+      "evidence": "{\"success\": true, \"message\": \"Tenant login successful\", \"data\": {\"token\": \"350|nwe384NWcsAJ13VIcQOC1D3ENir5H2UdBYrRqvEn6676b830\", \"user\": {\"id\": 2, \"name\": \"QA Staging Tester 20260614213121\", \"email\": \"qa-staging@dressnmore.test\", \"phone\": null, \"status\": \"active\", \"avatar_path\": null, \"avatar_url\": null}, \"tenant\": {\"id\": 20, \"name\": \"الحاطوم للأز"
+    },
+    {
+      "module": "Branch",
+      "scenario": "Create main branch",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Branch created",
+      "evidence": "{\"success\": true, \"message\": \"Branch created\", \"data\": {\"id\": 6, \"branch_code\": null, \"name\": \"QA-ATR-20260614214028-Main\", \"code\": null, \"phone\": \"0500100100\", \"vat_enabled\": false, \"vat_type\": null, \"vat_value\": null, \"currency\": null, \"currency_id\": null, \"street\": null, \"building\": null, \"city_id\": null, \"address\": \"فرع رئيسي QA\", \"notes\": null"
+    },
+    {
+      "module": "Supplier",
+      "scenario": "Create supplier",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Supplier created",
+      "evidence": "{\"success\": true, \"message\": \"Supplier created\", \"data\": {\"id\": 5, \"code\": null, \"name\": \"QA-ATR-20260614214028-Supplier\", \"phone\": \"0500200200\", \"whatsapp\": null, \"email\": null, \"address\": null, \"tax_number\": null, \"opening_balance\": \"0.00\", \"current_balance\": \"0.00\", \"total_purchase_orders\": 0, \"total_paid\": 0, \"total_remaining\": 0, \"notes\": null"
+    },
+    {
+      "module": "Catalog",
+      "scenario": "Create parent category",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Dress category created",
+      "evidence": "{\"success\": true, \"message\": \"Dress category created\", \"data\": {\"id\": 8, \"parent_id\": null, \"name\": \"QA-ATR-20260614214028-Cat\", \"slug\": \"qa-atr-20260614214028-cat\", \"description\": null, \"status\": \"active\", \"parent\": null, \"children\": [], \"created_at\": \"2026-06-14T21:40:29.000000Z\", \"updated_at\": \"2026-06-14T21:40:29.000000Z\", \"deleted_at\": null}, "
+    },
+    {
+      "module": "Catalog",
+      "scenario": "Create subcategory parent_id",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Dress category created",
+      "evidence": "{\"success\": true, \"message\": \"Dress category created\", \"data\": {\"id\": 9, \"parent_id\": 8, \"name\": \"QA-ATR-20260614214028-Sub\", \"slug\": \"qa-atr-20260614214028-sub\", \"description\": null, \"status\": \"active\", \"parent\": {\"id\": 8, \"parent_id\": null, \"name\": \"QA-ATR-20260614214028-Cat\", \"slug\": \"qa-atr-20260614214028-cat\", \"status\": \"active\"}, \"children\": "
+    },
+    {
+      "module": "Customer",
+      "scenario": "Create customer",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Customer created",
+      "evidence": "{\"success\": true, \"message\": \"Customer created\", \"data\": {\"id\": 6, \"customer_code\": \"CUS-006\", \"name\": \"QA-ATR-20260614214028-Customer\", \"date_of_birth\": null, \"wedding_date\": null, \"visit_date\": null, \"phone\": \"0500300300\", \"phone2\": null, \"whatsapp\": null, \"email\": null, \"address\": null, \"city_id\": null, \"city_name\": null, \"national_id\": null, \"s"
+    },
+    {
+      "module": "Cashbox",
+      "scenario": "Create cashbox",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Cashbox created",
+      "evidence": "{\"success\": true, \"message\": \"Cashbox created\", \"data\": {\"id\": 5, \"name\": \"QA-ATR-20260614214028-Cashbox\", \"branch_id\": 6, \"manager_name\": null, \"initial_balance\": 0, \"current_balance\": 0, \"balance_change\": 0, \"total_in\": 0, \"total_out\": 0, \"description\": null, \"is_active\": true, \"created_at\": \"2026-06-14T21:40:30.000000Z\", \"updated_at\": \"2026-06-1"
+    },
+    {
+      "module": "Purchase",
+      "scenario": "Create PO",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Purchase order created",
+      "evidence": "{\"success\": true, \"message\": \"Purchase order created\", \"data\": {\"id\": 5, \"supplier_id\": 5, \"branch_id\": 6, \"category_id\": 8, \"subcategory_id\": 9, \"purchase_order_number\": \"PO-20260614-0003\", \"status\": \"draft\", \"type\": null, \"is_returned\": false, \"returned_at\": null, \"return_notes\": null, \"received_at\": null, \"inventory_received\": false, \"subtotal\":"
+    },
+    {
+      "module": "Purchase",
+      "scenario": "Receive PO -> inventory",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Purchase order received and inventory updated",
+      "evidence": "{\"success\": true, \"message\": \"Purchase order received and inventory updated\", \"data\": {\"id\": 5, \"supplier_id\": 5, \"branch_id\": 6, \"category_id\": 8, \"subcategory_id\": 9, \"purchase_order_number\": \"PO-20260614-0003\", \"status\": \"received\", \"type\": null, \"is_returned\": false, \"returned_at\": null, \"return_notes\": null, \"received_at\": \"2026-06-14 21:40:30"
+    },
+    {
+      "module": "Inventory",
+      "scenario": "List dresses after PO",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 3, \"dress_category_id\": 8, \"dress_subcategory_id\": 9, \"branch_id\": 6, \"entity_type\": \"purchase_order\", \"entity_id\": 5, \"code\": \"PO-0003-1\", \"name\": \"قماش فاخر — QA-ATR-20260614214028-Cat — QA-ATR-20260614214028-Sub\", \"description\": null, \"size\": null, \"breast_size\": null, \"waist_size\": null, \""
+    },
+    {
+      "module": "Inventory",
+      "scenario": "Set sale/rent prices",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Dress updated",
+      "evidence": "{\"success\": true, \"message\": \"Dress updated\", \"data\": {\"id\": 3, \"dress_category_id\": 8, \"dress_subcategory_id\": 9, \"branch_id\": 6, \"entity_type\": \"purchase_order\", \"entity_id\": 5, \"code\": \"PO-0003-1\", \"name\": \"PO-0003-1-QA-ATR-20260614214028-Cat-QA-ATR-20260614214028-Sub\", \"description\": null, \"size\": null, \"breast_size\": null, \"waist_size\": null, "
+    },
+    {
+      "module": "Sales",
+      "scenario": "Create sale invoice",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Sale invoice created",
+      "evidence": "{\"success\": true, \"message\": \"Sale invoice created\", \"data\": {\"id\": 8, \"invoice_number\": \"INV-20260614-0008\", \"branch_id\": 6, \"status\": \"partially_paid\", \"client_name\": \"QA-ATR-20260614214028-Customer\", \"client_phone\": \"0500300300\", \"customer\": {\"name\": \"QA-ATR-20260614214028-Customer\", \"national_id\": \"\", \"phone\": \"0500300300\", \"whatsapp\": \"\", \"add"
+    },
+    {
+      "module": "Rental",
+      "scenario": "Create rental invoice",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Invoice created",
+      "evidence": "{\"success\": true, \"message\": \"Invoice created\", \"data\": {\"id\": 9, \"invoice_number\": \"INV-20260614-0009\", \"customer_id\": 6, \"client_id\": 6, \"customer\": {\"id\": 6, \"name\": \"QA-ATR-20260614214028-Customer\", \"phone\": \"0500300300\", \"national_id\": null, \"whatsapp\": null, \"address\": null, \"city\": null}, \"branch_id\": 6, \"type\": \"rent\", \"status\": \"partially_"
+    },
+    {
+      "module": "Rental",
+      "scenario": "Deliver dress",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Invoice delivered",
+      "evidence": "{\"success\": true, \"message\": \"Invoice delivered\", \"data\": {\"id\": 9, \"invoice_number\": \"INV-20260614-0009\", \"customer_id\": 6, \"client_id\": 6, \"customer\": {\"id\": 6, \"name\": \"QA-ATR-20260614214028-Customer\", \"phone\": \"0500300300\", \"national_id\": null, \"whatsapp\": null, \"address\": null, \"city\": null}, \"branch_id\": 6, \"type\": \"rent\", \"status\": \"delivere"
+    },
+    {
+      "module": "Rental",
+      "scenario": "Return dress",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Invoice returned",
+      "evidence": "{\"success\": true, \"message\": \"Invoice returned\", \"data\": {\"id\": 9, \"invoice_number\": \"INV-20260614-0009\", \"customer_id\": 6, \"client_id\": 6, \"customer\": {\"id\": 6, \"name\": \"QA-ATR-20260614214028-Customer\", \"phone\": \"0500300300\", \"national_id\": null, \"whatsapp\": null, \"address\": null, \"city\": null}, \"branch_id\": 6, \"type\": \"rent\", \"status\": \"returned\""
+    },
+    {
+      "module": "Tailoring",
+      "scenario": "Create tailoring order",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Tailoring order created",
+      "evidence": "{\"success\": true, \"message\": \"Tailoring order created\", \"data\": {\"id\": 10, \"order_number\": \"INV-20260614-0010\", \"client_name\": \"QA-ATR-20260614214028-Customer\", \"client_phone\": \"0500300300\", \"customer_id\": 6, \"branch_id\": 6, \"employee_name\": \"QA Staging Tester 20260614213121\", \"tailor_name\": \"\", \"assigned_tailor_id\": null, \"branch_name\": \"QA-ATR-20"
+    },
+    {
+      "module": "HR",
+      "scenario": "GET roles",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 2, \"name\": \"Manager\", \"slug\": \"manager\", \"permission_ids\": [8, 7, 67, 66, 75, 74, 72, 78, 77]}, {\"id\": 3, \"name\": \"QA FULL No Perms\", \"slug\": \"qa-full-noperms\", \"permission_ids\": []}], \"meta\": {}}"
+    },
+    {
+      "module": "HR",
+      "scenario": "Create employee",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Employee created",
+      "evidence": "{\"success\": true, \"message\": \"Employee created\", \"data\": {\"id\": 5, \"user_id\": 8, \"user_account\": {\"user_id\": 8, \"email\": \"qa-atr-20260614214028@alhatom-llazyaaa-2.dressnmore.test\", \"status\": \"active\", \"role_id\": 2, \"role_name\": \"Manager\", \"role_slug\": \"manager\", \"permission_ids\": [8, 7, 67, 66, 75, 74, 72, 78, 77]}, \"employee_code\": \"QA-ATR-2026061"
+    },
+    {
+      "module": "HR",
+      "scenario": "Add salary advance",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Adjustment created",
+      "evidence": "{\"success\": true, \"message\": \"Adjustment created\", \"data\": {\"id\": 1, \"employee_id\": 5, \"employee_name\": \"QA-ATR-20260614214028 Employee\", \"type\": \"advance\", \"amount\": 500, \"month\": \"2026-06\", \"status\": \"approved\", \"notes\": \"QA-ATR-20260614214028 advance\", \"invoice_id\": null}, \"meta\": {}}"
+    },
+    {
+      "module": "HR",
+      "scenario": "Payroll sheet",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": {\"summary\": {\"gross\": 29000, \"deductions\": 500, \"bonuses\": 0, \"net\": 28500, \"employee_count\": 5}, \"rows\": [{\"id\": 2, \"employee_id\": 2, \"employee_name\": \"QA-ATR-20260614211458 Employee\", \"employee_code\": \"QA-ATR-20260614211458-EMP\", \"branch_name\": \"QA-ATR-20260614211458-Main\", \"base_salary\": 6000, \"att"
+    },
+    {
+      "module": "HR",
+      "scenario": "Employee payslip",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": {\"id\": 5, \"employee_id\": 5, \"employee_name\": \"QA-ATR-20260614214028 Employee\", \"employee_code\": \"QA-ATR-20260614214028-EMP\", \"branch_name\": \"QA-ATR-20260614214028-Main\", \"base_salary\": 6000, \"attendance_days\": 0, \"absent_days\": 0, \"late_days\": 0, \"overtime\": 0, \"advances\": 500, \"deductions\": 0, \"bonus"
+    },
+    {
+      "module": "Accounting",
+      "scenario": "List accounts",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 1, \"code\": \"1000\", \"name\": \"الصندوق\", \"type\": \"asset\"}, {\"id\": 2, \"code\": \"1010\", \"name\": \"البنك\", \"type\": \"asset\"}, {\"id\": 3, \"code\": \"1200\", \"name\": \"العملاء\", \"type\": \"asset\"}, {\"id\": 4, \"code\": \"2000\", \"name\": \"الموردون\", \"type\": \"liability\"}, {\"id\": 5, \"code\": \"2100\", \"name\": \"ودائع تأمين"
+    },
+    {
+      "module": "Accounting",
+      "scenario": "Manual journal entry",
+      "result": "PASS",
+      "http_status": 201,
+      "notes": "Journal entry created",
+      "evidence": "{\"success\": true, \"message\": \"Journal entry created\", \"data\": {\"id\": 18, \"entry_number\": \"JE-20260615-0005\", \"entry_date\": \"2026-06-15\", \"date\": \"2026-06-15\", \"description\": \"QA-ATR-20260614214028 manual entry\", \"type\": \"normal\", \"entry_type\": \"normal\", \"source_type\": \"manual\", \"source_id\": null, \"reference_number\": null, \"total_debit\": 100, \"total"
+    },
+    {
+      "module": "Accounting",
+      "scenario": "Journal summary",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": {\"total_debit\": 8475, \"total_credit\": 8475, \"difference\": 0, \"approved_count\": 14, \"draft_count\": 4, \"cancelled_count\": 0, \"unbalanced_count\": 0, \"entries_count\": 18}, \"meta\": {}}"
+    },
+    {
+      "module": "Statement",
+      "scenario": "Branch summaries",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": \"all\", \"name\": \"الكل\", \"branch_code\": null, \"icon\": \"all\", \"balance\": 75, \"entry_count\": 11, \"accounts\": [{\"id\": 2, \"name\": \"QA-ATR-20260614211458-Cashbox\", \"account_number\": \"CB-0002\", \"branch_id\": 3, \"current_balance\": 0, \"initial_balance\": 0, \"is_active\": true}, {\"id\": 3, \"name\": \"QA-ATR-20"
+    },
+    {
+      "module": "Statement",
+      "scenario": "Ledger",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 2, \"date\": \"2026-06-14\", \"reference\": \"MOV-2\", \"description\": \"Invoice payment received\", \"category\": \"مدفوعات عملاء\", \"branch_id\": null, \"branch_name\": \"—\", \"party\": \"—\", \"credit\": 800, \"debit\": null, \"running_balance\": 800, \"status\": \"completed\", \"direction\": \"in\"}, {\"id\": 3, \"date\": \"2026-0"
+    },
+    {
+      "module": "Statement",
+      "scenario": "Export PDF",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 22747, \"ok\": true}"
+    },
+    {
+      "module": "Statement",
+      "scenario": "Export Excel",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 5024, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "PDF sales",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 16551, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "Excel sales",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 4493, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "PDF rental",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 17061, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "Excel rental",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 4556, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "PDF tailoring",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 17036, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "Excel tailoring",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 4521, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "PDF payments",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 17119, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "Excel payments",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 4570, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "PDF expenses",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 18315, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "Excel expenses",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 4535, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "PDF cash",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 15381, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "Excel cash",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 4475, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "PDF accounting",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 18143, \"ok\": true}"
+    },
+    {
+      "module": "Reports",
+      "scenario": "Excel accounting",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 4587, \"ok\": true}"
+    },
+    {
+      "module": "Exports",
+      "scenario": "Invoices PDF",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 22589, \"ok\": true}"
+    },
+    {
+      "module": "Exports",
+      "scenario": "Invoices Excel",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 5097, \"ok\": true}"
+    },
+    {
+      "module": "Exports",
+      "scenario": "Cashboxes PDF",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 18646, \"ok\": true}"
+    },
+    {
+      "module": "Exports",
+      "scenario": "Cashboxes Excel",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 4659, \"ok\": true}"
+    },
+    {
+      "module": "Exports",
+      "scenario": "Journal PDF",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 31411, \"ok\": true}"
+    },
+    {
+      "module": "Exports",
+      "scenario": "Journal Excel",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "",
+      "evidence": "{\"size\": 5719, \"ok\": true}"
+    },
+    {
+      "module": "Settings",
+      "scenario": "GET profile",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": {\"id\": 2, \"name\": \"QA Staging Tester 20260614213121\", \"email\": \"qa-staging@dressnmore.test\", \"phone\": null, \"status\": \"active\", \"avatar_path\": null, \"avatar_url\": null}, \"meta\": {}}"
+    },
+    {
+      "module": "Settings",
+      "scenario": "UPDATE profile name",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Profile updated",
+      "evidence": "{\"success\": true, \"message\": \"Profile updated\", \"data\": {\"id\": 2, \"name\": \"QA Staging Tester 20260614214028\", \"email\": \"qa-staging@dressnmore.test\", \"phone\": null, \"status\": \"active\", \"avatar_path\": null, \"avatar_url\": null}, \"meta\": {}}"
+    },
+    {
+      "module": "Subscription",
+      "scenario": "Overview",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": {\"subscription\": {\"account_type\": \"paid\", \"lifecycle_status\": \"active\", \"plan_id\": 2, \"plan_code\": \"pro\", \"plan_name\": \"Pro\", \"starts_at\": \"2026-06-13\", \"expires_at\": \"2027-06-13\", \"can_renew\": true, \"days_remaining\": 364, \"features\": {\"dashboard.enabled\": \"true\", \"customers.enabled\": \"true\", \"categor"
+    },
+    {
+      "module": "Subscription",
+      "scenario": "Payment gateways",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": \"1\", \"name\": \"فودافون كاش\", \"type\": \"vodafone_cash\", \"account_holder\": \"يوسف\", \"account_number\": \"01070205189\", \"bank_name\": null, \"iban\": null, \"instructions\": \"ارسل على الرقم وارفق سكرين التحويل\", \"is_active\": true, \"display_order\": 1}, {\"id\": \"2\", \"name\": \"مثال\", \"type\": \"vodafone_cash\", \"a"
+    },
+    {
+      "module": "Lists",
+      "scenario": "GET /dashboard/overview",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": {\"kpis\": [{\"key\": \"revenue\", \"label\": \"Revenue\", \"value\": \"24050\", \"trend\": \"+100%\"}, {\"key\": \"orders\", \"label\": \"Orders\", \"value\": \"10\", \"trend\": \"+100%\"}, {\"key\": \"customers\", \"label\": \"Customers\", \"value\": \"6\", \"trend\": \"+100%\"}, {\"key\": \"payments\", \"label\": \"Payments\", \"value\": \"10\", \"trend\": \"—\"}"
+    },
+    {
+      "module": "Lists",
+      "scenario": "GET /deliveries?per_page=3",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 3, \"invoice_number\": \"INV-20260614-0003\", \"branch_id\": 4, \"invoice_status\": \"returned\", \"client_name\": \"QA-ATR-20260614212801-Customer\", \"client_phone\": \"0500300300\", \"customer\": {\"name\": \"QA-ATR-20260614212801-Customer\", \"national_id\": \"\", \"phone\": \"0500300300\", \"whatsapp\": \"\", \"address\": \"\"}"
+    },
+    {
+      "module": "Lists",
+      "scenario": "GET /returns?per_page=3",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 3, \"invoice_number\": \"INV-20260614-0003\", \"branch_id\": 4, \"invoice_status\": \"returned\", \"client_name\": \"QA-ATR-20260614212801-Customer\", \"client_phone\": \"0500300300\", \"customer\": {\"name\": \"QA-ATR-20260614212801-Customer\", \"national_id\": \"\", \"phone\": \"0500300300\", \"whatsapp\": \"\", \"address\": \"\"}"
+    },
+    {
+      "module": "Lists",
+      "scenario": "GET /payments?per_page=3",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 10, \"payment_number\": \"PAY-0010\", \"invoice_id\": 10, \"invoice_number\": \"INV-20260614-0010\", \"customer_id\": 6, \"client_id\": 6, \"customer_name\": \"QA-ATR-20260614214028-Customer\", \"branch_id\": 6, \"branch_name\": \"QA-ATR-20260614214028-Main\", \"amount\": \"800.00\", \"status\": \"paid\", \"payment_type\": \"in"
+    },
+    {
+      "module": "Lists",
+      "scenario": "GET /expenses?per_page=3",
+      "result": "PASS",
+      "http_status": 200,
+      "notes": "Success",
+      "evidence": "{\"success\": true, \"message\": \"Success\", \"data\": [{\"id\": 1, \"expense_category_id\": null, \"branch_id\": 1, \"cashbox_id\": null, \"category\": null, \"amount\": \"120.00\", \"status\": \"approved\", \"method\": null, \"vendor\": null, \"reference\": null, \"reference_number\": null, \"expense_date\": \"2026-06-15\", \"description\": null, \"notes\": null, \"transaction_id\": null,"
+    }
+  ],
+  "summary": {
+    "PASS": 57
+  }
+}

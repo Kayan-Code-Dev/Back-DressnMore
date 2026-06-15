@@ -10,9 +10,10 @@ use App\Http\Resources\Tenant\JournalEntryResource;
 use App\Models\Tenant\Account;
 use App\Services\Tenant\JournalEntryService;
 use App\Support\ApiResponse;
-use App\Support\CsvExporter;
+use App\Support\Reports\TabularExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class JournalEntryController extends Controller
@@ -85,11 +86,10 @@ class JournalEntryController extends Controller
         return ApiResponse::success(new JournalEntryResource($reversal), 'Reversal journal entry created', 201);
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): StreamedResponse|Response
     {
         $rows = $this->journalEntryService->exportRows($this->filters($request));
-
-        return CsvExporter::stream('journal-entries.csv', [
+        $headers = [
             'entry_number',
             'entry_date',
             'type',
@@ -102,7 +102,15 @@ class JournalEntryController extends Controller
             'status',
             'branch',
             'created_by',
-        ], $rows);
+        ];
+
+        return TabularExport::download(
+            $request->query('format'),
+            'journal-entries',
+            'القيود المحاسبية',
+            $headers,
+            $rows,
+        );
     }
 
     public function accounts(): JsonResponse

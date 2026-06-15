@@ -22,7 +22,8 @@ use App\Http\Controllers\Tenant\HrDepartmentController;
 use App\Http\Controllers\Tenant\HrDocumentController;
 use App\Http\Controllers\Tenant\HrEmployeeController;
 use App\Http\Controllers\Tenant\HrJobTitleController;
-use App\Http\Controllers\Tenant\HrLeaveController;
+use App\Http\Controllers\Tenant\HrPayrollAdjustmentController;
+use App\Http\Controllers\Tenant\HrPayrollController;
 use App\Http\Controllers\Tenant\HrSettingController;
 use App\Http\Controllers\Tenant\HrShiftController;
 use App\Http\Controllers\Tenant\InvoiceController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\Tenant\ReportController;
 use App\Http\Controllers\Tenant\SalesController;
 use App\Http\Controllers\Tenant\SettingsController;
 use App\Http\Controllers\Tenant\SubscriptionController;
+use App\Http\Controllers\Tenant\TransactionStatementController;
 use App\Http\Controllers\Tenant\SupplierController;
 use App\Http\Controllers\Tenant\SupplierPaymentController;
 use App\Http\Controllers\Tenant\TailoringOrderController;
@@ -59,7 +61,11 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('/subscription/overview', [SubscriptionController::class, 'overview']);
         Route::get('/subscription/payment-gateways', [SubscriptionController::class, 'paymentGateways']);
         Route::post('/subscription/renew', [SubscriptionController::class, 'renew']);
+        Route::post('/subscription/change-request', [SubscriptionController::class, 'submitChangeRequest']);
         Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade']);
+        Route::get('/settings/profile', [SettingsController::class, 'profile']);
+        Route::put('/settings/profile', [SettingsController::class, 'updateProfile']);
+        Route::post('/settings/profile/avatar', [SettingsController::class, 'uploadAvatar']);
         Route::put('/settings/password', [SettingsController::class, 'updatePassword']);
         Route::delete('/settings/account', [SettingsController::class, 'deleteAccount']);
     });
@@ -148,15 +154,6 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:invoices.view');
             Route::post('/invoices', [SalesController::class, 'storeInvoice'])
                 ->middleware('tenant.permission:invoices.create');
-        });
-
-        Route::prefix('/settings')->group(function (): void {
-            Route::get('/profile', [SettingsController::class, 'profile'])
-                ->middleware('tenant.permission:settings.profile');
-            Route::put('/profile', [SettingsController::class, 'updateProfile'])
-                ->middleware('tenant.permission:settings.profile');
-            Route::post('/profile/avatar', [SettingsController::class, 'uploadAvatar'])
-                ->middleware('tenant.permission:settings.profile');
         });
 
         Route::prefix('/employees')->group(function (): void {
@@ -404,6 +401,18 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:cashboxes.export');
             Route::get('/daily-summary', [CashboxController::class, 'dailySummary'])
                 ->middleware('tenant.permission:cashboxes.view');
+            Route::prefix('/statement')->group(function (): void {
+                Route::get('/branches', [TransactionStatementController::class, 'branches'])
+                    ->middleware('tenant.permission:cashboxes.view');
+                Route::get('/summary', [TransactionStatementController::class, 'summary'])
+                    ->middleware('tenant.permission:cashboxes.view');
+                Route::get('/ledger', [TransactionStatementController::class, 'ledger'])
+                    ->middleware('tenant.permission:cashboxes.view');
+                Route::get('/export', [TransactionStatementController::class, 'export'])
+                    ->middleware('tenant.permission:cashboxes.export');
+                Route::post('/close-period', [TransactionStatementController::class, 'closePeriod'])
+                    ->middleware('tenant.permission:cash_movements.create');
+            });
             Route::get('/', [CashboxController::class, 'index'])
                 ->middleware('tenant.permission:cashboxes.view');
             Route::post('/', [CashboxController::class, 'store'])
@@ -644,6 +653,19 @@ Route::prefix('tenant')->group(function (): void {
             Route::patch('/leaves/{leave}/status', [HrLeaveController::class, 'updateStatus'])
                 ->whereNumber('leave')
                 ->middleware('tenant.permission:hr.leaves.status');
+
+            Route::get('/payroll', [HrPayrollController::class, 'index'])
+                ->middleware('tenant.permission:hr.view');
+            Route::get('/payroll/employees/{employee}/payslip', [HrPayrollController::class, 'payslip'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.view');
+            Route::get('/payroll/adjustments', [HrPayrollAdjustmentController::class, 'index'])
+                ->middleware('tenant.permission:hr.view');
+            Route::post('/payroll/adjustments', [HrPayrollAdjustmentController::class, 'store'])
+                ->middleware('tenant.permission:hr.view');
+            Route::delete('/payroll/adjustments/{adjustment}', [HrPayrollAdjustmentController::class, 'destroy'])
+                ->whereNumber('adjustment')
+                ->middleware('tenant.permission:hr.view');
         });
     });
 });

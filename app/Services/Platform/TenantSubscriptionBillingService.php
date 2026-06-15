@@ -8,6 +8,7 @@ use App\Models\Central\Plan;
 use App\Models\Central\Tenant;
 use App\Services\Platform\TenantProvisioningService;
 use App\Support\PlanFeatureCatalog;
+use App\Support\PlanCurrency;
 use App\Support\TenantSubscriptionPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -20,6 +21,7 @@ class TenantSubscriptionBillingService
     public function __construct(
         private readonly TenantProvisioningService $tenantProvisioningService,
         private readonly TenantSubscriptionPresenter $subscriptionPresenter,
+        private readonly TenantPlanChangeRequestService $changeRequestService,
     ) {}
 
     /**
@@ -37,6 +39,7 @@ class TenantSubscriptionBillingService
                 'slug' => $tenant->slug,
             ],
             'available_plans' => $this->availablePlans($tenant),
+            'pending_change_request' => $this->changeRequestService->pendingForTenant($tenant),
         ];
     }
 
@@ -141,13 +144,15 @@ class TenantSubscriptionBillingService
     private function presentPlanOption(Plan $plan, Tenant $tenant): array
     {
         $isPaid = (float) $plan->price > 0;
+        $currency = PlanCurrency::normalize($plan->currency ?? 'EGP');
 
         return [
             'code' => $plan->slug,
             'name' => $plan->name,
             'account_type' => $isPaid ? 'paid' : 'free',
             'price' => (float) $plan->price,
-            'currency' => 'ج.م',
+            'currency' => $currency,
+            'currency_symbol' => PlanCurrency::symbol($currency),
             'billing_period_days' => $plan->duration_days,
             'description' => $plan->description ?? '',
             'features' => $this->planFeatureLabels($plan),
