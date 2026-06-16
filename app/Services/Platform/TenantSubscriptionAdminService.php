@@ -107,6 +107,7 @@ class TenantSubscriptionAdminService
                 'days' => (int) ($plan->duration_days ?? 30),
                 'currency' => $plan->currency ?? 'EGP',
                 'currency_symbol' => \App\Support\PlanCurrency::symbol($plan->currency ?? 'EGP'),
+                'billing_cycle' => $plan->billing_cycle ?? 'monthly',
             ] : null,
             'tenant' => [
                 'id' => $tenant->id,

@@ -59,4 +59,13 @@ class PaymentGatewayController extends Controller
 
         return ApiResponse::success(null, 'Payment gateway deleted');
     }
+
+    public function toggleStatus(int $paymentGateway): JsonResponse
+    {
+        $gateway = $this->paymentGatewayService->toggleStatus(
+            $this->paymentGatewayService->findOrFail($paymentGateway)
+        );
+
+        return ApiResponse::success(new PaymentGatewayResource($gateway), 'Payment gateway status updated');
+    }
 }

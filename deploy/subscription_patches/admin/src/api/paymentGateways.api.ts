@@ -41,3 +41,10 @@ export async function updatePaymentGateway(
 export async function deletePaymentGateway(id: string): Promise<void> {
   await apiFetch(`/platform/payment-gateways/${id}`, { method: "DELETE" });
 }
+
+export async function togglePaymentGatewayStatus(id: string): Promise<PaymentGateway> {
+  const response = await apiFetch(`/platform/payment-gateways/${id}/toggle-status`, { method: "POST" });
+  const out = await parseJsonResponse<PaymentGateway>(response);
+  if (out.ok === false) throw new Error(out.message);
+  return out.data;
+}

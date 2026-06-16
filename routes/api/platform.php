@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Platform\DashboardController;
 use App\Http\Controllers\Platform\AuthController;
 use App\Http\Controllers\Platform\HealthController;
 use App\Http\Controllers\Platform\PaymentController;
@@ -23,6 +24,8 @@ Route::prefix('platform')->group(function (): void {
     Route::middleware(['auth:sanctum', 'platform.admin'])->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+
+        Route::get('/dashboard/subscription-stats', [DashboardController::class, 'subscriptionStats']);
 
         Route::get('/plans/feature-catalog', [PlanController::class, 'featureCatalog']);
         Route::get('/plans', [PlanController::class, 'index']);
@@ -68,6 +71,8 @@ Route::prefix('platform')->group(function (): void {
         Route::put('/payment-gateways/{paymentGateway}', [PaymentGatewayController::class, 'update'])
             ->whereNumber('paymentGateway');
         Route::delete('/payment-gateways/{paymentGateway}', [PaymentGatewayController::class, 'destroy'])
+            ->whereNumber('paymentGateway');
+        Route::post('/payment-gateways/{paymentGateway}/toggle-status', [PaymentGatewayController::class, 'toggleStatus'])
             ->whereNumber('paymentGateway');
 
         // Subscriptions

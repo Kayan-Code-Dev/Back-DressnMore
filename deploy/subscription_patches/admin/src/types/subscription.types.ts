@@ -3,7 +3,7 @@ import type { AdminPlan } from './plan.types';
 /** Matches backend subscription statuses. */
 export type SubscriptionStatusValue = 'pending' | 'active' | 'rejected' | 'cancelled';
 
-/** List + nested plan from GET /admin/subscriptions */
+/** List + nested plan from GET /platform/subscriptions */
 export type AdminSubscription = {
   id: number;
   tenant_id: string;
@@ -11,9 +11,18 @@ export type AdminSubscription = {
   status: SubscriptionStatusValue | string;
   starts_at: string;
   ends_at: string;
+  days_remaining?: number | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
   created_at: string;
   updated_at: string;
-  plan: AdminPlan;
+  plan: AdminPlan & { billing_cycle?: string };
+  tenant?: {
+    id: number;
+    name: string;
+    slug: string;
+    status: string;
+  };
 };
 
 export type AdminSubscriptionsListResponse = {

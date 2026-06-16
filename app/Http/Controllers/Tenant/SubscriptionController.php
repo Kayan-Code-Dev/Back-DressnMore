@@ -35,6 +35,30 @@ class SubscriptionController extends Controller
         return ApiResponse::success($this->billingService->overview($tenant));
     }
 
+    public function current(): JsonResponse
+    {
+        $tenant = $this->tenantContext->tenant();
+        if ($tenant === null) {
+            return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
+        }
+
+        $overview = $this->billingService->overview($tenant);
+
+        return ApiResponse::success($overview['subscription']);
+    }
+
+    public function plans(): JsonResponse
+    {
+        $tenant = $this->tenantContext->tenant();
+        if ($tenant === null) {
+            return ApiResponse::error(TenantMessages::CONTEXT_REQUIRED, 400);
+        }
+
+        $overview = $this->billingService->overview($tenant);
+
+        return ApiResponse::success($overview['available_plans']);
+    }
+
     public function paymentGateways(): JsonResponse
     {
         return ApiResponse::success($this->billingService->activePaymentGateways());

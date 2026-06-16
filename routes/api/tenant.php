@@ -60,6 +60,8 @@ Route::prefix('tenant')->group(function (): void {
         'ensure.tenant.token',
     ])->group(function (): void {
         Route::get('/subscription/overview', [SubscriptionController::class, 'overview']);
+        Route::get('/subscription/current', [SubscriptionController::class, 'current']);
+        Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
         Route::get('/subscription/payment-gateways', [SubscriptionController::class, 'paymentGateways']);
         Route::get('/subscription/orders', [SubscriptionController::class, 'orders']);
         Route::post('/subscription/orders/{id}/cancel', [SubscriptionController::class, 'cancelOrder'])->whereNumber('id');
