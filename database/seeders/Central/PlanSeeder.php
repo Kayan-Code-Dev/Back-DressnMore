@@ -43,7 +43,9 @@ class PlanSeeder extends Seeder
         ];
 
         foreach ($plans as $plan) {
-            Plan::query()->updateOrCreate(['slug' => $plan['slug']], $plan);
+            Plan::query()->updateOrCreate(['slug' => $plan['slug']], array_merge($plan, [
+                'currency' => $plan['currency'] ?? 'EGP',
+            ]));
         }
     }
 }

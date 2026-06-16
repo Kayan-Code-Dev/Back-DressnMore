@@ -61,6 +61,9 @@ Route::prefix('tenant')->group(function (): void {
     ])->group(function (): void {
         Route::get('/subscription/overview', [SubscriptionController::class, 'overview']);
         Route::get('/subscription/payment-gateways', [SubscriptionController::class, 'paymentGateways']);
+        Route::get('/subscription/orders', [SubscriptionController::class, 'orders']);
+        Route::post('/subscription/orders/{id}/cancel', [SubscriptionController::class, 'cancelOrder'])->whereNumber('id');
+        Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel']);
         Route::post('/subscription/renew', [SubscriptionController::class, 'renew']);
         Route::post('/subscription/change-request', [SubscriptionController::class, 'submitChangeRequest']);
         Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade']);
@@ -69,6 +72,10 @@ Route::prefix('tenant')->group(function (): void {
         Route::post('/settings/profile/avatar', [SettingsController::class, 'uploadAvatar']);
         Route::put('/settings/password', [SettingsController::class, 'updatePassword']);
         Route::delete('/settings/account', [SettingsController::class, 'deleteAccount']);
+        Route::get('/settings/app', [SettingsController::class, 'appSettings'])
+            ->middleware('tenant.permission:settings.view');
+        Route::put('/settings/app', [SettingsController::class, 'updateAppSettings'])
+            ->middleware('tenant.permission:settings.manage');
     });
 
     Route::middleware([
@@ -187,16 +194,13 @@ Route::prefix('tenant')->group(function (): void {
             ->middleware('tenant.permission:settings.manage');
 
         Route::prefix('/notifications')->group(function (): void {
-            Route::get('/', [NotificationController::class, 'index'])
-                ->middleware('tenant.permission:settings.view');
-            Route::post('/read-all', [NotificationController::class, 'markAllRead'])
-                ->middleware('tenant.permission:settings.view');
+            Route::get('/', [NotificationController::class, 'index']);
+            Route::get('/stats', [NotificationController::class, 'stats']);
+            Route::post('/read-all', [NotificationController::class, 'markAllRead']);
             Route::patch('/{notification}/read', [NotificationController::class, 'markRead'])
-                ->whereNumber('notification')
-                ->middleware('tenant.permission:settings.view');
+                ->whereNumber('notification');
             Route::delete('/{notification}', [NotificationController::class, 'destroy'])
-                ->whereNumber('notification')
-                ->middleware('tenant.permission:settings.view');
+                ->whereNumber('notification');
         });
 
         Route::prefix('/dashboard')->middleware('plan.feature:dashboard.enabled')->group(function (): void {
@@ -440,6 +444,8 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:payments.export');
             Route::get('/', [PaymentController::class, 'index'])
                 ->middleware('tenant.permission:payments.view');
+            Route::post('/', [PaymentController::class, 'store'])
+                ->middleware('tenant.permission:payments.create');
             Route::get('/{payment}', [PaymentController::class, 'show'])
                 ->whereNumber('payment')
                 ->middleware('tenant.permission:payments.view');
@@ -659,6 +665,11 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:hr.view');
             Route::get('/payroll/employees/{employee}/payslip', [HrPayrollController::class, 'payslip'])
                 ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.view');
+            Route::get('/payroll/employees/{employee}/history', [HrPayrollController::class, 'employeeHistory'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.view');
+            Route::post('/payroll/pay', [HrPayrollController::class, 'pay'])
                 ->middleware('tenant.permission:hr.view');
             Route::get('/payroll/adjustments', [HrPayrollAdjustmentController::class, 'index'])
                 ->middleware('tenant.permission:hr.view');

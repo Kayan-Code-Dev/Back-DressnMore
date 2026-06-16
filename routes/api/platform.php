@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Platform\AuthController;
 use App\Http\Controllers\Platform\HealthController;
+use App\Http\Controllers\Platform\PaymentController;
 use App\Http\Controllers\Platform\PaymentGatewayController;
+use App\Http\Controllers\Platform\PlatformNotificationController;
 use App\Http\Controllers\Platform\PlanController;
 use App\Http\Controllers\Platform\PlanRequestController;
 use App\Http\Controllers\Platform\SubscriptionController;
@@ -70,14 +72,31 @@ Route::prefix('platform')->group(function (): void {
 
         // Subscriptions
         Route::get('/subscriptions', [SubscriptionController::class, 'index']);
-        Route::get('/subscriptions/{id}', [SubscriptionController::class, 'show']);
-        Route::patch('/subscriptions/{id}', [SubscriptionController::class, 'update']);
+        Route::get('/subscriptions/{id}', [SubscriptionController::class, 'show'])->whereNumber('id');
+        Route::patch('/subscriptions/{id}', [SubscriptionController::class, 'update'])->whereNumber('id');
+        Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancel'])->whereNumber('id');
+
+        Route::get('/payments', [PaymentController::class, 'index']);
+        Route::get('/payments/{id}', [PaymentController::class, 'show'])->whereNumber('id');
+        Route::post('/payments/{id}/mark-paid', [PaymentController::class, 'markPaid'])->whereNumber('id');
+        Route::post('/payments/{id}/reject', [PaymentController::class, 'reject'])->whereNumber('id');
+        Route::post('/payments/{id}/refund', [PaymentController::class, 'refund'])->whereNumber('id');
 
         // Order Plans (Plan Requests)
         Route::get('/order-plans', [PlanRequestController::class, 'index']);
         Route::get('/order-plans/{id}', [PlanRequestController::class, 'show']);
         Route::patch('/order-plans/{id}', [PlanRequestController::class, 'update']);
         Route::post('/order-plans/{id}/approve', [PlanRequestController::class, 'approve']);
+
+        Route::prefix('/notifications')->group(function (): void {
+            Route::get('/', [PlatformNotificationController::class, 'index']);
+            Route::get('/stats', [PlatformNotificationController::class, 'stats']);
+            Route::post('/read-all', [PlatformNotificationController::class, 'markAllRead']);
+            Route::patch('/{notification}/read', [PlatformNotificationController::class, 'markRead'])
+                ->whereNumber('notification');
+            Route::delete('/{notification}', [PlatformNotificationController::class, 'destroy'])
+                ->whereNumber('notification');
+        });
         Route::post('/order-plans/{id}/reject', [PlanRequestController::class, 'reject']);
         Route::delete('/order-plans/{id}', [PlanRequestController::class, 'destroy']);
     });
