@@ -23,10 +23,10 @@ export default function SubscriptionStatsRow() {
   }
 
   const cards = [
-    { id: 'total_subscription_revenue', value: stats ? `${stats.total_subscription_revenue} ج.م` : '…', icon: 'ri-money-dollar-circle-line', color: 'teal' as const },
-    { id: 'active_subscriptions', value: stats ? String(stats.active_subscriptions) : '…', icon: 'ri-checkbox-circle-line', color: 'emerald' as const },
-    { id: 'pending_plan_requests', value: stats ? String(stats.pending_plan_requests) : '…', icon: 'ri-file-list-3-line', color: 'amber' as const },
-    { id: 'pending_payments', value: stats ? String(stats.pending_payments) : '…', icon: 'ri-time-line', color: 'rose' as const },
+    { id: 'total_subscription_revenue', label: 'إجمالي إيرادات الاشتراكات', value: stats ? `${stats.total_subscription_revenue} ج.م` : '…', icon: 'ri-money-dollar-circle-line', color: 'teal' as const },
+    { id: 'active_subscriptions', label: 'الاشتراكات النشطة', value: stats ? String(stats.active_subscriptions) : '…', icon: 'ri-checkbox-circle-line', color: 'emerald' as const },
+    { id: 'pending_plan_requests', label: 'طلبات الباقات المعلقة', value: stats ? String(stats.pending_plan_requests) : '…', icon: 'ri-file-list-3-line', color: 'amber' as const },
+    { id: 'pending_payments', label: 'المدفوعات المعلقة', value: stats ? String(stats.pending_payments) : '…', icon: 'ri-time-line', color: 'rose' as const },
   ];
 
   return (
@@ -35,6 +35,7 @@ export default function SubscriptionStatsRow() {
         <StatsCard
           key={stat.id}
           statKey={stat.id}
+          label={stat.label}
           value={stat.value}
           change=""
           changeType="up"
