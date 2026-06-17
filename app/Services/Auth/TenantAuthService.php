@@ -65,6 +65,7 @@ class TenantAuthService
             'user' => $user,
             'tenant' => $tenant->loadMissing('plan'),
             'permissions' => $permissions,
+            'roles' => $this->rolesForUser($user),
             'plan' => $tenant->plan,
         ];
     }
@@ -75,6 +76,20 @@ class TenantAuthService
         $tokenResult->accessToken->forceFill(['tenant_id' => $tenant->id])->save();
 
         return $tokenResult->plainTextToken;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function rolesForUser(User $user): array
+    {
+        return $user->roles()
+            ->get(['slug'])
+            ->pluck('slug')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

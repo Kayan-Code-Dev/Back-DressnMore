@@ -2,6 +2,8 @@
 
 namespace App\Services\Tenant;
 
+use App\Models\Central\PersonalAccessToken;
+use App\Models\Central\Tenant;
 use Illuminate\Http\Request;
 
 class TenantResolver
@@ -18,7 +20,37 @@ class TenantResolver
             return trim($query);
         }
 
-        return $this->resolveSlugFromHost($request->getHost());
+        $fromHost = $this->resolveSlugFromHost($request->getHost());
+        if ($fromHost !== null) {
+            return $fromHost;
+        }
+
+        return $this->resolveSlugFromBearerToken($request);
+    }
+
+    /**
+     * Fallback resolution from the authenticated bearer token.
+     *
+     * Tokens are bound to a tenant on issue, so when no explicit tenant
+     * context is supplied (header/query/subdomain) we derive it from the
+     * token itself. This keeps the API usable for token-based SPA clients
+     * that do not send an X-Tenant header.
+     */
+    private function resolveSlugFromBearerToken(Request $request): ?string
+    {
+        $bearer = $request->bearerToken();
+        if (! is_string($bearer) || trim($bearer) === '') {
+            return null;
+        }
+
+        $token = PersonalAccessToken::findToken($bearer);
+        if ($token === null || $token->tenant_id === null) {
+            return null;
+        }
+
+        $tenant = Tenant::query()->find($token->tenant_id);
+
+        return $tenant?->slug;
     }
 
     private function resolveSlugFromHost(string $host): ?string
