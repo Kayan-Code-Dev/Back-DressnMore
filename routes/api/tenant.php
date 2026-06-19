@@ -130,6 +130,9 @@ Route::prefix('tenant')->group(function (): void {
             Route::put('/orders/{invoice}/measurements', [TailoringOrderController::class, 'updateMeasurements'])
                 ->whereNumber('invoice')
                 ->middleware('tenant.permission:tailoring.update');
+            Route::post('/orders/{invoice}/cancel', [TailoringOrderController::class, 'cancel'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:tailoring.update');
             Route::get('/workshop-board', [TailoringOrderController::class, 'workshopBoard'])
                 ->middleware('tenant.permission:tailoring.view_workshop');
             Route::get('/schedule', [TailoringOrderController::class, 'schedule'])
