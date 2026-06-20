@@ -667,6 +667,11 @@ Route::prefix('tenant')->group(function (): void {
             Route::get('/payroll/employees/{employee}/payslip', [HrPayrollController::class, 'payslip'])
                 ->whereNumber('employee')
                 ->middleware('tenant.permission:hr.view');
+            Route::get('/payroll/employees/{employee}/history', [HrPayrollController::class, 'employeeHistory'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.view');
+            Route::post('/payroll/pay', [HrPayrollController::class, 'pay'])
+                ->middleware('tenant.permission:hr.view');
             Route::get('/payroll/adjustments', [HrPayrollAdjustmentController::class, 'index'])
                 ->middleware('tenant.permission:hr.view');
             Route::post('/payroll/adjustments', [HrPayrollAdjustmentController::class, 'store'])
