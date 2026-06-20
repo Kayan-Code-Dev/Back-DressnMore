@@ -196,6 +196,8 @@ Route::prefix('tenant')->group(function (): void {
         Route::prefix('/notifications')->group(function (): void {
             Route::get('/', [NotificationController::class, 'index'])
                 ->middleware('tenant.permission:settings.view');
+            Route::get('/stats', [NotificationController::class, 'stats'])
+                ->middleware('tenant.permission:settings.view');
             Route::post('/read-all', [NotificationController::class, 'markAllRead'])
                 ->middleware('tenant.permission:settings.view');
             Route::patch('/{notification}/read', [NotificationController::class, 'markRead'])
