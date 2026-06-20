@@ -81,6 +81,10 @@ Route::prefix('tenant')->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::get('/lookups', [LookupController::class, 'index']);
+        Route::get('/settings/app', [SettingsController::class, 'appSettings'])
+            ->middleware('tenant.permission:settings.view');
+        Route::put('/settings/app', [SettingsController::class, 'updateAppSettings'])
+            ->middleware('tenant.permission:settings.manage');
 
         Route::prefix('/orders')->middleware(['plan.feature:invoices.enabled', 'tenant.permission:invoices.view'])->group(function (): void {
             Route::get('/rental/stats', [RentalOrderController::class, 'stats']);
@@ -128,6 +132,9 @@ Route::prefix('tenant')->group(function (): void {
             Route::get('/orders/{invoice}/stage-history', [TailoringOrderController::class, 'stageHistory'])
                 ->whereNumber('invoice');
             Route::put('/orders/{invoice}/measurements', [TailoringOrderController::class, 'updateMeasurements'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:tailoring.update');
+            Route::post('/orders/{invoice}/cancel', [TailoringOrderController::class, 'cancel'])
                 ->whereNumber('invoice')
                 ->middleware('tenant.permission:tailoring.update');
             Route::get('/workshop-board', [TailoringOrderController::class, 'workshopBoard'])
