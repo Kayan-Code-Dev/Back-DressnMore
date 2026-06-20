@@ -7,7 +7,11 @@ use App\Enums\TailoringProductionStage;
 use App\Enums\TailoringProductionStatus;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\Customer;
+use App\Models\Tenant\Cashbox;
+use App\Models\Tenant\CashMovement;
 use App\Models\Tenant\Invoice;
+use App\Models\Tenant\InvoicePayment;
+use App\Models\Tenant\JournalEntry;
 use App\Models\Tenant\Permission;
 use App\Models\Tenant\Role;
 use App\Models\Tenant\TailoringStageHistory;
@@ -304,6 +308,90 @@ class TenantTailoringWorkflowTest extends TestCase
             'invoice_id' => $invoiceId,
             'amount' => 100,
         ], 'tenant');
+    }
+
+    public function test_cancel_tailoring_order_without_refund_marks_order_cancelled(): void
+    {
+        $invoice = $this->seedTailoringInvoice(stage: TailoringProductionStage::SEWING->value);
+        Sanctum::actingAs($this->user, ['*']);
+
+        $this->postJson("/api/tenant/tailoring/orders/{$invoice->id}/cancel", [
+            'refund_customer' => false,
+            'notes' => 'العميلة ألغت الطلب',
+        ], $this->tenantHeaders())
+            ->assertOk()
+            ->assertJsonPath('data.status', Invoice::STATUS_CANCELLED)
+            ->assertJsonPath('data.current_stage', TailoringProductionStage::CANCELLED->value)
+            ->assertJsonPath('data.production_status', TailoringProductionStatus::CANCELLED->value);
+
+        $this->assertDatabaseHas('invoices', [
+            'id' => $invoice->id,
+            'status' => Invoice::STATUS_CANCELLED,
+            'production_stage' => TailoringProductionStage::CANCELLED->value,
+        ], 'tenant');
+    }
+
+    public function test_cancel_tailoring_order_with_refund_records_cash_movement_and_journal_entry(): void
+    {
+        $invoice = $this->seedTailoringInvoice(stage: TailoringProductionStage::ADJUSTMENTS->value);
+        $invoice->update([
+            'total' => 500,
+            'paid_amount' => 300,
+            'remaining_amount' => 200,
+        ]);
+        InvoicePayment::query()->create([
+            'invoice_id' => $invoice->id,
+            'amount' => 300,
+            'status' => InvoicePayment::STATUS_PAID,
+            'payment_type' => InvoicePayment::TYPE_INVOICE_PAYMENT,
+            'method' => 'cash',
+            'reference' => 'PAY-001',
+            'paid_at' => now(),
+        ]);
+
+        $cashbox = Cashbox::query()->create([
+            'name' => 'الخزنة الرئيسية',
+            'initial_balance' => 1000,
+            'current_balance' => 1000,
+            'is_active' => true,
+        ]);
+
+        Sanctum::actingAs($this->user, ['*']);
+
+        $response = $this->postJson("/api/tenant/tailoring/orders/{$invoice->id}/cancel", [
+            'refund_customer' => true,
+            'refund_amount' => 120,
+            'cashbox_id' => $cashbox->id,
+            'refund_method' => 'cash',
+            'notes' => 'استرجاع جزئي للعميلة',
+        ], $this->tenantHeaders())
+            ->assertOk()
+            ->assertJsonPath('data.status', Invoice::STATUS_CANCELLED)
+            ->assertJsonPath('data.current_stage', TailoringProductionStage::CANCELLED->value);
+
+        $movementId = (int) CashMovement::query()
+            ->where('reference_type', 'tailoring_order_refund')
+            ->where('reference_id', $invoice->id)
+            ->value('id');
+
+        $this->assertNotSame(0, $movementId);
+
+        $this->assertDatabaseHas('cash_movements', [
+            'id' => $movementId,
+            'cashbox_id' => $cashbox->id,
+            'type' => CashMovement::TYPE_EXPENSE,
+            'direction' => CashMovement::DIRECTION_OUT,
+            'amount' => 120,
+        ], 'tenant');
+
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => JournalEntry::SOURCE_CASH_MOVEMENT,
+            'source_id' => $movementId,
+        ], 'tenant');
+
+        $cashbox->refresh();
+        $this->assertSame(880.0, round((float) $cashbox->current_balance, 2));
+        $this->assertSame(Invoice::STATUS_CANCELLED, (string) $response->json('data.status'));
     }
 
     private function seedTailoringInvoice(
