@@ -318,8 +318,8 @@ class TransactionStatementService
      */
     private function openingBalance(array $filters): float
     {
-        $query = Cashbox::query()->where('is_active', true);
         $branchId = $this->normalizeBranchId($filters['branch_id'] ?? null);
+        $query = Cashbox::query()->where('is_active', true);
 
         if ($branchId === 0) {
             $query->whereNull('branch_id');
@@ -327,7 +327,25 @@ class TransactionStatementService
             $query->where('branch_id', $branchId);
         }
 
-        return round((float) $query->sum('initial_balance'), 2);
+        $openingBalance = round((float) $query->sum('initial_balance'), 2);
+
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        if ($dateFrom === '') {
+            return $openingBalance;
+        }
+
+        $prePeriodMovements = CashMovement::query()
+            ->where('is_reversed', false)
+            ->whereDate('movement_date', '<', $dateFrom);
+
+        $this->applyBranchFilter($prePeriodMovements, $branchId);
+
+        $netBeforePeriod = (float) $prePeriodMovements->selectRaw(
+            'COALESCE(SUM(CASE WHEN direction = ? THEN amount ELSE -amount END), 0) as net',
+            [CashMovement::DIRECTION_IN]
+        )->value('net');
+
+        return round($openingBalance + $netBeforePeriod, 2);
     }
 
     /**
