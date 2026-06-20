@@ -88,6 +88,55 @@ class TenantCashboxTest extends TestCase
         $this->assertSoftDeleted('cashboxes', ['id' => $cashboxId], 'tenant');
     }
 
+    public function test_statement_summary_uses_pre_period_movements_for_opening_balance(): void
+    {
+        Sanctum::actingAs($this->user, ['*']);
+
+        $create = $this->postJson('/api/tenant/cashboxes', [
+            'name' => 'Statement Cashbox',
+            'initial_balance' => 100,
+            'is_active' => true,
+        ], $this->tenantHeaders());
+        $create->assertCreated();
+
+        $cashboxId = (int) $create->json('data.id');
+
+        $this->postJson('/api/tenant/cash-movements', [
+            'type' => 'manual_adjustment',
+            'direction' => 'in',
+            'amount' => 50,
+            'cashbox_id' => $cashboxId,
+            'movement_date' => '2026-05-20 09:00:00',
+            'description' => 'Pre-period income',
+        ], $this->tenantHeaders())->assertCreated();
+
+        $this->postJson('/api/tenant/cash-movements', [
+            'type' => 'manual_adjustment',
+            'direction' => 'out',
+            'amount' => 30,
+            'cashbox_id' => $cashboxId,
+            'movement_date' => '2026-05-22 10:00:00',
+            'description' => 'Pre-period expense',
+        ], $this->tenantHeaders())->assertCreated();
+
+        $this->postJson('/api/tenant/cash-movements', [
+            'type' => 'manual_adjustment',
+            'direction' => 'in',
+            'amount' => 20,
+            'cashbox_id' => $cashboxId,
+            'movement_date' => '2026-05-25 11:00:00',
+            'description' => 'Inside period income',
+        ], $this->tenantHeaders())->assertCreated();
+
+        $response = $this->getJson('/api/tenant/cashboxes/statement/summary?date_from=2026-05-25&date_to=2026-05-25', $this->tenantHeaders());
+        $response->assertOk()
+            ->assertJsonPath('data.opening_balance', 120.0)
+            ->assertJsonPath('data.total_revenues', 20.0)
+            ->assertJsonPath('data.total_expenses', 0.0)
+            ->assertJsonPath('data.current_balance', 140.0)
+            ->assertJsonPath('data.closing_balance', 140.0);
+    }
+
     private function prepareSqliteDatabases(): void
     {
         $testingPath = storage_path('framework/testing');
