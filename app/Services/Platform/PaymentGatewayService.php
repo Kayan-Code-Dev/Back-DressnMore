@@ -61,6 +61,14 @@ class PaymentGatewayService
         $gateway->delete();
     }
 
+    public function toggleStatus(PaymentGateway $gateway): PaymentGateway
+    {
+        $gateway->is_active = ! $gateway->is_active;
+        $gateway->save();
+
+        return $gateway->refresh();
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      * @return Builder<PaymentGateway>

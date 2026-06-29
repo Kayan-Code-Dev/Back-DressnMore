@@ -13,6 +13,13 @@ final class PlanCurrency
         return in_array($code, self::SUPPORTED, true) ? $code : 'EGP';
     }
 
+    public static function normalizeTenant(?string $currency): string
+    {
+        $code = strtoupper(trim((string) $currency));
+
+        return in_array($code, self::SUPPORTED, true) ? $code : 'USD';
+    }
+
     public static function symbol(?string $currency): string
     {
         return match (self::normalize($currency)) {

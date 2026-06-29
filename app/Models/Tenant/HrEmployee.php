@@ -33,6 +33,10 @@ class HrEmployee extends BaseTenantModel
         'leaving_date',
         'base_salary',
         'salary_type',
+        'commission_type',
+        'commission_fixed_amount',
+        'commission_rate',
+        'commission_activity',
         'working_hours_per_day',
         'emergency_contact_name',
         'emergency_contact_phone',
@@ -46,6 +50,8 @@ class HrEmployee extends BaseTenantModel
             'joining_date' => 'date',
             'leaving_date' => 'date',
             'base_salary' => 'decimal:2',
+            'commission_fixed_amount' => 'decimal:2',
+            'commission_rate' => 'decimal:2',
             'working_hours_per_day' => 'decimal:2',
         ];
     }

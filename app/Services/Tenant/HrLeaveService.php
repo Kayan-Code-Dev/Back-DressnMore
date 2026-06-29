@@ -8,6 +8,8 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class HrLeaveService
 {
+    public function __construct(private readonly TenantNotifier $notifier) {}
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -38,7 +40,19 @@ class HrLeaveService
             $data['days'] = $this->calculateDays($data['from_date'], $data['to_date']);
         }
 
-        return HrLeaveRequest::query()->create($data)->load(['employee', 'reviewer']);
+        $leave = HrLeaveRequest::query()->create($data)->load(['employee', 'reviewer']);
+
+        $employeeName = $leave->employee?->full_name ?? 'موظف';
+        $this->notifier->toUsersWithPermissions(
+            ['hr.leaves.status', 'hr.view'],
+            'طلب إجازة جديد',
+            sprintf('طلب إجازة من %s من %s إلى %s.', $employeeName, $leave->from_date?->toDateString(), $leave->to_date?->toDateString()),
+            'employees',
+            'normal',
+            '/hr/leaves',
+        );
+
+        return $leave;
     }
 
     public function findOrFail(int $id): HrLeaveRequest
@@ -54,7 +68,28 @@ class HrLeaveService
         $leaveRequest->reviewed_at = now();
         $leaveRequest->save();
 
-        return $leaveRequest->refresh()->load(['employee', 'reviewer']);
+        $leaveRequest = $leaveRequest->refresh()->load(['employee', 'reviewer']);
+        $employee = $leaveRequest->employee;
+
+        if ($employee?->user_id) {
+            $statusLabel = match ($leaveRequest->status) {
+                'approved' => 'تمت الموافقة على إجازتك',
+                'rejected' => 'تم رفض طلب إجازتك',
+                'cancelled' => 'تم إلغاء طلب إجازتك',
+                default => 'تحديث على طلب الإجازة',
+            };
+
+            $this->notifier->toUser(
+                (int) $employee->user_id,
+                $statusLabel,
+                sprintf('طلب الإجازة من %s إلى %s — الحالة: %s', $leaveRequest->from_date?->toDateString(), $leaveRequest->to_date?->toDateString(), $leaveRequest->status),
+                'employees',
+                $leaveRequest->status === 'rejected' ? 'high' : 'normal',
+                '/hr/leaves',
+            );
+        }
+
+        return $leaveRequest;
     }
 
     private function calculateDays(string $fromDate, string $toDate): float

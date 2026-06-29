@@ -11,9 +11,10 @@ use App\Http\Requests\Tenant\Expense\UpdateExpenseRequest;
 use App\Http\Resources\Tenant\ExpenseResource;
 use App\Services\Tenant\ExpenseService;
 use App\Support\ApiResponse;
-use App\Support\CsvExporter;
+use App\Support\Reports\TabularExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExpenseController extends Controller
@@ -106,7 +107,7 @@ class ExpenseController extends Controller
         return ApiResponse::success($summary);
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): StreamedResponse|Response
     {
         $rows = $this->expenseService->exportRows([
             'search' => $request->query('search'),
@@ -119,10 +120,14 @@ class ExpenseController extends Controller
             'date_to' => $request->query('date_to'),
         ]);
 
-        return CsvExporter::download(
-            filename: 'expenses.csv',
-            headers: ['ID', 'Category', 'Branch', 'Cashbox', 'Status', 'Amount', 'Method', 'Vendor', 'Reference Number', 'Expense Date', 'Transaction ID'],
-            rows: $rows
+        $headers = ['ID', 'Category', 'Branch', 'Cashbox', 'Status', 'Amount', 'Method', 'Vendor', 'Reference Number', 'Expense Date', 'Transaction ID'];
+
+        return TabularExport::download(
+            $request->query('format'),
+            'expenses',
+            'المصروفات',
+            $headers,
+            $rows,
         );
     }
 }

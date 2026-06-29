@@ -18,6 +18,8 @@ class AddInvoicePaymentRequest extends FormRequest
         return [
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['nullable', 'string', Rule::in(PaymentMethod::values())],
+            'cashbox_id' => ['nullable', 'integer', Rule::exists('tenant.cashboxes', 'id')->whereNull('deleted_at')],
+            'branch_id' => ['nullable', 'integer', Rule::exists('tenant.branches', 'id')->whereNull('deleted_at')],
             'reference' => ['nullable', 'string', 'max:255'],
             'paid_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],

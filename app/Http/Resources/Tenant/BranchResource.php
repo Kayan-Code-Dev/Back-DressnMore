@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Tenant;
 
+use App\Services\Tenant\AppSettingService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,6 +10,8 @@ class BranchResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $appSettings = app(AppSettingService::class)->present();
+
         return [
             'id' => $this->id,
             'branch_code' => $this->branch_code ?: $this->code,
@@ -18,8 +21,8 @@ class BranchResource extends JsonResource
             'vat_enabled' => (bool) $this->vat_enabled,
             'vat_type' => $this->vat_type,
             'vat_value' => $this->vat_value,
-            'currency' => $this->currency,
-            'currency_id' => $this->currency_id,
+            'currency' => $appSettings['currency'],
+            'currency_symbol' => $appSettings['currency_symbol'],
             'street' => $this->street,
             'building' => $this->building,
             'city_id' => $this->city_id,
