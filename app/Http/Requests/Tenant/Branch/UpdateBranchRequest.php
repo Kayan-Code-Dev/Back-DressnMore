@@ -32,8 +32,6 @@ class UpdateBranchRequest extends FormRequest
             'vat_enabled' => ['nullable', 'boolean'],
             'vat_type' => ['nullable', 'string', Rule::in(VatType::values())],
             'vat_value' => ['nullable', 'numeric', 'min:0'],
-            'currency' => ['nullable', 'string', 'max:50'],
-            'currency_id' => ['nullable', 'integer'],
             'street' => ['nullable', 'string', 'max:255'],
             'building' => ['nullable', 'string', 'max:255'],
             'city_id' => ['nullable', 'integer'],

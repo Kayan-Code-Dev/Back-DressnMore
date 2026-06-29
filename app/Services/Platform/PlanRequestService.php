@@ -17,12 +17,13 @@ class PlanRequestService
     public function __construct(
         private readonly PlanRequestApprovalService $planRequestApprovalService,
         private readonly PlanRequestPaymentProofService $planRequestPaymentProofService,
+        private readonly PlatformNotificationService $platformNotifier,
     ) {}
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = PlanRequest::query()
-            ->with(['plan', 'paymentGateway', 'tenant'])
+            ->with(['plan', 'oldPlan', 'paymentGateway', 'tenant', 'sourceTenant', 'payment'])
             ->latest('id');
 
         $status = trim((string) ($filters['status'] ?? ''));
@@ -66,6 +67,7 @@ class PlanRequestService
         $plainPassword = (string) $data['password'];
 
         $planRequest = PlanRequest::query()->create([
+            'request_type' => 'signup',
             'plan_id' => $plan->id,
             'name' => $data['name'],
             'email' => $email,
@@ -79,6 +81,16 @@ class PlanRequestService
 
         if (! $isFreePlan) {
             $this->attachPaymentProof($planRequest, $data);
+        }
+
+        if (! $isFreePlan) {
+            $this->platformNotifier->notifyAllAdmins(
+                'طلب اشتراك جديد',
+                sprintf('طلب جديد من %s للخطة %s بانتظار المراجعة.', $planRequest->name, $plan->name),
+                'system',
+                'high',
+                '/order-plans/'.$planRequest->id,
+            );
         }
 
         if ($isFreePlan) {

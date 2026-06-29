@@ -68,7 +68,7 @@ class TenantSubscriptionBillingService
         }
 
         if ((float) $plan->price > 0) {
-            throw new RuntimeException('Paid plans require upgrade flow');
+            throw new RuntimeException('الباقات المدفوعة تتطلب إرسال طلب تجديد مع إثبات الدفع عبر change-request');
         }
 
         $days = (int) ($data['extension_days'] ?? $plan->duration_days ?? 30);
@@ -151,6 +151,25 @@ class TenantSubscriptionBillingService
     {
         $isPaid = (float) $plan->price > 0;
         $currency = PlanCurrency::normalize($plan->currency ?? 'EGP');
+        $isCurrent = (int) $tenant->plan_id === (int) $plan->id;
+        $currentPlan = $tenant->plan;
+        $action = 'select';
+
+        if ($isCurrent) {
+            $action = 'current';
+        } elseif ($currentPlan !== null) {
+            $currentOrder = (int) ($currentPlan->sort_order ?? 0);
+            $targetOrder = (int) ($plan->sort_order ?? 0);
+            if ($targetOrder > $currentOrder || (float) $plan->price > (float) $currentPlan->price) {
+                $action = 'upgrade';
+            } elseif ($targetOrder < $currentOrder || (float) $plan->price < (float) $currentPlan->price) {
+                $action = 'downgrade';
+            }
+        }
+
+        if ($isCurrent && $isPaid) {
+            $action = 'renew';
+        }
 
         return [
             'code' => $plan->slug,
@@ -159,10 +178,13 @@ class TenantSubscriptionBillingService
             'price' => (float) $plan->price,
             'currency' => $currency,
             'currency_symbol' => PlanCurrency::symbol($currency),
+            'billing_cycle' => $plan->billing_cycle ?? 'monthly',
             'billing_period_days' => $plan->duration_days,
             'description' => $plan->description ?? '',
             'features' => $this->planFeatureLabels($plan),
-            'is_current' => (int) $tenant->plan_id === (int) $plan->id,
+            'is_current' => $isCurrent,
+            'action' => $action,
+            'recommended' => (int) ($plan->sort_order ?? 0) === 2,
         ];
     }
 

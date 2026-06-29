@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class HrPayrollAdjustmentService
 {
+    public function __construct(private readonly TenantNotifier $notifier) {}
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -43,7 +44,7 @@ class HrPayrollAdjustmentService
     {
         $month = Carbon::parse(($data['month'] ?? date('Y-m')).'-01')->toDateString();
 
-        return HrPayrollAdjustment::query()->create([
+        $adjustment = HrPayrollAdjustment::query()->create([
             'employee_id' => $data['employee_id'],
             'type' => $data['type'],
             'amount' => $data['amount'],
@@ -52,6 +53,11 @@ class HrPayrollAdjustmentService
             'invoice_id' => $data['invoice_id'] ?? null,
             'notes' => $data['notes'] ?? null,
         ]);
+
+        $adjustment->loadMissing('employee');
+        $this->dispatchAdjustmentNotification($adjustment);
+
+        return $adjustment;
     }
 
     public function delete(HrPayrollAdjustment $adjustment): void
@@ -76,6 +82,71 @@ class HrPayrollAdjustmentService
             'status' => $adjustment->status,
             'notes' => $adjustment->notes,
             'invoice_id' => $adjustment->invoice_id,
+            'created_at' => $adjustment->created_at?->toISOString(),
+            'date' => $adjustment->created_at?->toDateString(),
         ];
+    }
+
+    private function dispatchAdjustmentNotification(HrPayrollAdjustment $adjustment): void
+    {
+        $employee = $adjustment->employee;
+        if (! $employee) {
+            return;
+        }
+
+        $amount = number_format((float) $adjustment->amount, 2);
+        $month = $adjustment->effective_month?->format('Y-m') ?? now()->format('Y-m');
+
+        $messages = match ($adjustment->type) {
+            HrPayrollAdjustment::TYPE_ADVANCE => [
+                'title' => 'سلفة جديدة',
+                'message' => sprintf('تم تسجيل سلفة بقيمة %s لشهر %s.', $amount, $month),
+                'priority' => 'normal',
+                'url' => '/hr/advances-deductions',
+            ],
+            HrPayrollAdjustment::TYPE_DEDUCTION => [
+                'title' => 'خصم / جزاء',
+                'message' => sprintf('تم تسجيل خصم بقيمة %s لشهر %s.', $amount, $month),
+                'priority' => 'high',
+                'url' => '/hr/advances-deductions',
+            ],
+            HrPayrollAdjustment::TYPE_BONUS => [
+                'title' => 'مكافأة',
+                'message' => sprintf('تم تسجيل مكافأة بقيمة %s لشهر %s.', $amount, $month),
+                'priority' => 'normal',
+                'url' => '/hr/bonuses-commissions',
+            ],
+            HrPayrollAdjustment::TYPE_COMMISSION => [
+                'title' => 'عمولة',
+                'message' => sprintf('تم تسجيل عمولة بقيمة %s لشهر %s.', $amount, $month),
+                'priority' => 'normal',
+                'url' => '/hr/bonuses-commissions',
+            ],
+            default => null,
+        };
+
+        if ($messages === null) {
+            return;
+        }
+
+        if ($employee->user_id) {
+            $this->notifier->toUser(
+                (int) $employee->user_id,
+                $messages['title'],
+                $messages['message'],
+                'employees',
+                $messages['priority'],
+                $messages['url'],
+            );
+        }
+
+        $this->notifier->toUsersWithPermissions(
+            ['hr.view'],
+            $messages['title'].' — '.$employee->full_name,
+            $messages['message'],
+            'employees',
+            $messages['priority'],
+            $messages['url'],
+        );
     }
 }

@@ -4,13 +4,17 @@ namespace App\Models\Central;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PlanRequest extends Model
 {
     protected $connection = 'central';
 
     protected $fillable = [
+        'request_type',
+        'source_tenant_id',
         'plan_id',
+        'old_plan_id',
         'name',
         'email',
         'phone',
@@ -25,6 +29,8 @@ class PlanRequest extends Model
         'tenant_id',
         'subscription_id',
         'admin_notes',
+        'tenant_notes',
+        'billing_cycle',
         'approved_at',
         'approved_by',
     ];
@@ -47,6 +53,11 @@ class PlanRequest extends Model
         return $this->belongsTo(Plan::class);
     }
 
+    public function oldPlan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'old_plan_id');
+    }
+
     public function paymentGateway(): BelongsTo
     {
         return $this->belongsTo(PaymentGateway::class);
@@ -57,9 +68,19 @@ class PlanRequest extends Model
         return $this->belongsTo(Tenant::class);
     }
 
+    public function sourceTenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class, 'source_tenant_id');
+    }
+
     public function subscription(): BelongsTo
     {
         return $this->belongsTo(Subscription::class);
+    }
+
+    public function payment(): HasOne
+    {
+        return $this->hasOne(Payment::class);
     }
 }
 

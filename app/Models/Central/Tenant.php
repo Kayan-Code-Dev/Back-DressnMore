@@ -18,6 +18,8 @@ class Tenant extends Model
         'plan_id',
         'subscription_starts_at',
         'subscription_ends_at',
+        'cancelled_at',
+        'cancellation_reason',
         'metadata',
     ];
 
@@ -26,6 +28,7 @@ class Tenant extends Model
         return [
             'subscription_starts_at' => 'datetime',
             'subscription_ends_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'metadata' => 'array',
         ];
     }

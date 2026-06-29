@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Settings\DeleteAccountRequest;
+use App\Http\Requests\Tenant\Settings\UpdateAppSettingsRequest;
 use App\Http\Requests\Tenant\Settings\UpdatePasswordRequest;
 use App\Http\Requests\Tenant\Settings\UpdateProfileRequest;
 use App\Http\Requests\Tenant\Settings\UploadAvatarRequest;
 use App\Http\Resources\Tenant\UserResource;
+use App\Services\Tenant\AppSettingService;
 use App\Services\Tenant\TenantContext;
 use App\Services\Tenant\TenantUserAvatarService;
 use App\Support\ApiResponse;
@@ -21,7 +23,20 @@ class SettingsController extends Controller
     public function __construct(
         private readonly TenantContext $tenantContext,
         private readonly TenantUserAvatarService $avatarService,
+        private readonly AppSettingService $appSettingService,
     ) {}
+
+    public function appSettings(): JsonResponse
+    {
+        return ApiResponse::success($this->appSettingService->present());
+    }
+
+    public function updateAppSettings(UpdateAppSettingsRequest $request): JsonResponse
+    {
+        $settings = $this->appSettingService->update($request->validated());
+
+        return ApiResponse::success($settings, 'App settings updated');
+    }
 
     public function profile(Request $request): JsonResponse
     {
@@ -38,18 +53,28 @@ class SettingsController extends Controller
     }
 
     public function uploadAvatar(UploadAvatarRequest $request): JsonResponse
-    {
+  {
         $tenant = $this->tenantContext->requireTenant();
         $user = $request->user();
         $this->avatarService->assertTenantContext($tenant);
 
-        $previousPath = $user->avatar_path;
-        $storedPath = $this->avatarService->store($tenant, $user, $request->file('avatar'));
+        if (! $request->hasFile('avatar')) {
+            return ApiResponse::error('لم يتم إرسال ملف الصورة', 422);
+        }
 
-        $user->avatar_path = $storedPath;
-        $user->save();
+        try {
+            $previousPath = $user->avatar_path;
+            $storedPath = $this->avatarService->store($tenant, $user, $request->file('avatar'));
 
-        $this->avatarService->deleteIfOwned($tenant, $previousPath);
+            $user->avatar_path = $storedPath;
+            $user->save();
+
+            $this->avatarService->deleteIfOwned($tenant, $previousPath);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return ApiResponse::error('تعذر حفظ الصورة. تحقق من صلاحيات التخزين أو حجم الملف.', 500);
+        }
 
         return ApiResponse::success(new UserResource($user->refresh()), 'Avatar updated');
     }

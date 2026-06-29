@@ -13,6 +13,30 @@ class StorePurchaseOrderRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $items = $this->input('items');
+        if (! is_array($items)) {
+            return;
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                $normalized[] = $item;
+                continue;
+            }
+
+            if (empty($item['item_code']) && ! empty($item['code'])) {
+                $item['item_code'] = $item['code'];
+            }
+
+            $normalized[] = $item;
+        }
+
+        $this->merge(['items' => $normalized]);
+    }
+
     public function rules(): array
     {
         return [
@@ -30,11 +54,13 @@ class StorePurchaseOrderRequest extends FormRequest
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_name' => ['required', 'string', 'max:255'],
+            'items.*.item_code' => ['nullable', 'string', 'max:120'],
+            'items.*.code' => ['nullable', 'string', 'max:120'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity' => ['nullable', 'numeric', 'gt:0'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
-            'items.*.dress_category_id' => ['nullable', 'integer'],
-            'items.*.dress_subcategory_id' => ['nullable', 'integer'],
+            'items.*.dress_category_id' => ['nullable', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
+            'items.*.dress_subcategory_id' => ['nullable', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
         ];
     }
 }

@@ -2,9 +2,13 @@
 
 namespace App\Services\Tenant;
 
+use App\Enums\ReportExportFormat;
 use App\Models\Tenant\PurchaseOrder;
 use App\Models\Tenant\Supplier;
 use App\Models\Tenant\SupplierPayment;
+use App\Support\Reports\ReportExporter;
+use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupplierAccountService
 {
@@ -91,6 +95,33 @@ class SupplierAccountService
         return $this->supplierService->findOrFail($supplierId);
     }
 
+    public function exportStatement(Supplier $supplier, ReportExportFormat $format): StreamedResponse|Response
+    {
+        $summary = $this->summary($supplier);
+        $statement = $summary['statement'];
+
+        $headers = ['التاريخ', 'البيان', 'مدين', 'دائن', 'الرصيد'];
+        $rows = array_map(static fn (array $line): array => [
+            $line['date'],
+            $line['description'],
+            $line['debit'] > 0 ? $line['debit'] : '',
+            $line['credit'] > 0 ? $line['credit'] : '',
+            $line['balance'],
+        ], $statement);
+
+        return ReportExporter::download(
+            $format,
+            'supplier-account-'.$supplier->code,
+            'كشف حساب المورد — '.$supplier->name,
+            $headers,
+            $rows,
+            [
+                'supplier_code' => $supplier->code,
+                'current_balance' => $summary['supplier']['current_balance'],
+            ],
+        );
+    }
+
     /**
      * @param  list<array<string, mixed>>  $orders
      * @param  list<array<string, mixed>>  $payments
@@ -105,7 +136,7 @@ class SupplierAccountService
             $lines[] = [
                 'sort_at' => $order['order_date'],
                 'date' => $order['order_date'],
-                'description' => 'Purchase order '.$order['purchase_order_number'],
+                'description' => 'طلبية شراء '.$order['purchase_order_number'],
                 'debit' => (float) $order['total'],
                 'credit' => 0.0,
             ];
@@ -115,7 +146,7 @@ class SupplierAccountService
             $lines[] = [
                 'sort_at' => $payment['paid_at'],
                 'date' => $payment['paid_at'],
-                'description' => 'Payment '.$payment['reference'],
+                'description' => 'دفعة مورد'.($payment['reference'] ? ' — '.$payment['reference'] : ''),
                 'debit' => 0.0,
                 'credit' => (float) $payment['amount'],
             ];
@@ -125,7 +156,7 @@ class SupplierAccountService
             $lines[] = [
                 'sort_at' => $return['date'],
                 'date' => $return['date'],
-                'description' => 'Return '.$return['return_number'],
+                'description' => 'مرتجع '.$return['return_number'],
                 'debit' => 0.0,
                 'credit' => (float) $return['amount'],
             ];
