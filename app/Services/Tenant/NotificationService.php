@@ -3,24 +3,34 @@
 namespace App\Services\Tenant;
 
 use App\Models\Tenant\Notification;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 
 class NotificationService
 {
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function create(array $data): Notification
+    {
+        return Notification::query()->create([
+            'user_id' => $data['user_id'] ?? null,
+            'title' => $data['title'],
+            'message' => $data['message'],
+            'category' => $data['category'] ?? 'system',
+            'priority' => $data['priority'] ?? 'normal',
+            'action_url' => $data['action_url'] ?? null,
+        ]);
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      */
     public function paginate(array $filters, int $perPage = 15, ?int $userId = null): LengthAwarePaginator
     {
         $query = Notification::query()->latest('id');
-
-        if ($userId !== null) {
-            $query->where(function (Builder $builder) use ($userId): void {
-                $builder->whereNull('user_id')->orWhere('user_id', $userId);
-            });
-        }
+        $this->scopeForUser($query, $userId);
 
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
@@ -29,6 +39,15 @@ class NotificationService
                 $builder->whereRaw('LOWER(title) LIKE ?', [$needle])
                     ->orWhereRaw('LOWER(message) LIKE ?', [$needle]);
             });
+        }
+
+        $category = trim((string) ($filters['category'] ?? ''));
+        if ($category !== '') {
+            $query->where('category', $category);
+        }
+
+        if (filter_var($filters['unread_only'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->whereNull('read_at');
         }
 
         return $query->paginate($perPage)->withQueryString();
@@ -40,12 +59,7 @@ class NotificationService
     public function stats(?int $userId = null): array
     {
         $query = Notification::query();
-
-        if ($userId !== null) {
-            $query->where(function (Builder $builder) use ($userId): void {
-                $builder->whereNull('user_id')->orWhere('user_id', $userId);
-            });
-        }
+        $this->scopeForUser($query, $userId);
 
         $total = (clone $query)->count();
         $read = (clone $query)->whereNotNull('read_at')->count();
@@ -73,12 +87,7 @@ class NotificationService
     public function markAllRead(?int $userId = null): int
     {
         $query = Notification::query()->whereNull('read_at');
-
-        if ($userId !== null) {
-            $query->where(function (Builder $builder) use ($userId): void {
-                $builder->whereNull('user_id')->orWhere('user_id', $userId);
-            });
-        }
+        $this->scopeForUser($query, $userId);
 
         return $query->update(['read_at' => Carbon::now()]);
     }
@@ -86,5 +95,16 @@ class NotificationService
     public function delete(Notification $notification): void
     {
         $notification->delete();
+    }
+
+    private function scopeForUser(Builder $query, ?int $userId): void
+    {
+        if ($userId === null) {
+            return;
+        }
+
+        $query->where(function (Builder $builder) use ($userId): void {
+            $builder->whereNull('user_id')->orWhere('user_id', $userId);
+        });
     }
 }

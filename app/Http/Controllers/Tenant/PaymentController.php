@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\Payment\StorePaymentRequest;
 use App\Http\Resources\Tenant\InvoicePaymentResource;
 use App\Services\Tenant\InvoicePaymentService;
 use App\Support\ApiResponse;
-use App\Support\CsvExporter;
+use App\Support\Reports\TabularExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentController extends Controller
@@ -37,6 +39,13 @@ class PaymentController extends Controller
         return ApiResponse::paginated($payments, InvoicePaymentResource::collection($payments->items())->resolve());
     }
 
+    public function store(StorePaymentRequest $request): JsonResponse
+    {
+        $payment = $this->invoicePaymentService->store($request->validated(), $request->user()?->id);
+
+        return ApiResponse::success(new InvoicePaymentResource($payment), 'Payment recorded', 201);
+    }
+
     public function show(int $payment): JsonResponse
     {
         $paymentModel = $this->invoicePaymentService->findPaymentOrFail($payment);
@@ -60,7 +69,7 @@ class PaymentController extends Controller
         return ApiResponse::success(new InvoicePaymentResource($paymentModel), 'Payment cancelled');
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): StreamedResponse|Response
     {
         $rows = $this->invoicePaymentService->exportRows([
             'search' => $request->query('search'),
@@ -77,10 +86,14 @@ class PaymentController extends Controller
             'amount_max' => $request->query('amount_max'),
         ]);
 
-        return CsvExporter::download(
-            filename: 'payments.csv',
-            headers: ['ID', 'Invoice ID', 'Invoice Number', 'Customer ID', 'Branch ID', 'Payment Type', 'Status', 'Amount', 'Method', 'Reference', 'Paid At'],
-            rows: $rows
+        $headers = ['ID', 'Invoice ID', 'Invoice Number', 'Customer ID', 'Branch ID', 'Payment Type', 'Status', 'Amount', 'Method', 'Reference', 'Paid At'];
+
+        return TabularExport::download(
+            $request->query('format'),
+            'payments',
+            'المدفوعات',
+            $headers,
+            $rows,
         );
     }
 }

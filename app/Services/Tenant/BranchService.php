@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 class BranchService
 {
+    public function __construct(
+        private readonly AppSettingService $appSettingService,
+    ) {}
+
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = Branch::query()->latest('id');
@@ -67,7 +71,7 @@ class BranchService
                 $branch->branch_code ?: $branch->code,
                 $branch->name,
                 $branch->phone,
-                $branch->currency,
+                $this->appSettingService->currency(),
                 $branch->address,
                 $branch->status,
             ];
@@ -90,8 +94,6 @@ class BranchService
             'vat_value' => array_key_exists('vat_value', $data)
                 ? round((float) $data['vat_value'], 2)
                 : $branch?->vat_value,
-            'currency' => array_key_exists('currency', $data) ? $data['currency'] : $branch?->currency,
-            'currency_id' => array_key_exists('currency_id', $data) ? $data['currency_id'] : $branch?->currency_id,
             'street' => array_key_exists('street', $data) ? $data['street'] : $branch?->street,
             'building' => array_key_exists('building', $data) ? $data['building'] : $branch?->building,
             'city_id' => array_key_exists('city_id', $data) ? $data['city_id'] : $branch?->city_id,

@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Tenant\Hr\Employee;
 
+use App\Enums\HrCommissionActivity;
+use App\Enums\HrCommissionType;
 use App\Enums\HrEmployeeStatus;
 use App\Enums\HrEmploymentType;
 use App\Enums\HrSalaryType;
@@ -51,6 +53,10 @@ class UpdateHrEmployeeRequest extends FormRequest
             'leaving_date' => ['sometimes', 'nullable', 'date', 'after_or_equal:joining_date'],
             'base_salary' => ['sometimes', 'required', 'numeric', 'min:0'],
             'salary_type' => ['sometimes', 'required', 'string', Rule::in(HrSalaryType::values())],
+            'commission_type' => ['sometimes', 'nullable', 'string', Rule::in(HrCommissionType::values())],
+            'commission_fixed_amount' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'commission_rate' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'commission_activity' => ['sometimes', 'nullable', 'string', Rule::in(HrCommissionActivity::values())],
             'working_hours_per_day' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:24'],
             'emergency_contact_name' => ['sometimes', 'nullable', 'string', 'max:120'],
             'emergency_contact_phone' => ['sometimes', 'nullable', 'string', 'max:30'],

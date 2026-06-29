@@ -3,6 +3,7 @@
 namespace App\Services\Tenant;
 
 use App\Models\Central\Tenant;
+use Database\Seeders\Tenant\ExpenseCategorySeeder;
 use Database\Seeders\Tenant\TenantRolePermissionSeeder;
 use Database\Seeders\Tenant\TenantSettingsSeeder;
 use Illuminate\Support\Facades\Artisan;
@@ -123,6 +124,7 @@ class TenantDatabaseManager
         $seeders = [
             TenantRolePermissionSeeder::class,
             TenantSettingsSeeder::class,
+            ExpenseCategorySeeder::class,
         ];
 
         foreach ($seeders as $seederClass) {

@@ -5,7 +5,9 @@ namespace App\Services\Tenant;
 use App\Enums\TailoringPriority;
 use App\Enums\TailoringProductionStage;
 use App\Enums\TailoringProductionStatus;
+use App\Models\Tenant\CashMovement;
 use App\Models\Tenant\Invoice;
+use App\Models\Tenant\InvoicePayment;
 use App\Models\Tenant\TailoringStageHistory;
 use App\Support\Tenant\TailoringOrderPresenter;
 use Illuminate\Support\Carbon;
@@ -16,6 +18,7 @@ class TailoringProductionService
 {
     public function __construct(
         private readonly InvoiceService $invoiceService,
+        private readonly CashMovementService $cashMovementService,
     ) {}
 
     /**
@@ -192,6 +195,112 @@ class TailoringProductionService
                 toStatus: $toStatus->value,
                 changedBy: $actorId,
                 notes: $payload['notes'] ?? null,
+            );
+
+            return $invoice->refresh()->load(['customer', 'items.dress', 'payments', 'branch', 'createdBy', 'assignedTailor', 'tailoringStageHistories.changedByUser']);
+        });
+    }
+
+    /**
+     * @param  array{refund_customer?: bool, refund_amount?: float|int|string|null, cashbox_id?: int|string|null, refund_method?: string|null, notes?: string|null}  $payload
+     */
+    public function cancelOrder(Invoice $invoice, array $payload, ?int $actorId = null): Invoice
+    {
+        $this->ensureTailoringInvoice($invoice);
+
+        if ($invoice->status === Invoice::STATUS_CANCELLED
+            || $invoice->production_stage === TailoringProductionStage::CANCELLED->value) {
+            throw ValidationException::withMessages([
+                'invoice' => ['طلب التفصيل ملغي بالفعل'],
+            ]);
+        }
+
+        if (in_array($invoice->status, [Invoice::STATUS_DELIVERED, Invoice::STATUS_RETURNED], true)
+            || $invoice->production_stage === TailoringProductionStage::DELIVERED->value) {
+            throw ValidationException::withMessages([
+                'invoice' => ['لا يمكن إلغاء طلب تفصيل تم تسليمه'],
+            ]);
+        }
+
+        $refundCustomer = (bool) ($payload['refund_customer'] ?? false);
+        $paidAmount = round((float) $invoice->payments()
+            ->where(function ($builder): void {
+                $builder->where('status', InvoicePayment::STATUS_PAID)
+                    ->orWhereNull('status');
+            })
+            ->sum('amount'), 2);
+
+        $refundAmount = 0.0;
+        if ($refundCustomer) {
+            if ($paidAmount <= 0) {
+                throw ValidationException::withMessages([
+                    'refund_customer' => ['لا توجد دفعات مسجلة ليتم استرجاعها'],
+                ]);
+            }
+
+            $refundAmount = round((float) ($payload['refund_amount'] ?? $paidAmount), 2);
+            if ($refundAmount <= 0) {
+                throw ValidationException::withMessages([
+                    'refund_amount' => ['مبلغ الاسترجاع يجب أن يكون أكبر من صفر'],
+                ]);
+            }
+
+            if ($refundAmount > $paidAmount + 0.009) {
+                throw ValidationException::withMessages([
+                    'refund_amount' => ['مبلغ الاسترجاع أكبر من إجمالي الدفعات المسجلة'],
+                ]);
+            }
+        }
+
+        return DB::connection('tenant')->transaction(function () use (
+            $invoice,
+            $refundCustomer,
+            $refundAmount,
+            $payload,
+            $actorId
+        ): Invoice {
+            $invoice->refresh();
+            $fromStage = (string) ($invoice->production_stage ?: TailoringProductionStage::NEW_ORDER->value);
+            $fromStatus = (string) ($invoice->production_status ?: TailoringProductionStatus::PENDING->value);
+
+            if ($refundCustomer) {
+                $this->cashMovementService->createManual([
+                    'type' => CashMovement::TYPE_EXPENSE,
+                    'direction' => CashMovement::DIRECTION_OUT,
+                    'amount' => $refundAmount,
+                    'method' => $payload['refund_method'] ?? 'cash',
+                    'cashbox_id' => (int) ($payload['cashbox_id'] ?? 0),
+                    'reference_type' => 'tailoring_order_refund',
+                    'reference_id' => $invoice->id,
+                    'reference' => $invoice->invoice_number,
+                    'movement_date' => Carbon::now(),
+                    'description' => 'Refund for cancelled tailoring order '.$invoice->invoice_number,
+                    'notes' => $payload['notes'] ?? null,
+                ], $actorId);
+            }
+
+            $invoice->status = Invoice::STATUS_CANCELLED;
+            $invoice->production_stage = TailoringProductionStage::CANCELLED->value;
+            $invoice->production_status = TailoringProductionStatus::CANCELLED->value;
+            $invoice->tailoring_cancelled_at = Carbon::now();
+            $invoice->save();
+
+            $historyNote = trim((string) ($payload['notes'] ?? ''));
+            if ($refundCustomer) {
+                $refundNote = sprintf('تم استرجاع %.2f من الخزنة', $refundAmount);
+                $historyNote = $historyNote === '' ? $refundNote : $historyNote.' — '.$refundNote;
+            } elseif ($historyNote === '') {
+                $historyNote = 'تم إلغاء الطلب';
+            }
+
+            $this->recordHistory(
+                invoice: $invoice,
+                fromStage: $fromStage,
+                toStage: TailoringProductionStage::CANCELLED->value,
+                fromStatus: $fromStatus,
+                toStatus: TailoringProductionStatus::CANCELLED->value,
+                changedBy: $actorId,
+                notes: $historyNote,
             );
 
             return $invoice->refresh()->load(['customer', 'items.dress', 'payments', 'branch', 'createdBy', 'assignedTailor', 'tailoringStageHistories.changedByUser']);

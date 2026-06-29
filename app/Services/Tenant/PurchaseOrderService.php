@@ -23,7 +23,7 @@ class PurchaseOrderService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = PurchaseOrder::query()
-            ->with(['supplier', 'items', 'branch', 'category', 'subcategory'])
+            ->with(['supplier', 'items.category', 'items.subcategory', 'branch', 'category', 'subcategory'])
             ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -71,11 +71,14 @@ class PurchaseOrderService
 
         /** @var PurchaseOrder $purchaseOrder */
         $purchaseOrder = DB::connection('tenant')->transaction(function () use ($data, $items, $summary, $actorId): PurchaseOrder {
+            $headerCategoryId = $data['category_id'] ?? ($items[0]['dress_category_id'] ?? null);
+            $headerSubcategoryId = $data['subcategory_id'] ?? ($items[0]['dress_subcategory_id'] ?? null);
+
             $purchaseOrder = PurchaseOrder::query()->create([
                 'supplier_id' => $data['supplier_id'],
                 'branch_id' => $data['branch_id'] ?? null,
-                'category_id' => $data['category_id'] ?? null,
-                'subcategory_id' => $data['subcategory_id'] ?? null,
+                'category_id' => $headerCategoryId,
+                'subcategory_id' => $headerSubcategoryId,
                 'purchase_order_number' => $this->generatePurchaseOrderNumber(),
                 'status' => $data['status'] ?? PurchaseOrder::STATUS_DRAFT,
                 'type' => $data['type'] ?? null,
@@ -104,7 +107,7 @@ class PurchaseOrderService
     public function findOrFail(int $purchaseOrderId): PurchaseOrder
     {
         return PurchaseOrder::query()
-            ->with(['supplier', 'items', 'branch', 'category', 'subcategory'])
+            ->with(['supplier', 'items.category', 'items.subcategory', 'branch', 'category', 'subcategory'])
             ->findOrFail($purchaseOrderId);
     }
 
@@ -120,11 +123,14 @@ class PurchaseOrderService
 
         /** @var PurchaseOrder $updated */
         $updated = DB::connection('tenant')->transaction(function () use ($purchaseOrder, $data, $items, $summary, $actorId): PurchaseOrder {
+            $headerCategoryId = $data['category_id'] ?? ($items[0]['dress_category_id'] ?? null);
+            $headerSubcategoryId = $data['subcategory_id'] ?? ($items[0]['dress_subcategory_id'] ?? null);
+
             $purchaseOrder->fill([
                 'supplier_id' => $data['supplier_id'],
                 'branch_id' => $data['branch_id'] ?? null,
-                'category_id' => $data['category_id'] ?? null,
-                'subcategory_id' => $data['subcategory_id'] ?? null,
+                'category_id' => $headerCategoryId,
+                'subcategory_id' => $headerSubcategoryId,
                 'status' => $data['status'] ?? $purchaseOrder->status,
                 'type' => $data['type'] ?? $purchaseOrder->type,
                 'subtotal' => $summary['subtotal'],
@@ -182,32 +188,37 @@ class PurchaseOrderService
 
         $this->supplierService->recalculateCurrentBalance($purchaseOrder->supplier()->firstOrFail());
 
-        return $purchaseOrder->refresh()->load(['supplier', 'items', 'branch', 'category', 'subcategory']);
+        return $purchaseOrder->refresh()->load(['supplier', 'items.category', 'items.subcategory', 'branch', 'category', 'subcategory']);
     }
 
     public function receive(PurchaseOrder $purchaseOrder, ?int $actorId = null): PurchaseOrder
     {
         if ($purchaseOrder->received_at !== null) {
-            return $purchaseOrder->refresh()->load(['supplier', 'items', 'branch', 'category', 'subcategory']);
+            return $purchaseOrder->refresh()->load(['supplier', 'items.category', 'items.subcategory', 'branch', 'category', 'subcategory']);
         }
 
         $purchaseOrder = DB::connection('tenant')->transaction(function () use ($purchaseOrder, $actorId): PurchaseOrder {
-            // 1. Mark as received
             $purchaseOrder->received_at = now();
             $purchaseOrder->status = 'received';
             $purchaseOrder->save();
+            $purchaseOrder->load(['items.category', 'items.subcategory', 'category', 'subcategory', 'supplier']);
 
             // 2. Create Dress records for each item + inventory movement
             foreach ($purchaseOrder->items as $index => $item) {
                 $poNumber = $purchaseOrder->purchase_order_number;
                 $poShortId = substr($poNumber, strrpos($poNumber, '-') + 1);
-                $categoryName = $purchaseOrder->category?->name ?? 'غير مصنف';
-                $subcategoryName = $purchaseOrder->subcategory?->name ?? '';
-                $displayName = $item->item_name . ' — ' . $categoryName . ($subcategoryName ? ' — ' . $subcategoryName : '');
+                $categoryName = $item->category?->name ?? $purchaseOrder->category?->name ?? 'غير مصنف';
+                $subcategoryName = $item->subcategory?->name ?? $purchaseOrder->subcategory?->name ?? '';
+                $displayName = $item->item_name.' — '.$categoryName.($subcategoryName ? ' — '.$subcategoryName : '');
+
+                $itemCode = trim((string) ($item->item_code ?? ''));
+                if ($itemCode === '') {
+                    $itemCode = 'PO-'.$poShortId.'-'.($index + 1);
+                }
 
                 $dress = Dress::query()->create([
                     'name' => $displayName,
-                    'code' => 'PO-' . $poShortId . '-' . ($index + 1),
+                    'code' => $itemCode,
                     'purchase_price' => $item->unit_price,
                     'branch_id' => $purchaseOrder->branch_id,
                     'dress_category_id' => $item->dress_category_id ?? $purchaseOrder->category_id,
@@ -352,6 +363,7 @@ class PurchaseOrderService
 
             return [
                 'item_name' => trim((string) $item['item_name']),
+                'item_code' => trim((string) ($item['item_code'] ?? $item['code'] ?? '')) ?: null,
                 'description' => $item['description'] ?? null,
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
