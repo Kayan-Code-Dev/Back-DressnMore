@@ -17,16 +17,28 @@ class NotificationController extends Controller
     {
         $perPage = max(1, min(100, $request->integer('per_page', 15)));
         $userId = $request->user()?->id;
-        $rows = $this->notificationService->paginate(['search' => $request->query('search')], $perPage, $userId);
-        $data = collect($rows->items())->map(fn ($row) => HrOperationsPresenter::notification($row))->all();
+        $paginator = $this->notificationService->paginate([
+            'search' => $request->query('search'),
+            'category' => $request->query('category'),
+            'unread_only' => $request->boolean('unread_only'),
+        ], $perPage, $userId);
+
+        $data = collect($paginator->items())
+            ->map(fn ($row) => HrOperationsPresenter::notification($row))
+            ->all();
 
         return ApiResponse::success($data, 'Success', 200, [
-            'current_page' => $rows->currentPage(),
-            'per_page' => $rows->perPage(),
-            'total' => $rows->total(),
-            'last_page' => $rows->lastPage(),
+            'current_page' => $paginator->currentPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'last_page' => $paginator->lastPage(),
             'stats' => $this->notificationService->stats($userId),
         ]);
+    }
+
+    public function stats(Request $request): JsonResponse
+    {
+        return ApiResponse::success($this->notificationService->stats($request->user()?->id));
     }
 
     public function markRead(int $notification): JsonResponse

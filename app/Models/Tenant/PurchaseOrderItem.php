@@ -11,6 +11,7 @@ class PurchaseOrderItem extends BaseTenantModel
     protected $fillable = [
         'purchase_order_id',
         'item_name',
+        'item_code',
         'description',
         'quantity',
         'unit_price',
@@ -31,5 +32,15 @@ class PurchaseOrderItem extends BaseTenantModel
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(DressCategory::class, 'dress_category_id');
+    }
+
+    public function subcategory(): BelongsTo
+    {
+        return $this->belongsTo(DressCategory::class, 'dress_subcategory_id');
     }
 }

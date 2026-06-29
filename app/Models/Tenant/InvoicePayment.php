@@ -20,6 +20,8 @@ class InvoicePayment extends BaseTenantModel
 
     protected $fillable = [
         'invoice_id',
+        'branch_id',
+        'cashbox_id',
         'amount',
         'status',
         'payment_type',
@@ -43,6 +45,16 @@ class InvoicePayment extends BaseTenantModel
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function cashbox(): BelongsTo
+    {
+        return $this->belongsTo(Cashbox::class);
     }
 
     /**

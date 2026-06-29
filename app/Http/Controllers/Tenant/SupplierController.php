@@ -8,10 +8,12 @@ use App\Http\Requests\Tenant\Supplier\UpdateSupplierRequest;
 use App\Http\Resources\Tenant\SupplierResource;
 use App\Services\Tenant\SupplierAccountService;
 use App\Services\Tenant\SupplierService;
+use App\Enums\ReportExportFormat;
 use App\Support\ApiResponse;
 use App\Support\CsvExporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupplierController extends Controller
@@ -51,6 +53,20 @@ class SupplierController extends Controller
         $supplierModel = $this->supplierAccountService->findSupplierOrFail($supplier);
 
         return ApiResponse::success($this->supplierAccountService->summary($supplierModel));
+    }
+
+    public function exportAccount(Request $request, int $supplier): StreamedResponse|Response|JsonResponse
+    {
+        $formatValue = strtolower(trim((string) $request->query('format', 'xlsx')));
+        $format = ReportExportFormat::tryFrom($formatValue);
+
+        if ($format === null) {
+            return ApiResponse::error('صيغة التصدير غير مدعومة', 422);
+        }
+
+        $supplierModel = $this->supplierAccountService->findSupplierOrFail($supplier);
+
+        return $this->supplierAccountService->exportStatement($supplierModel, $format);
     }
 
     public function update(UpdateSupplierRequest $request, int $supplier): JsonResponse

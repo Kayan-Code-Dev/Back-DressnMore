@@ -81,6 +81,10 @@ Route::prefix('tenant')->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::get('/lookups', [LookupController::class, 'index']);
+        Route::get('/settings/app', [SettingsController::class, 'appSettings'])
+            ->middleware('tenant.permission:settings.view');
+        Route::put('/settings/app', [SettingsController::class, 'updateAppSettings'])
+            ->middleware('tenant.permission:settings.manage');
 
         Route::prefix('/orders')->middleware(['plan.feature:invoices.enabled', 'tenant.permission:invoices.view'])->group(function (): void {
             Route::get('/rental/stats', [RentalOrderController::class, 'stats']);
@@ -128,6 +132,9 @@ Route::prefix('tenant')->group(function (): void {
             Route::get('/orders/{invoice}/stage-history', [TailoringOrderController::class, 'stageHistory'])
                 ->whereNumber('invoice');
             Route::put('/orders/{invoice}/measurements', [TailoringOrderController::class, 'updateMeasurements'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:tailoring.update');
+            Route::post('/orders/{invoice}/cancel', [TailoringOrderController::class, 'cancel'])
                 ->whereNumber('invoice')
                 ->middleware('tenant.permission:tailoring.update');
             Route::get('/workshop-board', [TailoringOrderController::class, 'workshopBoard'])
@@ -189,6 +196,7 @@ Route::prefix('tenant')->group(function (): void {
         Route::prefix('/notifications')->group(function (): void {
             Route::get('/', [NotificationController::class, 'index'])
                 ->middleware('tenant.permission:settings.view');
+            Route::get('/stats', [NotificationController::class, 'stats']);
             Route::post('/read-all', [NotificationController::class, 'markAllRead'])
                 ->middleware('tenant.permission:settings.view');
             Route::patch('/{notification}/read', [NotificationController::class, 'markRead'])
@@ -659,6 +667,11 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:hr.view');
             Route::get('/payroll/employees/{employee}/payslip', [HrPayrollController::class, 'payslip'])
                 ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.view');
+            Route::get('/payroll/employees/{employee}/history', [HrPayrollController::class, 'employeeHistory'])
+                ->whereNumber('employee')
+                ->middleware('tenant.permission:hr.view');
+            Route::post('/payroll/pay', [HrPayrollController::class, 'pay'])
                 ->middleware('tenant.permission:hr.view');
             Route::get('/payroll/adjustments', [HrPayrollAdjustmentController::class, 'index'])
                 ->middleware('tenant.permission:hr.view');
