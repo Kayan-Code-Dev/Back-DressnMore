@@ -137,7 +137,18 @@ class TenantController extends Controller
             return ApiResponse::error('لا يمكن الدخول إلى حساب Tenant غير فعال.', 403);
         }
 
-        // Find the first active user of this tenant
+        // Set the correct tenant database
+        $dbName = $tenantModel->database_name;
+        if (!$dbName) {
+            $dbName = "tenant_" . str_replace("-", "_", $tenantModel->slug);
+        }
+
+        // Configure tenant connection with correct DB
+        config(['database.connections.tenant.database' => $dbName]);
+        \DB::purge('tenant');
+        \DB::reconnect('tenant');
+
+        // Find the first active user in THIS tenant's database
         $tenantUser = \DB::connection("tenant")
             ->table("users")
             ->where("status", "active")
@@ -147,13 +158,7 @@ class TenantController extends Controller
             return ApiResponse::error('لا يوجد مستخدمون نشطون في هذا الـ Tenant.', 404);
         }
 
-        // Switch to tenant database and create token directly
-        $dbName = $tenantModel->database_name;
-        config(['database.connections.tenant.database' => $dbName]);
-        \DB::purge('tenant');
-        \DB::reconnect('tenant');
-
-        // Find user model on tenant connection
+        // Load the user model from tenant connection and create token
         $userModel = \App\Models\Tenant\User::on('tenant')->find($tenantUser->id);
 
         if (!$userModel) {
@@ -163,7 +168,7 @@ class TenantController extends Controller
         // Delete old impersonation tokens
         $userModel->tokens()->where('name', 'impersonation')->delete();
 
-        // Create new token
+        // Create new impersonation token
         $newToken = $userModel->createToken('impersonation', ['*'], now()->addHour());
 
         return ApiResponse::success([
