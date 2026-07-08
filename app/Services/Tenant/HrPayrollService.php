@@ -2,9 +2,12 @@
 
 namespace App\Services\Tenant;
 
+use App\Enums\HrCommissionActivity;
+use App\Enums\HrCommissionType;
 use App\Enums\HrEmployeeStatus;
 use App\Models\Tenant\HrEmployee;
 use App\Models\Tenant\HrPayrollAdjustment;
+use App\Models\Tenant\HrPayrollPayment;
 use App\Models\Tenant\Invoice;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,9 +46,37 @@ class HrPayrollService
                 'bonuses' => round(collect($rows)->sum(fn (array $r) => $r['bonuses'] + $r['commissions']), 2),
                 'net' => round(collect($rows)->sum('net_salary'), 2),
                 'employee_count' => count($rows),
+                'paid_count' => collect($rows)->where('status', 'paid')->count(),
             ],
             'rows' => $rows,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function payrollRowForEmployee(HrEmployee $employee, string $month): array
+    {
+        $period = Carbon::parse($month.'-01');
+        $rules = $this->settingService->all()['payroll_rules'] ?? [];
+
+        return $this->buildPayrollRow($employee->loadMissing(['branch', 'department']), $period, $rules);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function payrollHistoryForEmployee(HrEmployee $employee, int $months = 6): array
+    {
+        $months = max(1, min(12, $months));
+        $rows = [];
+
+        for ($i = 0; $i < $months; $i++) {
+            $period = now()->subMonths($i);
+            $rows[] = $this->buildPayrollRow($employee, $period, $this->settingService->all()['payroll_rules'] ?? []);
+        }
+
+        return $rows;
     }
 
     /**
@@ -69,6 +100,7 @@ class HrPayrollService
             'attendance' => $this->metricsService->employeeMonthAttendance($employee, $period),
             'leaves' => $this->metricsService->employeeMonthLeaves($employee, $period),
             'adjustment_lines' => $this->adjustmentLines($employee->id, $period),
+            'commission_breakdown' => $this->commissionBreakdown($employee, $period),
         ]);
     }
 
@@ -121,11 +153,17 @@ class HrPayrollService
         $bonuses = (float) $adjustments->where('type', HrPayrollAdjustment::TYPE_BONUS)->sum('amount');
         $manualCommissions = (float) $adjustments->where('type', HrPayrollAdjustment::TYPE_COMMISSION)->sum('amount');
 
-        $salesCommissions = $this->salesCommissionForEmployee($employee, $period);
+        $commissionBreakdown = $this->commissionBreakdown($employee, $period);
+        $activityCommissions = (float) ($commissionBreakdown['total'] ?? 0);
 
-        $commissions = $manualCommissions + $salesCommissions;
+        $commissions = $manualCommissions + $activityCommissions;
         $deductions = $attendanceDeduction + $manualDeductions;
         $net = max(0, $baseSalary + $overtimePay + $bonuses + $commissions - $deductions - $advances);
+
+        $payment = HrPayrollPayment::query()
+            ->where('employee_id', $employee->id)
+            ->whereDate('payroll_month', $monthKey.'-01')
+            ->first();
 
         return [
             'id' => $employee->id,
@@ -142,23 +180,68 @@ class HrPayrollService
             'deductions' => round($deductions, 2),
             'bonuses' => round($bonuses, 2),
             'commissions' => round($commissions, 2),
+            'activity_commissions' => round($activityCommissions, 2),
+            'manual_commissions' => round($manualCommissions, 2),
             'net_salary' => round($net, 2),
-            'status' => 'draft',
+            'status' => $payment ? 'paid' : 'draft',
+            'payment_id' => $payment?->id,
+            'paid_at' => $payment?->paid_at?->toISOString(),
             'month' => $monthKey,
         ];
     }
 
-    private function salesCommissionForEmployee(HrEmployee $employee, Carbon $period): float
+    /**
+     * @return array{fixed: float, percentage: float, activity_total: float, rate: float, total: float}
+     */
+    private function commissionBreakdown(HrEmployee $employee, Carbon $period): array
+    {
+        $type = (string) ($employee->commission_type ?? HrCommissionType::NONE->value);
+        $fixed = 0.0;
+        $percentage = 0.0;
+        $activityTotal = 0.0;
+        $rate = (float) ($employee->commission_rate ?? 0);
+
+        if (in_array($type, [HrCommissionType::FIXED->value, HrCommissionType::MIXED->value], true)) {
+            $fixed = (float) ($employee->commission_fixed_amount ?? 0);
+        }
+
+        if (
+            in_array($type, [HrCommissionType::PERCENTAGE->value, HrCommissionType::MIXED->value], true)
+            && $employee->user_id
+            && $rate > 0
+        ) {
+            $activityTotal = $this->activityTotalForEmployee($employee, $period);
+            $percentage = round($activityTotal * ($rate / 100), 2);
+        }
+
+        return [
+            'fixed' => round($fixed, 2),
+            'percentage' => $percentage,
+            'activity_total' => round($activityTotal, 2),
+            'rate' => $rate,
+            'total' => round($fixed + $percentage, 2),
+        ];
+    }
+
+    private function activityTotalForEmployee(HrEmployee $employee, Carbon $period): float
     {
         if (! $employee->user_id) {
             return 0.0;
         }
 
+        $activity = (string) ($employee->commission_activity ?? HrCommissionActivity::ALL->value);
+        $types = match ($activity) {
+            HrCommissionActivity::SALE->value => [Invoice::TYPE_SELL],
+            HrCommissionActivity::RENT->value => [Invoice::TYPE_RENT],
+            HrCommissionActivity::TAILORING->value => [Invoice::TYPE_TAILORING],
+            default => [Invoice::TYPE_SELL, Invoice::TYPE_RENT, Invoice::TYPE_TAILORING],
+        };
+
         $start = $period->copy()->startOfMonth();
         $end = $period->copy()->endOfMonth();
 
         return (float) Invoice::query()
-            ->where('type', Invoice::TYPE_SELL)
+            ->whereIn('type', $types)
             ->where('created_by', $employee->user_id)
             ->whereNotIn('status', [Invoice::STATUS_CANCELLED, Invoice::STATUS_DRAFT])
             ->whereBetween('created_at', [$start, $end])

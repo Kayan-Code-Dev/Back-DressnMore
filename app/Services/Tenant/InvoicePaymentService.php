@@ -4,6 +4,7 @@ namespace App\Services\Tenant;
 
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Models\Tenant\Cashbox;
 use App\Models\Tenant\CashMovement;
 use App\Models\Tenant\Invoice;
 use App\Models\Tenant\InvoicePayment;
@@ -21,6 +22,53 @@ class InvoicePaymentService
         private readonly CashMovementService $cashMovementService,
         private readonly JournalEntryPostingService $journalEntryPostingService,
     ) {}
+
+    public function store(array $data, ?int $actorId = null): InvoicePayment
+    {
+        $kind = (string) ($data['kind'] ?? 'invoice');
+        $branchId = (int) $data['branch_id'];
+        $cashboxId = (int) $data['cashbox_id'];
+        $this->assertCashboxBelongsToBranch($cashboxId, $branchId);
+
+        if ($kind === 'invoice') {
+            $invoice = $this->invoiceService->findOrFail((int) $data['invoice_id']);
+
+            return $this->recordPaidPayment($invoice, array_merge($data, [
+                'branch_id' => $branchId,
+                'cashbox_id' => $cashboxId,
+            ]), $actorId);
+        }
+
+        $amount = round((float) ($data['amount'] ?? 0), 2);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => ['مبلغ الدفعة يجب أن يكون أكبر من صفر'],
+            ]);
+        }
+
+        /** @var InvoicePayment $payment */
+        $payment = DB::connection('tenant')->transaction(function () use ($data, $amount, $branchId, $cashboxId, $actorId): InvoicePayment {
+            $payment = InvoicePayment::query()->create([
+                'invoice_id' => null,
+                'branch_id' => $branchId,
+                'cashbox_id' => $cashboxId,
+                'amount' => $amount,
+                'status' => InvoicePayment::STATUS_PAID,
+                'payment_type' => PaymentType::MANUAL_ADJUSTMENT->value,
+                'method' => $data['method'] ?? null,
+                'reference' => $data['reference'] ?? null,
+                'paid_at' => isset($data['paid_at']) ? Carbon::parse((string) $data['paid_at']) : Carbon::now(),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $actorId,
+            ]);
+
+            $this->cashMovementService->recordInvoicePayment($payment, $actorId);
+
+            return $payment;
+        });
+
+        return $payment->refresh()->load(['branch', 'cashbox']);
+    }
 
     public function addPayment(Invoice $invoice, array $data, ?int $actorId = null): Invoice
     {
@@ -60,8 +108,16 @@ class InvoicePaymentService
 
         /** @var InvoicePayment $payment */
         $payment = DB::connection('tenant')->transaction(function () use ($invoice, $data, $amount, $actorId): InvoicePayment {
+            $branchId = isset($data['branch_id']) ? (int) $data['branch_id'] : (int) ($invoice->branch_id ?? 0);
+            $cashboxId = isset($data['cashbox_id']) ? (int) $data['cashbox_id'] : null;
+            if ($cashboxId !== null && $branchId > 0) {
+                $this->assertCashboxBelongsToBranch($cashboxId, $branchId);
+            }
+
             $payment = InvoicePayment::query()->create([
                 'invoice_id' => $invoice->id,
+                'branch_id' => $branchId > 0 ? $branchId : $invoice->branch_id,
+                'cashbox_id' => $cashboxId,
                 'amount' => $amount,
                 'status' => InvoicePayment::STATUS_PAID,
                 'payment_type' => InvoicePayment::TYPE_INVOICE_PAYMENT,
@@ -95,7 +151,7 @@ class InvoicePaymentService
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = InvoicePayment::query()
-            ->with(['invoice.customer', 'invoice.branch'])
+            ->with(['invoice.customer', 'invoice.branch', 'branch', 'cashbox'])
             ->latest('id');
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -120,7 +176,10 @@ class InvoicePaymentService
 
         $branchId = $filters['branch_id'] ?? null;
         if ($branchId !== null && trim((string) $branchId) !== '') {
-            $query->whereHas('invoice', fn (Builder $q) => $q->where('branch_id', $branchId));
+            $query->where(function (Builder $builder) use ($branchId): void {
+                $builder->where('branch_id', $branchId)
+                    ->orWhereHas('invoice', fn (Builder $q) => $q->where('branch_id', $branchId));
+            });
         }
 
         $dateFrom = trim((string) ($filters['date_from'] ?? ''));
@@ -175,7 +234,9 @@ class InvoicePaymentService
                 $this->cashMovementService->recordInvoicePayment($payment, $actorId);
             }
 
-            $this->invoiceService->refreshFinancials($payment->invoice()->firstOrFail()->refresh());
+            if ($payment->invoice_id) {
+                $this->invoiceService->refreshFinancials($payment->invoice()->firstOrFail()->refresh());
+            }
 
             return $payment->refresh();
         });
@@ -206,7 +267,9 @@ class InvoicePaymentService
 
             $this->journalEntryPostingService->cancelBySource(JournalEntry::SOURCE_PAYMENT, (int) $payment->id, null);
 
-            $this->invoiceService->refreshFinancials($payment->invoice()->firstOrFail()->refresh());
+            if ($payment->invoice_id) {
+                $this->invoiceService->refreshFinancials($payment->invoice()->firstOrFail()->refresh());
+            }
 
             return $payment->refresh();
         });
@@ -227,7 +290,7 @@ class InvoicePaymentService
                 $payment->invoice_id,
                 $payment->invoice?->invoice_number,
                 $payment->invoice?->customer_id,
-                $payment->invoice?->branch_id,
+                $payment->invoice?->branch_id ?? $payment->branch_id,
                 $payment->payment_type,
                 $payment->status,
                 $payment->amount,
@@ -236,6 +299,16 @@ class InvoicePaymentService
                 $payment->paid_at?->toDateTimeString(),
             ];
         }, $rows);
+    }
+
+    private function assertCashboxBelongsToBranch(int $cashboxId, int $branchId): void
+    {
+        $cashbox = Cashbox::query()->find($cashboxId);
+        if (! $cashbox instanceof Cashbox || (int) $cashbox->branch_id !== $branchId) {
+            throw ValidationException::withMessages([
+                'cashbox_id' => ['الخزنة المحددة لا تتبع الفرع المختار'],
+            ]);
+        }
     }
 
     private function applyExactFilter(Builder $query, string $column, mixed $value): void
