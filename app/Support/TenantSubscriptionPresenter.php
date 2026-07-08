@@ -9,19 +9,7 @@ use Carbon\CarbonImmutable;
 class TenantSubscriptionPresenter
 {
     /**
-     * @return array{
-     *     account_type: string,
-     *     lifecycle_status: string,
-     *     plan_code: string,
-     *     plan_name: string,
-     *     plan_id: int|null,
-     *     starts_at: string,
-     *     expires_at: string|null,
-     *     can_renew: bool,
-     *     days_remaining: int|null,
-     *     features: array<string, string>,
-     *     enabled_modules: list<string>
-     * }
+     * @return array<string, mixed>
      */
     public function forTenant(Tenant $tenant): array
     {
@@ -46,7 +34,9 @@ class TenantSubscriptionPresenter
         }
 
         $lifecycleStatus = 'active';
-        if ($expiresAt !== null && $expiresAt->lt(CarbonImmutable::today())) {
+        if ($tenant->cancelled_at !== null) {
+            $lifecycleStatus = 'cancelled';
+        } elseif ($expiresAt !== null && $expiresAt->lt(CarbonImmutable::today())) {
             $lifecycleStatus = 'expired';
         }
 
@@ -60,16 +50,25 @@ class TenantSubscriptionPresenter
             }
         }
 
+        $currency = PlanCurrency::normalize($plan?->currency ?? 'EGP');
+
         return [
             'account_type' => $isPaid ? 'paid' : 'free',
             'lifecycle_status' => $lifecycleStatus,
             'plan_id' => $plan?->id,
             'plan_code' => $plan?->slug ?? 'free',
             'plan_name' => $plan?->name ?? 'مجاني',
+            'price' => (float) ($plan?->price ?? 0),
+            'currency' => $currency,
+            'currency_symbol' => PlanCurrency::symbol($currency),
+            'billing_cycle' => $plan?->billing_cycle ?? 'monthly',
             'starts_at' => $startsAt->toDateString(),
             'expires_at' => $expiresAt?->toDateString(),
-            'can_renew' => true,
+            'can_renew' => $isPaid ? $lifecycleStatus !== 'cancelled' : true,
+            'can_cancel' => $lifecycleStatus === 'active' || $lifecycleStatus === 'expired',
             'days_remaining' => $daysRemaining,
+            'cancelled_at' => $tenant->cancelled_at?->toDateString(),
+            'cancellation_reason' => $tenant->cancellation_reason,
             'features' => $features,
             'enabled_modules' => $enabledModules,
         ];

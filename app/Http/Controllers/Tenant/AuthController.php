@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\LoginRequest;
 use App\Http\Resources\Tenant\UserResource;
 use App\Services\Auth\TenantAuthService;
+use App\Services\Tenant\AppSettingService;
 use App\Services\Tenant\TenantContext;
 use App\Support\ApiResponse;
 use App\Support\TenantSubscriptionPresenter;
@@ -18,6 +19,7 @@ class AuthController extends Controller
         private readonly TenantAuthService $tenantAuthService,
         private readonly TenantContext $tenantContext,
         private readonly TenantSubscriptionPresenter $tenantSubscriptionPresenter,
+        private readonly AppSettingService $appSettingService,
     ) {}
 
     public function login(LoginRequest $request): JsonResponse
@@ -37,6 +39,7 @@ class AuthController extends Controller
             ],
             'permissions' => $result['permissions'],
             'subscription' => $this->tenantSubscriptionPresenter->forTenant($result['tenant']),
+            'app_settings' => $this->appSettingService->present(),
         ], 'Tenant login successful');
     }
 
@@ -53,6 +56,7 @@ class AuthController extends Controller
             'subscription' => $this->tenantSubscriptionPresenter->forTenant(
                 $this->tenantContext->tenant()
             ),
+            'app_settings' => $this->appSettingService->present(),
         ]);
     }
 

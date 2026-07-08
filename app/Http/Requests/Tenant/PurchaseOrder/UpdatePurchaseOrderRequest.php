@@ -13,6 +13,30 @@ class UpdatePurchaseOrderRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $items = $this->input('items');
+        if (! is_array($items)) {
+            return;
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                $normalized[] = $item;
+                continue;
+            }
+
+            if (empty($item['item_code']) && ! empty($item['code'])) {
+                $item['item_code'] = $item['code'];
+            }
+
+            $normalized[] = $item;
+        }
+
+        $this->merge(['items' => $normalized]);
+    }
+
     public function rules(): array
     {
         return [
@@ -24,13 +48,19 @@ class UpdatePurchaseOrderRequest extends FormRequest
             'type' => ['nullable', 'string', 'max:100'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'tax' => ['nullable', 'numeric', 'min:0'],
+            'deposit_amount' => ['nullable', 'numeric', 'min:0'],
+            'deposit_method' => ['nullable', 'string', 'in:cash,bank_transfer,check'],
             'order_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_name' => ['required', 'string', 'max:255'],
+            'items.*.item_code' => ['nullable', 'string', 'max:120'],
+            'items.*.code' => ['nullable', 'string', 'max:120'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity' => ['nullable', 'numeric', 'gt:0'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.dress_category_id' => ['nullable', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
+            'items.*.dress_subcategory_id' => ['nullable', 'integer', Rule::exists('tenant.dress_categories', 'id')->whereNull('deleted_at')],
         ];
     }
 }

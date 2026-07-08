@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\Tailoring\CancelTailoringOrderRequest;
 use App\Http\Requests\Tenant\Tailoring\ChangeTailoringStageRequest;
 use App\Http\Requests\Tenant\Tailoring\StoreTailoringOrderRequest;
 use App\Http\Requests\Tenant\Tailoring\UpdateTailoringMeasurementsRequest;
@@ -153,5 +154,20 @@ class TailoringOrderController extends Controller
         ], $perPage);
 
         return ApiResponse::paginated($rows, $rows->items());
+    }
+
+    public function cancel(CancelTailoringOrderRequest $request, int $invoice): JsonResponse
+    {
+        $order = $this->tailoringOrderService->findOrFail($invoice);
+        $order = $this->tailoringProductionService->cancelOrder(
+            $order,
+            $request->validated(),
+            $request->user()?->id,
+        );
+
+        return ApiResponse::success(
+            TailoringOrderPresenter::fromInvoice($order, includeDetails: true),
+            'Tailoring order cancelled',
+        );
     }
 }

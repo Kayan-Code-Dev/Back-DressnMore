@@ -11,6 +11,15 @@ class SubmitSubscriptionChangeRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('payment_gateway_id') && $this->input('payment_gateway_id') !== '') {
+            $this->merge([
+                'payment_gateway_id' => (int) $this->input('payment_gateway_id'),
+            ]);
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -18,9 +27,9 @@ class SubmitSubscriptionChangeRequest extends FormRequest
     {
         return [
             'plan_code' => ['required', 'string', 'max:120'],
-            'payment_gateway_id' => ['required', 'integer', 'min:1'],
+            'payment_gateway_id' => ['required', 'integer', 'min:1', 'exists:central.payment_gateways,id'],
             'payment_reference' => ['required', 'string', 'max:255'],
-            'payment_proof' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
+            'payment_proof' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf,heic,heif', 'max:10240'],
         ];
     }
 

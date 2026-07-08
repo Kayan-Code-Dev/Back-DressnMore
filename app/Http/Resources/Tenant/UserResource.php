@@ -13,6 +13,8 @@ class UserResource extends JsonResource
     {
         $tenant = app(TenantContext::class)->tenant();
 
+        $avatarUrl = app(TenantUserAvatarService::class)->url($this->avatar_path, $tenant);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -20,7 +22,8 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'status' => $this->status,
             'avatar_path' => $this->avatar_path,
-            'avatar_url' => app(TenantUserAvatarService::class)->url($this->avatar_path, $tenant),
+            'avatar_url' => $avatarUrl,
+            'avatar' => $avatarUrl,
         ];
     }
 }
