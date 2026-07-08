@@ -57,6 +57,8 @@ Route::prefix('platform')->group(function (): void {
             ->whereNumber('tenant');
         Route::post('/tenants/{tenant}/activate', [TenantController::class, 'activate'])
             ->whereNumber('tenant');
+        Route::post('/tenants/{tenant}/impersonate', [TenantController::class, 'impersonate'])
+            ->whereNumber('tenant');
         Route::post('/tenants/{tenant}/renew', [TenantController::class, 'renew'])
             ->whereNumber('tenant');
         Route::post('/tenants/{tenant}/seed', [TenantController::class, 'seed'])

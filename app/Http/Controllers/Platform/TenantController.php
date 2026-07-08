@@ -137,8 +137,7 @@ class TenantController extends Controller
             return ApiResponse::error('لا يمكن الدخول إلى حساب Tenant غير فعال.', 403);
         }
 
-        // Find the first user of this tenant
-        $dbName = $tenantModel->database_name ?? "tenant_" . str_replace("-", "_", $tenantModel->slug);
+        // Find the first active user of this tenant
         $tenantUser = \DB::connection("tenant")
             ->table("users")
             ->where("status", "active")
@@ -148,12 +147,13 @@ class TenantController extends Controller
             return ApiResponse::error('لا يوجد مستخدمون نشطون في هذا الـ Tenant.', 404);
         }
 
-        // Create a temporary impersonation token using Sanctum
-        $token = \App\Models\Central\PersonalAccessToken::create([
+        // Generate impersonation token
+        $plainToken = \Illuminate\Support\Str::random(64);
+        $token = \Laravel\Sanctum\PersonalAccessToken::create([
             'tokenable_type' => \App\Models\Tenant\User::class,
             'tokenable_id' => $tenantUser->id,
-            'name' => 'impersonation_' . time(),
-            'token' => hash('sha256', $plainToken = \Illuminate\Support\Str::random(40)),
+            'name' => 'impersonation',
+            'token' => hash('sha256', $plainToken),
             'abilities' => ['*'],
             'expires_at' => now()->addHour(),
         ]);
@@ -170,7 +170,7 @@ class TenantController extends Controller
                 'email' => $tenantUser->email,
             ],
             'token' => $token->id . '|' . $plainToken,
-            'redirect_url' => config('app.frontend_url') . '/?tenant=' . $tenantModel->slug,
-        ], 'Impersonation token created successfully.');
+            'redirect_url' => config('app.frontend_url', 'https://dressnmore.it.com') . '/?tenant=' . $tenantModel->slug,
+        ], 'تم إنشاء رمز الدخول بنجاح.');
     }
 }
