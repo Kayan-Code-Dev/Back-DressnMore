@@ -44,6 +44,11 @@ return [
             'provider' => 'super_admins',
         ],
 
+        'api' => [
+            'driver' => 'sanctum',
+            'provider' => 'super_admins',
+        ],
+
         'tenant-web' => [
             'driver' => 'session',
             'provider' => 'tenant_users',
