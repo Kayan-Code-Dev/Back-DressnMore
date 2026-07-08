@@ -2,6 +2,8 @@
 
 namespace App\Models\Tenant;
 
+use App\Models\Tenant\Cashbox;
+
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SupplierPayment extends BaseTenantModel
@@ -35,5 +37,10 @@ class SupplierPayment extends BaseTenantModel
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function cashbox(): BelongsTo
+    {
+        return $this->belongsTo(Cashbox::class);
     }
 }
