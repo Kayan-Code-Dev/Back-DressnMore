@@ -42,4 +42,11 @@ class HrAttendanceController extends Controller
 
         return ApiResponse::success(new HrAttendanceRecordResource($record), 'Attendance updated');
     }
+
+    public function today(Request $request): JsonResponse
+    {
+        $records = \App\Models\Tenant\HrAttendanceRecord::whereDate('date', today())->get();
+
+        return ApiResponse::success($records);
+    }
 }

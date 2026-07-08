@@ -59,4 +59,14 @@ class SupplierPaymentController extends Controller
 
         return ApiResponse::paginated($payments, SupplierPaymentResource::collection($payments->items())->resolve());
     }
+
+    public function stats(Request $request): JsonResponse
+    {
+        return ApiResponse::success([
+            'total_payments' => \App\Models\Tenant\SupplierPayment::count(),
+            'total_amount' => \App\Models\Tenant\SupplierPayment::sum('amount'),
+            'this_month' => \App\Models\Tenant\SupplierPayment::whereMonth('created_at', now()->month)->sum('amount'),
+            'last_month' => \App\Models\Tenant\SupplierPayment::whereMonth('created_at', now()->subMonth()->month)->sum('amount'),
+        ]);
+    }
 }

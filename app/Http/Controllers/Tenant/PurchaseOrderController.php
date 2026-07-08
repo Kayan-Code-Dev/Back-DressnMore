@@ -114,4 +114,18 @@ class PurchaseOrderController extends Controller
             rows: $rows
         );
     }
+
+    public function stats(Request $request): JsonResponse
+    {
+        return ApiResponse::success([
+            'total' => \App\Models\Tenant\PurchaseOrder::count(),
+            'draft' => \App\Models\Tenant\PurchaseOrder::where('status', 'draft')->count(),
+            'confirmed' => \App\Models\Tenant\PurchaseOrder::where('status', 'confirmed')->count(),
+            'received' => \App\Models\Tenant\PurchaseOrder::where('status', 'received')->count(),
+            'cancelled' => \App\Models\Tenant\PurchaseOrder::where('status', 'cancelled')->count(),
+            'total_amount' => \App\Models\Tenant\PurchaseOrder::sum('total'),
+            'total_paid' => \App\Models\Tenant\PurchaseOrder::sum('paid_amount'),
+            'total_remaining' => \App\Models\Tenant\PurchaseOrder::sum('remaining_amount'),
+        ]);
+    }
 }

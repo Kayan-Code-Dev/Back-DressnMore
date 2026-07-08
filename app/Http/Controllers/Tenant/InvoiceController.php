@@ -129,4 +129,31 @@ class InvoiceController extends Controller
             $rows,
         );
     }
+
+    public function print(int $invoice): JsonResponse
+    {
+        $invoiceModel = $this->invoiceService->findOrFail($invoice);
+        $data = new InvoiceResource($invoiceModel);
+
+        return ApiResponse::success([
+            'invoice' => $data,
+            'print_date' => now()->toDateTimeString(),
+        ], 'Invoice print data');
+    }
+
+    public function items(int $invoice): JsonResponse
+    {
+        $invoiceModel = $this->invoiceService->findOrFail($invoice);
+        $items = $invoiceModel->items()->with('dress')->get();
+
+        return ApiResponse::success($items->map(fn ($item) => [
+            'id' => $item->id,
+            'product_name' => $item->dress?->name ?? $item->product_name ?? '',
+            'product_code' => $item->dress?->code ?? '',
+            'quantity' => $item->quantity,
+            'unit_price' => $item->unit_price,
+            'discount' => $item->discount ?? 0,
+            'total' => $item->total,
+        ]));
+    }
 }

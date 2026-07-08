@@ -81,6 +81,10 @@ Route::prefix('tenant')->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::get('/lookups', [LookupController::class, 'index']);
+        Route::get('/dashboard', [DashboardController::class, 'overview'])
+            ->middleware('tenant.permission:dashboard.view');
+        Route::get('/settings/roles', [HrAccessController::class, 'roles'])
+            ->middleware('tenant.permission:hr.employees.view');
         Route::get('/settings/app', [SettingsController::class, 'appSettings'])
             ->middleware('tenant.permission:settings.view');
         Route::put('/settings/app', [SettingsController::class, 'updateAppSettings'])
@@ -113,6 +117,8 @@ Route::prefix('tenant')->group(function (): void {
             ->whereNumber('invoice')
             ->middleware(['tenant.permission:invoice_delivery.return', 'plan.feature:returns.enabled']);
 
+        Route::get('/supplier-payments/stats', [SupplierPaymentController::class, 'stats'])
+            ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);
         Route::get('/supplier-payments', [SupplierPaymentController::class, 'index'])
             ->middleware(['tenant.permission:supplier_payments.view', 'plan.feature:supplier_payments.enabled']);
 
@@ -155,6 +161,15 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:reports.sales');
             Route::get('/invoices/stats', [SalesController::class, 'invoiceStats'])
                 ->middleware('tenant.permission:invoices.view');
+            Route::get('/invoices/{invoice}/payments', [InvoiceController::class, 'payments'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoice_payments.view');
+            Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.view');
+            Route::get('/invoices/{invoice}/items', [InvoiceController::class, 'items'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.view');
             Route::get('/invoices', [SalesController::class, 'indexInvoices'])
                 ->middleware('tenant.permission:invoices.view');
             Route::get('/invoices/{invoice}', [SalesController::class, 'show'])
@@ -194,6 +209,7 @@ Route::prefix('tenant')->group(function (): void {
             ->middleware('tenant.permission:settings.manage');
 
         Route::prefix('/notifications')->group(function (): void {
+            Route::get('/unread-count', [NotificationController::class, 'stats']);
             Route::get('/', [NotificationController::class, 'index'])
                 ->middleware('tenant.permission:settings.view');
             Route::get('/stats', [NotificationController::class, 'stats']);
@@ -225,6 +241,9 @@ Route::prefix('tenant')->group(function (): void {
                 ->where('type', 'sales-daily|sales-products|sales-employees|rental|deliveries|returns|customers|inventory|expenses|cash|accounting|payments|suppliers')
                 ->middleware('tenant.permission:reports.view');
         });
+
+        Route::get('/accounts', [AccountingController::class, 'summary'])
+            ->middleware('tenant.permission:accounting.view');
 
         Route::prefix('/accounting')->middleware('plan.feature:accounting.enabled')->group(function (): void {
             Route::get('/summary', [AccountingController::class, 'summary'])
@@ -327,6 +346,8 @@ Route::prefix('tenant')->group(function (): void {
         });
 
         Route::prefix('/purchase-orders')->middleware('plan.feature:purchase_orders.enabled')->group(function (): void {
+            Route::get('/stats', [PurchaseOrderController::class, 'stats'])
+                ->middleware('tenant.permission:purchase_orders.view');
             Route::get('/export', [PurchaseOrderController::class, 'export'])
                 ->middleware('tenant.permission:purchase_orders.export');
             Route::get('/', [PurchaseOrderController::class, 'index'])
@@ -408,6 +429,8 @@ Route::prefix('tenant')->group(function (): void {
         Route::prefix('/cashboxes')->middleware('plan.feature:cashboxes.enabled')->group(function (): void {
             Route::get('/export', [CashboxController::class, 'export'])
                 ->middleware('tenant.permission:cashboxes.export');
+            Route::get('/summary', [CashboxController::class, 'dailySummary'])
+                ->middleware('tenant.permission:cashboxes.view');
             Route::get('/daily-summary', [CashboxController::class, 'dailySummary'])
                 ->middleware('tenant.permission:cashboxes.view');
             Route::prefix('/statement')->group(function (): void {
@@ -435,6 +458,9 @@ Route::prefix('tenant')->group(function (): void {
             Route::delete('/{cashbox}', [CashboxController::class, 'destroy'])
                 ->whereNumber('cashbox')
                 ->middleware('tenant.permission:cashboxes.delete');
+            Route::get('/{cashbox}/statement', [CashboxController::class, 'transactions'])
+                ->whereNumber('cashbox')
+                ->middleware('tenant.permission:cashboxes.view');
             Route::get('/{cashbox}/transactions', [CashboxController::class, 'transactions'])
                 ->whereNumber('cashbox')
                 ->middleware('tenant.permission:cashboxes.view');
@@ -464,6 +490,8 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware('tenant.permission:dress_categories.view');
             Route::post('/', [DressCategoryController::class, 'store'])
                 ->middleware('tenant.permission:dress_categories.create');
+            Route::get('/tree', [DressCategoryController::class, 'tree'])
+                ->middleware('tenant.permission:dress_categories.view');
             Route::get('/{dressCategory}', [DressCategoryController::class, 'show'])
                 ->whereNumber('dressCategory')
                 ->middleware('tenant.permission:dress_categories.view');
@@ -507,6 +535,11 @@ Route::prefix('tenant')->group(function (): void {
                 ->middleware(['tenant.permission:inventory.view', 'plan.feature:inventory.enabled']);
         });
 
+        Route::prefix('/reports')->middleware('tenant.permission:reports.view')->group(function (): void {
+            Route::get('/summary', [ReportController::class, 'overview']);
+            Route::get('/catalog', [ReportController::class, 'catalog']);
+        });
+
         Route::prefix('/invoices')->middleware('plan.feature:invoices.enabled')->group(function (): void {
             Route::get('/export', [InvoiceController::class, 'export'])
                 ->middleware('tenant.permission:invoices.export');
@@ -517,6 +550,12 @@ Route::prefix('tenant')->group(function (): void {
             Route::post('/{invoice}/cancel', [InvoiceController::class, 'cancel'])
                 ->whereNumber('invoice')
                 ->middleware('tenant.permission:invoices.cancel');
+            Route::get('/{invoice}/print', [InvoiceController::class, 'print'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.view');
+            Route::get('/{invoice}/items', [InvoiceController::class, 'items'])
+                ->whereNumber('invoice')
+                ->middleware('tenant.permission:invoices.view');
             Route::get('/{invoice}', [InvoiceController::class, 'show'])
                 ->whereNumber('invoice')
                 ->middleware('tenant.permission:invoices.view');
@@ -647,6 +686,8 @@ Route::prefix('tenant')->group(function (): void {
                 ->whereNumber('shift')
                 ->middleware('tenant.permission:hr.shifts.delete');
 
+            Route::get('/attendance/today', [HrAttendanceController::class, 'today'])
+                ->middleware('tenant.permission:hr.attendance.view');
             Route::get('/attendance', [HrAttendanceController::class, 'index'])
                 ->middleware('tenant.permission:hr.attendance.view');
             Route::post('/attendance', [HrAttendanceController::class, 'store'])

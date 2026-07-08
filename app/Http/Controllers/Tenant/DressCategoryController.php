@@ -59,4 +59,14 @@ class DressCategoryController extends Controller
 
         return ApiResponse::success(null, 'Dress category deleted');
     }
+
+    public function tree(Request $request): JsonResponse
+    {
+        $categories = \App\Models\Tenant\DressCategory::whereNull('parent_id')
+            ->with('children.children')
+            ->where('status', 'active')
+            ->get();
+
+        return ApiResponse::success($categories);
+    }
 }
