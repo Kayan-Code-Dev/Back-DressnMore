@@ -36,6 +36,7 @@ class SupplierPaymentService
             $payment = SupplierPayment::query()->create([
                 'supplier_id' => $supplier->id,
                 'purchase_order_id' => $purchaseOrder?->id,
+                'cashbox_id' => $data['cashbox_id'] ?? null,
                 'amount' => round((float) $data['amount'], 2),
                 'method' => $data['method'] ?? null,
                 'reference' => $data['reference'] ?? null,

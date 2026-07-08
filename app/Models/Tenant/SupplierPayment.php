@@ -13,6 +13,7 @@ class SupplierPayment extends BaseTenantModel
     protected $fillable = [
         'supplier_id',
         'purchase_order_id',
+        'cashbox_id',
         'amount',
         'method',
         'reference',

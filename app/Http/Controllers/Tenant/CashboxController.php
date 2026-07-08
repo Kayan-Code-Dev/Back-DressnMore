@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Models\Tenant\Cashbox;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Cashbox\StoreCashboxRequest;
 use App\Http\Requests\Tenant\Cashbox\UpdateCashboxRequest;
@@ -40,7 +42,11 @@ class CashboxController extends Controller
 
     public function show(int $cashbox): JsonResponse
     {
-        $cashboxModel = $this->cashboxService->findOrFail($cashbox);
+        $cashboxModel = Cashbox::query()
+            ->with('branch')
+            ->withSum(['movements as total_in' => fn ($q) => $q->where('direction', 'in')->where('is_reversed', false)], 'amount')
+            ->withSum(['movements as total_out' => fn ($q) => $q->where('direction', 'out')->where('is_reversed', false)], 'amount')
+            ->findOrFail($cashbox);
 
         return ApiResponse::success(new CashboxResource($cashboxModel));
     }
