@@ -43,6 +43,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(AuthenticatesRequests::class, SetTenantDatabase::class);
         $middleware->prependToPriorityList(SetTenantDatabase::class, CheckTenantSubscription::class);
         $middleware->prependToPriorityList(CheckTenantSubscription::class, IdentifyTenant::class);
+
+        $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $exception, Request $request) {

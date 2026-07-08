@@ -147,17 +147,23 @@ class TenantController extends Controller
             return ApiResponse::error('لا يوجد مستخدمون نشطون في هذا الـ Tenant.', 404);
         }
 
-        // Load the tenant User model and create token
+        // Switch to tenant database and create token directly
+        $dbName = $tenantModel->database_name;
+        config(['database.connections.tenant.database' => $dbName]);
+        \DB::purge('tenant');
+        \DB::reconnect('tenant');
+
+        // Find user model on tenant connection
         $userModel = \App\Models\Tenant\User::on('tenant')->find($tenantUser->id);
 
         if (!$userModel) {
-            return ApiResponse::error('لم يتم العثور على المستخدم في قاعدة بيانات Tenant.', 404);
+            return ApiResponse::error('لم يتم العثور على المستخدم.', 404);
         }
 
         // Delete old impersonation tokens
         $userModel->tokens()->where('name', 'impersonation')->delete();
 
-        // Create new impersonation token
+        // Create new token
         $newToken = $userModel->createToken('impersonation', ['*'], now()->addHour());
 
         return ApiResponse::success([
