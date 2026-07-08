@@ -147,16 +147,18 @@ class TenantController extends Controller
             return ApiResponse::error('لا يوجد مستخدمون نشطون في هذا الـ Tenant.', 404);
         }
 
-        // Generate impersonation token
-        $plainToken = \Illuminate\Support\Str::random(64);
-        $token = \Laravel\Sanctum\PersonalAccessToken::create([
-            'tokenable_type' => \App\Models\Tenant\User::class,
-            'tokenable_id' => $tenantUser->id,
-            'name' => 'impersonation',
-            'token' => hash('sha256', $plainToken),
-            'abilities' => ['*'],
-            'expires_at' => now()->addHour(),
-        ]);
+        // Load the tenant User model and create token
+        $userModel = \App\Models\Tenant\User::on('tenant')->find($tenantUser->id);
+
+        if (!$userModel) {
+            return ApiResponse::error('لم يتم العثور على المستخدم في قاعدة بيانات Tenant.', 404);
+        }
+
+        // Delete old impersonation tokens
+        $userModel->tokens()->where('name', 'impersonation')->delete();
+
+        // Create new impersonation token
+        $newToken = $userModel->createToken('impersonation', ['*'], now()->addHour());
 
         return ApiResponse::success([
             'tenant' => [
@@ -169,7 +171,7 @@ class TenantController extends Controller
                 'name' => $tenantUser->name,
                 'email' => $tenantUser->email,
             ],
-            'token' => $token->id . '|' . $plainToken,
+            'token' => $newToken->plainTextToken,
             'redirect_url' => config('app.frontend_url', 'https://dressnmore.it.com') . '/?tenant=' . $tenantModel->slug,
         ], 'تم إنشاء رمز الدخول بنجاح.');
     }
