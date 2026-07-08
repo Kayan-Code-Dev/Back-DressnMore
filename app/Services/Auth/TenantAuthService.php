@@ -82,15 +82,17 @@ class TenantAuthService
      */
     public function permissionsForUser(User $user): array
     {
-        return $user->roles()
-            ->with('permissions:id,key')
+        $permissions = $user->roles()
+            ->with('permissions:id,key,display_name')
             ->get()
             ->pluck('permissions')
             ->flatten()
-            ->pluck('key')
-            ->unique()
-            ->values()
-            ->all();
+            ->unique('id');
+
+        return $permissions->map(fn ($p) => [
+            'key' => $p->key,
+            'display_name' => $p->display_name ?? $p->name,
+        ])->values()->all();
     }
 
     private function assertTenantCanAuthenticate(Tenant $tenant): void

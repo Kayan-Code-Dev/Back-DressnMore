@@ -2,7 +2,9 @@
 
 namespace App\Models\Tenant;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -17,6 +19,7 @@ class User extends Authenticatable
         'email',
         'password',
         'phone',
+        'branch_id',
         'avatar_path',
         'status',
     ];
@@ -36,5 +39,15 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'role_user');
+    }
+
+    public function hrEmployee(): HasOne
+    {
+        return $this->hasOne(HrEmployee::class, 'user_id');
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'branch_id');
     }
 }

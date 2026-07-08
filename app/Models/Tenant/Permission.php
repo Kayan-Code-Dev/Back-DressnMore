@@ -10,6 +10,7 @@ class Permission extends BaseTenantModel
 
     protected $fillable = [
         'name',
+        'display_name',
         'key',
     ];
 

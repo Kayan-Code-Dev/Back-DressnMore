@@ -29,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'branch.scope' => \App\Http\Middleware\BranchScope::class,
             'platform.admin' => EnsurePlatformAdmin::class,
             'identify.tenant' => IdentifyTenant::class,
             'check.tenant.subscription' => CheckTenantSubscription::class,

@@ -45,8 +45,10 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user()->load(['hrEmployee.branch']);
+
         return ApiResponse::success([
-            'user' => new UserResource($request->user()),
+            'user' => new UserResource($user),
             'tenant' => [
                 'id' => $this->tenantContext->id(),
                 'name' => $this->tenantContext->tenant()?->name,

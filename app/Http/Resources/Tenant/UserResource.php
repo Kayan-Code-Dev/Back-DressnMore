@@ -15,11 +15,15 @@ class UserResource extends JsonResource
 
         $avatarUrl = app(TenantUserAvatarService::class)->url($this->avatar_path, $tenant);
 
+        $branch = $this->whenLoaded('hrEmployee.branch', fn () => $this->hrEmployee?->branch);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
+            'branch_id' => $this->branch_id,
+            'branch_name' => $branch?->name,
             'status' => $this->status,
             'avatar_path' => $this->avatar_path,
             'avatar_url' => $avatarUrl,
