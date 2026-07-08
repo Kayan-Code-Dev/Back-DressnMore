@@ -128,4 +128,49 @@ class TenantController extends Controller
 
         return ApiResponse::success(new TenantResource($tenant), 'Tenant renewed');
     }
+
+    public function impersonate(int $tenant): JsonResponse
+    {
+        $tenantModel = Tenant::query()->findOrFail($tenant);
+
+        if ($tenantModel->status !== 'active') {
+            return ApiResponse::error('لا يمكن الدخول إلى حساب Tenant غير فعال.', 403);
+        }
+
+        // Find the first user of this tenant
+        $dbName = $tenantModel->database_name ?? "tenant_" . str_replace("-", "_", $tenantModel->slug);
+        $tenantUser = \DB::connection("tenant")
+            ->table("users")
+            ->where("status", "active")
+            ->first();
+
+        if (!$tenantUser) {
+            return ApiResponse::error('لا يوجد مستخدمون نشطون في هذا الـ Tenant.', 404);
+        }
+
+        // Create a temporary impersonation token using Sanctum
+        $token = \App\Models\Central\PersonalAccessToken::create([
+            'tokenable_type' => \App\Models\Tenant\User::class,
+            'tokenable_id' => $tenantUser->id,
+            'name' => 'impersonation_' . time(),
+            'token' => hash('sha256', $plainToken = \Illuminate\Support\Str::random(40)),
+            'abilities' => ['*'],
+            'expires_at' => now()->addHour(),
+        ]);
+
+        return ApiResponse::success([
+            'tenant' => [
+                'id' => $tenantModel->id,
+                'name' => $tenantModel->name,
+                'slug' => $tenantModel->slug,
+            ],
+            'user' => [
+                'id' => $tenantUser->id,
+                'name' => $tenantUser->name,
+                'email' => $tenantUser->email,
+            ],
+            'token' => $token->id . '|' . $plainToken,
+            'redirect_url' => config('app.frontend_url') . '/?tenant=' . $tenantModel->slug,
+        ], 'Impersonation token created successfully.');
+    }
 }
