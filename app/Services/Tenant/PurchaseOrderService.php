@@ -243,8 +243,11 @@ class PurchaseOrderService
             }
 
             // 3. Create journal entry: Debit Inventory / Credit Suppliers
-            $inventoryAccount = $this->findOrCreateAccount('1200', 'المخزون', 'asset');
-            $suppliersAccount = $this->findOrCreateAccount('2100', 'الموردين', 'liability');
+            $inventoryAccount = $this->findOrCreateAccountByName('المخزون', '1210', 'asset');
+            $suppliersAccount = Account::query()->where('code', '2000')->first();
+            if ($suppliersAccount === null) {
+                $suppliersAccount = $this->findOrCreateAccount('2000', 'الموردون', 'liability');
+            }
 
             $this->journalEntryService->createFromSource(
                 header: [
@@ -262,7 +265,7 @@ class PurchaseOrderService
                         'code' => $inventoryAccount->code,
                         'debit' => (float) $purchaseOrder->total,
                         'credit' => 0,
-                        'description' => 'زيادة المخزون — استلام ' . $purchaseOrder->purchase_order_number,
+                        'description' => 'زيادة المخزون — استلام ' . $purchaseOrder->purchase_order_number . ' (' . $inventoryAccount->name . ')',
                         'branch_id' => $purchaseOrder->branch_id,
                     ],
                     [
@@ -270,7 +273,7 @@ class PurchaseOrderService
                         'code' => $suppliersAccount->code,
                         'debit' => 0,
                         'credit' => (float) $purchaseOrder->total,
-                        'description' => 'التزام تجاه المورد — ' . ($purchaseOrder->supplier->name ?? ''),
+                        'description' => 'التزام تجاه المورد — ' . ($purchaseOrder->supplier->name ?? '') . ' (' . $suppliersAccount->name . ')',
                         'branch_id' => $purchaseOrder->branch_id,
                     ],
                 ],
@@ -301,13 +304,34 @@ class PurchaseOrderService
         ]);
     }
 
+    private function findOrCreateAccountByName(string $name, string $fallbackCode, string $type): Account
+    {
+        $account = Account::query()->where('name', $name)->first();
+        if ($account !== null) {
+            return $account;
+        }
+
+        $account = Account::query()->where('code', $fallbackCode)->first();
+        if ($account !== null) {
+            return $account;
+        }
+
+        return Account::query()->create([
+            'code' => $fallbackCode,
+            'name' => $name,
+            'type' => $type,
+            'is_active' => true,
+        ]);
+    }
+
     public function syncFinancials(PurchaseOrder $purchaseOrder, ?string $preferredStatus = null): PurchaseOrder
     {
         $supplierPaymentsSum = $this->money((float) SupplierPayment::query()
             ->where('purchase_order_id', $purchaseOrder->id)
             ->sum('amount'));
         $depositAmount = $this->money((float) $purchaseOrder->deposit_amount);
-        $paidAmount = $this->money(max($supplierPaymentsSum, $depositAmount));
+        // Deposit is a payment made at PO creation, so add it to supplier payments
+        $paidAmount = $this->money($supplierPaymentsSum + $depositAmount);
         $total = $this->money((float) $purchaseOrder->total);
         $remainingAmount = $this->money(max(0, $total - $paidAmount));
 
