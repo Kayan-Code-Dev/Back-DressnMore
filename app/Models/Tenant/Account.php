@@ -2,23 +2,35 @@
 
 namespace App\Models\Tenant;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Model;
 
-class Account extends BaseTenantModel
+class Account extends Model
 {
+    protected $connection = 'tenant';
+    protected $table = 'gl_accounts';
+
     protected $fillable = [
-        'code',
-        'name',
-        'type',
-        'is_active',
+        'account_type_id', 'parent_id', 'code', 'name', 'name_en',
+        'level', 'is_active', 'current_balance',
     ];
 
     protected $casts = [
+        'current_balance' => 'decimal:2',
         'is_active' => 'boolean',
     ];
 
-    public function journalLines(): HasMany
+    public function type()
     {
-        return $this->hasMany(JournalEntryLine::class);
+        return $this->belongsTo(GlAccountType::class, 'account_type_id');
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(self::class, 'parent_id');
     }
 }

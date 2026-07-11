@@ -154,6 +154,8 @@ class TenantRolePermissionSeeder extends Seeder
             ['name' => 'HR Leaves View', 'key' => 'hr.leaves.view'],
             ['name' => 'HR Leaves Create', 'key' => 'hr.leaves.create'],
             ['name' => 'HR Leaves Status', 'key' => 'hr.leaves.status'],
+            ['name' => 'AI Assistant View', 'key' => 'intelligence.view'],
+            ['name' => 'AI Assistant Chat', 'key' => 'intelligence.chat'],
         ];
 
         $permissionIds = [];

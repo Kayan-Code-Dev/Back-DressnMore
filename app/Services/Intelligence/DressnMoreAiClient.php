@@ -27,10 +27,16 @@ class DressnMoreAiClient
 
     public function generate(array $messages, array $options = []): array
     {
+        $defaultTokens = config('intelligence.generation.default_output_tokens', 96);
+        $maxTokens = config('intelligence.generation.max_output_tokens', 160);
+
+        $requestedTokens = $options['max_tokens'] ?? $defaultTokens;
+        $requestedTokens = min($requestedTokens, $maxTokens);
+
         $payload = [
             'messages' => $messages,
-            'temperature' => $options['temperature'] ?? 0.7,
-            'max_tokens' => $options['max_tokens'] ?? 160,
+            'temperature' => $options['temperature'] ?? config('intelligence.generation.temperature', 0.7),
+            'max_tokens' => $requestedTokens,
             'stream' => false,
         ];
 
@@ -64,10 +70,14 @@ class DressnMoreAiClient
 
             $data = $response->json();
 
+            // Map response fields: usage.total_tokens, latency_ms
+            $tokensUsed = $data['usage']['total_tokens'] ?? ($data['tokens_used'] ?? 0);
+            $latencyMs = $data['latency_ms'] ?? ($data['generation_time_ms'] ?? 0);
+
             return [
                 'response' => $data['response'] ?? '',
-                'tokens_used' => $data['tokens_used'] ?? 0,
-                'generation_time_ms' => $data['generation_time_ms'] ?? 0,
+                'tokens_used' => $tokensUsed,
+                'generation_time_ms' => $latencyMs,
             ];
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error('AI service unreachable', ['error' => $e->getMessage()]);
@@ -89,21 +99,12 @@ class DressnMoreAiClient
             ->get("{$this->baseUrl}/health");
 
             if ($response->successful()) {
-                return [
-                    'status' => 'healthy',
-                    'details' => $response->json(),
-                ];
+                return ['status' => 'healthy', 'details' => $response->json()];
             }
 
-            return [
-                'status' => 'unhealthy',
-                'details' => ['status_code' => $response->status()],
-            ];
+            return ['status' => 'unhealthy', 'details' => ['status_code' => $response->status()]];
         } catch (\Exception $e) {
-            return [
-                'status' => 'unreachable',
-                'details' => ['error' => $e->getMessage()],
-            ];
+            return ['status' => 'unreachable', 'details' => ['error' => $e->getMessage()]];
         }
     }
 }

@@ -14,6 +14,7 @@ class AiMessage extends BaseTenantModel
         'role',
         'content',
         'tokens_used',
+        'request_id',
         'generation_time_ms',
     ];
 

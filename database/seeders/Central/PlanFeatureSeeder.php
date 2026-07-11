@@ -27,6 +27,7 @@ class PlanFeatureSeeder extends Seeder
                 'users.max' => 3,
             ],
             'pro' => [
+                'ai_assistant.enabled' => true,
                 'dashboard.enabled' => true,
                 'customers.enabled' => true,
                 'categories.enabled' => true,

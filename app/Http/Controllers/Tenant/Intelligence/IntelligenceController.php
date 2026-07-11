@@ -115,6 +115,22 @@ class IntelligenceController extends Controller
         $this->authorizeConversation($request, $conversation);
 
         $user = $request->user();
+        $requestId = $request->input('request_id');
+
+        // Idempotency: check for existing message with same request_id
+        if ($requestId !== null) {
+            $existingMessage = $conversation->messages()
+                ->where('request_id', $requestId)
+                ->first();
+
+            if ($existingMessage !== null) {
+                $existingRun = AiRun::where('message_id', $existingMessage->id)->first();
+                return ApiResponse::success([
+                    'message' => new MessageResource($existingMessage),
+                    'run' => $existingRun ? new RunResource($existingRun) : null,
+                ], 'Message already processed', 200);
+            }
+        }
 
         // Check queue protection
         try {
@@ -130,11 +146,15 @@ class IntelligenceController extends Controller
         }
 
         // Save user message
-        $message = $conversation->messages()->create([
+        $messageData = [
             'user_id' => $user->id,
             'role' => 'user',
             'content' => $request->input('content'),
-        ]);
+        ];
+        if ($requestId !== null) {
+            $messageData['request_id'] = $requestId;
+        }
+        $message = $conversation->messages()->create($messageData);
 
         // Update conversation timestamp
         $conversation->update(['last_message_at' => now()]);
