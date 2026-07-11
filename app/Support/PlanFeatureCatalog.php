@@ -30,6 +30,7 @@ class PlanFeatureCatalog
             ['key' => 'cash_movements.enabled', 'label' => 'Cash movements', 'group' => 'finance', 'type' => 'boolean', 'description' => 'Manual cash entries'],
             ['key' => 'reports.enabled', 'label' => 'Reports', 'group' => 'analytics', 'type' => 'boolean', 'description' => 'Sales and tailoring reports'],
             ['key' => 'accounting.enabled', 'label' => 'Accounting', 'group' => 'analytics', 'type' => 'boolean', 'description' => 'Accounting summary and ledger'],
+            ['key' => 'ai_assistant.enabled', 'label' => 'AI Assistant', 'group' => 'intelligence', 'type' => 'boolean', 'description' => 'AI-powered business assistant for insights and guidance'],
             ['key' => 'branches.max', 'label' => 'Max branches', 'group' => 'limits', 'type' => 'integer', 'description' => '0 = unlimited'],
             ['key' => 'users.max', 'label' => 'Max staff users', 'group' => 'limits', 'type' => 'integer', 'description' => '0 = unlimited'],
         ];

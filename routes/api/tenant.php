@@ -245,6 +245,14 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('/accounts', [AccountingController::class, 'summary'])
             ->middleware('tenant.permission:accounting.view');
 
+        // Treasury
+        Route::prefix('/treasury')->middleware('plan.feature:accounting.enabled')->group(function () {
+            Route::get('/accounts', [AccountingController::class, 'listTreasuryAccounts']);
+            Route::post('/accounts', [AccountingController::class, 'createTreasuryAccount']);
+            Route::get('/entries', [AccountingController::class, 'listTreasuryEntries']);
+            Route::post('/entries', [AccountingController::class, 'createTreasuryEntry']);
+        });
+
         Route::prefix('/accounting')->middleware('plan.feature:accounting.enabled')->group(function (): void {
             Route::get('/summary', [AccountingController::class, 'summary'])
                 ->middleware('tenant.permission:accounting.view');
@@ -278,6 +286,22 @@ Route::prefix('tenant')->group(function (): void {
                     ->whereNumber('journalEntry')
                     ->middleware('tenant.permission:accounting.journal_entries.reverse');
             });
+
+            // Chart of Accounts
+            Route::get('/accounts-tree', [AccountingController::class, 'listAccounts'])
+                ->middleware('tenant.permission:accounting.view');
+            Route::get('/account-types', [AccountingController::class, 'getAccountTypes'])
+                ->middleware('tenant.permission:accounting.view');
+
+            // Financial Reports
+            Route::get('/reports/balance-sheet', [AccountingController::class, 'balanceSheet'])
+                ->middleware('tenant.permission:accounting.view');
+            Route::get('/reports/income-statement', [AccountingController::class, 'incomeStatement'])
+                ->middleware('tenant.permission:accounting.view');
+
+            // Auto-post
+            Route::post('/auto-post', [AccountingController::class, 'autoPostJournal'])
+                ->middleware('tenant.permission:accounting.journal_entries.create');
         });
 
         Route::prefix('/customers')->middleware('plan.feature:customers.enabled')->group(function (): void {
@@ -721,6 +745,36 @@ Route::prefix('tenant')->group(function (): void {
             Route::delete('/payroll/adjustments/{adjustment}', [HrPayrollAdjustmentController::class, 'destroy'])
                 ->whereNumber('adjustment')
                 ->middleware('tenant.permission:hr.view');
+        });
+    });
+});
+
+
+// AI Intelligence Routes
+Route::prefix('/intelligence')->middleware([
+    'identify.tenant',
+    'check.tenant.subscription',
+    'set.tenant.database',
+    'auth:sanctum',
+    'ensure.tenant.token',
+])->group(function (): void {
+
+    // Feature gate: ai_assistant.enabled
+    Route::middleware(['plan.feature:ai_assistant.enabled'])->group(function (): void {
+
+        // Conversations (require view permission)
+        Route::middleware('tenant.permission:intelligence.view')->group(function (): void {
+            Route::get('/conversations', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'conversations']);
+            Route::get('/conversations/{conversation}', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'showConversation']);
+            Route::post('/conversations', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'storeConversation']);
+            Route::delete('/conversations/{conversation}', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'archiveConversation']);
+            Route::get('/health', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'health']);
+        });
+
+        // Messaging (require chat permission)
+        Route::middleware('tenant.permission:intelligence.chat')->group(function (): void {
+            Route::post('/conversations/{conversation}/messages', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'storeMessage']);
+            Route::get('/runs/{run}', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'showRun']);
         });
     });
 });
