@@ -15,7 +15,9 @@ class AiRun extends BaseTenantModel
         'assistant_message_id',
         'status',
         'error_message',
-        'tokens_used',
+        'total_tokens',
+        'input_tokens',
+        'output_tokens',
         'generation_time_ms',
         'started_at',
         'completed_at',
@@ -25,7 +27,9 @@ class AiRun extends BaseTenantModel
     {
         return [
             'status' => 'string',
-            'tokens_used' => 'integer',
+            'total_tokens' => 'integer',
+            'input_tokens' => 'integer',
+            'output_tokens' => 'integer',
             'generation_time_ms' => 'integer',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
@@ -65,8 +69,10 @@ class AiRun extends BaseTenantModel
         $this->update([
             'status' => 'completed',
             'assistant_message_id' => $assistantMessageId,
-            'tokens_used' => $result['tokens_used'],
-            'generation_time_ms' => $result['generation_time_ms'],
+            'total_tokens' => $result['total_tokens'] ?? 0,
+            'input_tokens' => $result['input_tokens'] ?? null,
+            'output_tokens' => $result['output_tokens'] ?? null,
+            'generation_time_ms' => $result['generation_time_ms'] ?? 0,
             'completed_at' => now(),
         ]);
     }

@@ -13,7 +13,9 @@ class RunResource extends JsonResource
             'id' => $this->id,
             'status' => $this->status,
             'error_message' => $this->error_message,
-            'tokens_used' => $this->tokens_used,
+            'input_tokens' => $this->input_tokens,
+            'output_tokens' => $this->output_tokens,
+            'total_tokens' => $this->total_tokens,
             'generation_time_ms' => $this->generation_time_ms,
             'assistant_message' => $this->whenLoaded('assistantMessage', function () {
                 return new MessageResource($this->assistantMessage);

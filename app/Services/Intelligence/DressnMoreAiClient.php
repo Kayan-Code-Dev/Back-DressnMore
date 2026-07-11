@@ -60,6 +60,11 @@ class DressnMoreAiClient
                 throw new RuntimeException('Request too large. Please shorten your message.');
             }
 
+            if ($response->status() === 401 || $response->status() === 403) {
+                Log::error('AI service auth rejected');
+                throw new RuntimeException('AI service authentication failed.');
+            }
+
             if ($response->failed()) {
                 Log::error('AI service error', [
                     'status' => $response->status(),
@@ -70,13 +75,17 @@ class DressnMoreAiClient
 
             $data = $response->json();
 
-            // Map response fields: usage.total_tokens, latency_ms
-            $tokensUsed = $data['usage']['total_tokens'] ?? ($data['tokens_used'] ?? 0);
-            $latencyMs = $data['latency_ms'] ?? ($data['generation_time_ms'] ?? 0);
+            // Map token fields from inference service response
+            $inputTokens = $data['usage']['input_tokens'] ?? null;
+            $outputTokens = $data['usage']['output_tokens'] ?? null;
+            $totalTokens = $data['usage']['total_tokens'] ?? null;
+            $latencyMs = $data['latency_ms'] ?? null;
 
             return [
                 'response' => $data['response'] ?? '',
-                'tokens_used' => $tokensUsed,
+                'input_tokens' => $inputTokens,
+                'output_tokens' => $outputTokens,
+                'total_tokens' => $totalTokens,
                 'generation_time_ms' => $latencyMs,
             ];
         } catch (\Illuminate\Http\Client\ConnectionException $e) {

@@ -13,15 +13,19 @@ class AiMessage extends BaseTenantModel
         'user_id',
         'role',
         'content',
-        'tokens_used',
         'request_id',
+        'total_tokens',
+        'input_tokens',
+        'output_tokens',
         'generation_time_ms',
     ];
 
     protected function casts(): array
     {
         return [
-            'tokens_used' => 'integer',
+            'total_tokens' => 'integer',
+            'input_tokens' => 'integer',
+            'output_tokens' => 'integer',
             'generation_time_ms' => 'integer',
         ];
     }
