@@ -751,7 +751,7 @@ Route::prefix('tenant')->group(function (): void {
 
 
 // AI Intelligence Routes
-Route::prefix('/intelligence')->middleware([
+Route::prefix('/tenant/intelligence')->middleware([
     'identify.tenant',
     'check.tenant.subscription',
     'set.tenant.database',
