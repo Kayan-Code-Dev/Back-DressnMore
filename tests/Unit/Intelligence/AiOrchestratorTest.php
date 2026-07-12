@@ -8,6 +8,7 @@ use App\Models\Tenant\Intelligence\AiMessage;
 use App\Models\Tenant\Intelligence\AiRun;
 use App\Models\Tenant\User;
 use App\Services\Intelligence\AiOrchestrator;
+use App\Services\Intelligence\Tools\BusinessToolExecutor;
 use App\Services\Intelligence\DressnMoreAiClient;
 use App\Services\Tenant\TenantContext;
 use Illuminate\Database\Schema\Blueprint;
@@ -66,7 +67,17 @@ class AiOrchestratorTest extends TestCase
         $tenantContext->shouldReceive('tenant')->andReturn($this->tenant);
         $tenantContext->shouldReceive('slug')->andReturn('test');
 
-        return new AiOrchestrator($client, $tenantContext);
+        $toolExecutor = Mockery::mock(BusinessToolExecutor::class);
+        $toolExecutor->shouldReceive('tryAnswer')->andReturn([
+            'handled' => true,
+            'response' => 'Test tool response',
+            'facts' => [],
+            'tools_executed' => [],
+            'execution_ms' => 100,
+            'model_needed' => false,
+        ]);
+        $toolExecutor->shouldIgnoreMissing();
+        return new AiOrchestrator($client, $tenantContext, $toolExecutor);
     }
 
     public function test_default_output_tokens_are_96(): void
@@ -98,7 +109,17 @@ class AiOrchestratorTest extends TestCase
         $tenantContext = Mockery::mock(TenantContext::class);
         $tenantContext->shouldReceive('tenant')->andReturn($this->tenant);
         $tenantContext->shouldReceive('slug')->andReturn('test');
-        $orch = new AiOrchestrator($client, $tenantContext);
+        $toolExecutor = Mockery::mock(BusinessToolExecutor::class);
+        $toolExecutor->shouldReceive('tryAnswer')->andReturn([
+            'handled' => true,
+            'response' => 'Test tool response',
+            'facts' => [],
+            'tools_executed' => [],
+            'execution_ms' => 100,
+            'model_needed' => false,
+        ]);
+        $toolExecutor->shouldIgnoreMissing();
+        $orch = new AiOrchestrator($client, $tenantContext, $toolExecutor);
 
         $conv = AiConversation::on('orch_test')->create(['user_id' => $this->user->id, 'title' => 'Test', 'status' => 'active']);
         $msg = $conv->messages()->create(['user_id' => $this->user->id, 'role' => 'user', 'content' => 'What is revenue?']);
@@ -107,7 +128,7 @@ class AiOrchestratorTest extends TestCase
         $orch->executeRun($run);
 
         $systemMsg = collect($capturedMessages)->firstWhere('role', 'system');
-        $this->assertStringContainsString('do not have access to live business data', $systemMsg['content']);
+        $this->assertStringContainsString('You do NOT have database access', $systemMsg['content']);
         $this->assertStringContainsString('Do NOT fabricate numbers', $systemMsg['content']);
     }
 
@@ -123,7 +144,17 @@ class AiOrchestratorTest extends TestCase
         $tenantContext = Mockery::mock(TenantContext::class);
         $tenantContext->shouldReceive('tenant')->andReturn($this->tenant);
         $tenantContext->shouldReceive('slug')->andReturn('test');
-        $orch = new AiOrchestrator($client, $tenantContext);
+        $toolExecutor = Mockery::mock(BusinessToolExecutor::class);
+        $toolExecutor->shouldReceive('tryAnswer')->andReturn([
+            'handled' => true,
+            'response' => 'Test tool response',
+            'facts' => [],
+            'tools_executed' => [],
+            'execution_ms' => 100,
+            'model_needed' => false,
+        ]);
+        $toolExecutor->shouldIgnoreMissing();
+        $orch = new AiOrchestrator($client, $tenantContext, $toolExecutor);
 
         $conv = AiConversation::on('orch_test')->create(['user_id' => $this->user->id, 'title' => 'Test', 'status' => 'active']);
         $msg = $conv->messages()->create(['user_id' => $this->user->id, 'role' => 'user', 'content' => 'Hello test']);
@@ -148,7 +179,17 @@ class AiOrchestratorTest extends TestCase
         $tenantContext = Mockery::mock(TenantContext::class);
         $tenantContext->shouldReceive('tenant')->andReturn($this->tenant);
         $tenantContext->shouldReceive('slug')->andReturn('test');
-        $orch = new AiOrchestrator($client, $tenantContext);
+        $toolExecutor = Mockery::mock(BusinessToolExecutor::class);
+        $toolExecutor->shouldReceive('tryAnswer')->andReturn([
+            'handled' => true,
+            'response' => 'Test tool response',
+            'facts' => [],
+            'tools_executed' => [],
+            'execution_ms' => 100,
+            'model_needed' => false,
+        ]);
+        $toolExecutor->shouldIgnoreMissing();
+        $orch = new AiOrchestrator($client, $tenantContext, $toolExecutor);
 
         $conv = AiConversation::on('orch_test')->create(['user_id' => $this->user->id, 'title' => 'Test', 'status' => 'active']);
         $msg = $conv->messages()->create(['user_id' => $this->user->id, 'role' => 'user', 'content' => 'Hi']);
