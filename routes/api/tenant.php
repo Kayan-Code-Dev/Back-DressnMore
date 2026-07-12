@@ -769,6 +769,9 @@ Route::prefix('/intelligence')->middleware([
             Route::post('/conversations', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'storeConversation']);
             Route::delete('/conversations/{conversation}', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'archiveConversation']);
             Route::get('/health', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceController::class, 'health']);
+            Route::get('/snapshot', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceInsightsController::class, 'snapshot']);
+            Route::get('/business-health', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceInsightsController::class, 'health']);
+            Route::get('/daily-brief', [\App\Http\Controllers\Tenant\Intelligence\IntelligenceInsightsController::class, 'dailyBrief']);
         });
 
         // Messaging (require chat permission)
