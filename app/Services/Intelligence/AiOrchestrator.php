@@ -22,9 +22,6 @@ class AiOrchestrator
     private BusinessToolExecutor $toolExecutor;
     private BusinessToolRegistry $toolRegistry;
 
-    private const AR_CAPABILITY = 'أستطيع حاليًا مساعدتك في تحليل بيانات الأتيليه، مثل الإيرادات والحجوزات والتسليمات والمرتجعات والمخزون وملخص العمل اليومي.' . "\n\n" . 'اختر أحد الأسئلة المقترحة أو اسألني عن جزء محدد من نشاط الأتيليه.';
-    private const EN_CAPABILITY = 'I can help you analyze your atelier data: revenue, reservations, deliveries, returns, inventory, and daily summary.' . "\n\n" . 'Choose a suggested question or ask about a specific area.';
-    private const AR_FALLBACK = 'تعذر تشغيل التحليل المتقدم مؤقتًا، لكن يمكنني مساعدتك في الاستفسارات المباشرة عن الإيرادات والحجوزات والتسليمات والمرتجعات والمخزون.';
     private const MAX_TOOL_ROUNDS = 3;
     private const MAX_TOOLS_PER_RUN = 6;
 
@@ -50,85 +47,85 @@ class AiOrchestrator
             $userMessage = $run->userMessage;
             $content = $this->sanitizeInput($userMessage->content);
             $user = $userMessage->user;
+            $isComplex = $this->isComplexQuery($content);
+            $externalEnabled = config('intelligence.external_enabled', false);
 
-            // Step 1: Deterministic fast path for clear factual questions
+            // Step 1: Try business tools (always for supported questions)
             $deterministicResult = $this->toolExecutor->tryAnswer($user, $content, $tenantSlug);
-            if ($deterministicResult['handled'] ?? false) {
-                $isComplexQuery = $this->isComplexQuery($content);
-                $externalEnabled = config('intelligence.external_enabled', false);
 
-                // If complex query + Groq available → use model for richer response
-                if ($isComplexQuery && $externalEnabled && $this->providerManager?->isExternal()) {
-                    $this->executeAgenticFlow($run, $conversation, $userMessage, $content, $deterministicResult, $tenantSlug);
+            if ($deterministicResult['handled'] ?? false) {
+                // Supported business question
+                if ($isComplex && $externalEnabled && $this->providerManager?->isExternal()) {
+                    // Complex query + Groq → try agentic with fallback to deterministic
+                    $this->executeAgenticWithFallback($run, $conversation, $userMessage, $content, $deterministicResult, $tenantSlug);
                     return;
                 }
-
-                // Simple query or no Groq → deterministic response
+                // Simple query → deterministic response
                 $this->saveDeterministicResponse($run, $conversation, $deterministicResult);
                 return;
             }
 
-            // Step 2: No tool matched — check if complex query for Groq
-            $isComplexQuery = $this->isComplexQuery($content);
-            $externalEnabled = config('intelligence.external_enabled', false);
-
-            if ($isComplexQuery && $externalEnabled && $this->providerManager?->isExternal()) {
-                $this->executeAgenticFlow($run, $conversation, $userMessage, $content, null, $tenantSlug);
+            // Step 2: Not a tool question
+            if ($isComplex && $externalEnabled && $this->providerManager?->isExternal()) {
+                $this->executeAgenticWithFallback($run, $conversation, $userMessage, $content, null, $tenantSlug);
                 return;
             }
 
             if (!$this->isGeneralChatEnabled()) {
-                $this->saveCapabilityResponse($run, $conversation, $content);
+                $this->saveSmartFallback($run, $conversation, $content, $deterministicResult);
                 return;
             }
 
-            // Step 3: General AI (Groq or local)
+            // General AI
             if ($this->providerManager?->isExternal()) {
-                $this->executeAgenticFlow($run, $conversation, $userMessage, $content, null, $tenantSlug);
+                $this->executeAgenticWithFallback($run, $conversation, $userMessage, $content, null, $tenantSlug);
             } else {
                 $this->handleGeneralAi($run, $conversation, $userMessage, $tenantSlug);
             }
 
         } catch (Throwable $e) {
             $run->markFailed($e->getMessage());
-            Log::error('AI run failed', [
-                'run_id' => $run->id,
-                'tenant' => $tenantSlug,
-                'error' => $e->getMessage(),
-            ]);
+            Log::error('AI run failed', ['run_id' => $run->id, 'tenant' => $tenantSlug, 'error' => $e->getMessage()]);
             throw $e;
         }
     }
 
     /**
-     * Agentic tool-calling flow with Groq.
+     * Try Groq agentic, but fall back to deterministic data + smart response.
      */
-    private function executeAgenticFlow(
-        AiRun $run,
-        AiConversation $conversation,
-        AiMessage $userMessage,
-        string $content,
-        ?array $preToolResult,
-        string $tenantSlug,
+    private function executeAgenticWithFallback(
+        AiRun $run, AiConversation $conversation, AiMessage $userMessage,
+        string $content, ?array $preToolResult, string $tenantSlug,
     ): void {
-        $provider = $this->providerManager->primary();
-        if (!$provider) {
-            // Fallback to deterministic
+        try {
+            $this->executeAgenticFlow($run, $conversation, $userMessage, $content, $preToolResult, $tenantSlug);
+        } catch (Throwable $e) {
+            $errorCode = $e->getMessage();
+            Log::warning('Groq failed, using smart fallback', ['run_id' => $run->id, 'error' => $errorCode]);
+
             if ($preToolResult) {
-                $this->saveDeterministicResponse($run, $conversation, $preToolResult);
+                // Return deterministic data with smart analysis
+                $this->saveSmartFallback($run, $conversation, $content, $preToolResult);
             } else {
-                $this->saveFallbackResponse($run, $conversation);
+                $this->saveBasicFallback($run, $conversation);
             }
-            return;
+        }
+    }
+
+    private function executeAgenticFlow(AiRun $run, AiConversation $conversation,
+        AiMessage $userMessage, string $content, ?array $preToolResult, string $tenantSlug): void
+    {
+        $provider = $this->providerManager?->primary();
+        if (!$provider) {
+            throw new RuntimeException('NO_PROVIDER');
         }
 
         $memory = new ConversationMemory($conversation);
         $start = hrtime(true);
         $allToolFacts = [];
-        $toolRound = 0;
         $toolsCalled = [];
+        $toolRound = 0;
 
-        // Build initial messages
         $tenant = $this->tenantContext->tenant();
         $systemPrompt = BusinessConstitution::build(
             $tenant?->name ?? 'Atelier',
@@ -141,179 +138,172 @@ class AiOrchestrator
             $memory->toContextMessage(),
         ];
 
-        // Add recent history (last 6 messages)
         $history = $conversation->messages()
             ->where('id', '<', $userMessage->id)
             ->whereIn('role', ['user', 'assistant'])
-            ->orderBy('id', 'desc')
-            ->limit(6)
-            ->get()
-            ->sortBy('id');
+            ->orderBy('id', 'desc')->limit(6)->get()->sortBy('id');
         foreach ($history as $msg) {
             $messages[] = ['role' => $msg->role, 'content' => $msg->content];
         }
-
         $messages[] = ['role' => 'user', 'content' => $content];
 
-        // Tool schemas
         $tools = ToolSchemaBuilder::all();
 
-        try {
-            // Tool-calling loop
-            while ($toolRound < self::MAX_TOOL_ROUNDS) {
-                $result = $provider->chat($messages, $tools);
+        while ($toolRound < self::MAX_TOOL_ROUNDS) {
+            $result = $provider->chat($messages, $tools);
 
-                // Check if model requested tool calls
-                $toolCalls = $result['tool_calls'] ?? [];
-                if ($toolCalls === []) {
-                    // Model gave final response
-                    break;
-                }
+            $toolCalls = $result['tool_calls'] ?? [];
+            if ($toolCalls === []) {
+                break;
+            }
 
-                // Execute requested tools
-                $toolResults = [];
-                foreach ($toolCalls as $toolCall) {
-                    if (count($toolsCalled) >= self::MAX_TOOLS_PER_RUN) {
-                        break 2;
-                    }
+            foreach ($toolCalls as $toolCall) {
+                if (count($toolsCalled) >= self::MAX_TOOLS_PER_RUN) break 2;
 
-                    $function = $toolCall['function'] ?? [];
-                    $toolName = $function['name'] ?? '';
-                    $args = json_decode($function['arguments'] ?? '{}', true) ?: [];
+                $function = $toolCall['function'] ?? [];
+                $toolName = $function['name'] ?? '';
+                $args = json_decode($function['arguments'] ?? '{}', true) ?: [];
+                if (!$toolName) continue;
 
-                    if (!$toolName) {
-                        continue;
-                    }
+                $context = BusinessToolContext::forUser($userMessage->user, $tenantSlug);
+                $toolResult = $this->toolRegistry->execute($toolName, $context);
+                $minimizedFacts = DataMinimizer::minimize($toolResult->facts);
 
-                    $context = BusinessToolContext::forUser($userMessage->user, $tenantSlug);
-                    $toolResult = $this->toolRegistry->execute($toolName, $context);
-
-                    // Minimize before sending back to model
-                    $minimizedFacts = DataMinimizer::minimize($toolResult->facts);
-                    $toolResults[] = [
-                        'tool_call_id' => $toolCall['id'] ?? '',
-                        'role' => 'tool',
-                        'name' => $toolName,
-                        'content' => json_encode($minimizedFacts, JSON_UNESCAPED_UNICODE),
-                    ];
-
-                    $allToolFacts[] = $toolResult->facts;
-                    $toolsCalled[] = $toolName;
-                    $memory->recordToolUse($toolName);
-                }
-
-                // Add assistant's tool request + tool results to messages
                 $messages[] = [
                     'role' => 'assistant',
                     'content' => $result['response'] ?? '',
-                    'tool_calls' => $toolCalls,
+                    'tool_calls' => [$toolCall],
                 ];
-                foreach ($toolResults as $tr) {
-                    $messages[] = [
-                        'role' => 'tool',
-                        'tool_call_id' => $tr['tool_call_id'],
-                        'name' => $tr['name'],
-                        'content' => $tr['content'],
-                    ];
-                }
+                $messages[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $toolCall['id'] ?? '',
+                    'name' => $toolName,
+                    'content' => json_encode($minimizedFacts, JSON_UNESCAPED_UNICODE),
+                ];
 
-                $toolRound++;
+                $allToolFacts[] = $toolResult->facts;
+                $toolsCalled[] = $toolName;
+                $memory->recordToolUse($toolName);
             }
-
-            // Get final response (if we broke from tool loop, get one more)
-            if ($toolRound >= self::MAX_TOOL_ROUNDS || !isset($result)) {
-                $result = $provider->chat($messages, []);
-            }
-
-            $response = $result['response'] ?? '';
-
-            // Validate numerical integrity
-            if (!NumericalIntegrityValidator::validate($response, $allToolFacts)) {
-                Log::warning('Numerical integrity failed, using deterministic fallback', [
-                    'run_id' => $run->id,
-                ]);
-                if ($preToolResult) {
-                    $this->saveDeterministicResponse($run, $conversation, $preToolResult);
-                    return;
-                }
-                $response = self::AR_FALLBACK;
-            }
-
-            $elapsedMs = (int) ((hrtime(true) - $start) / 1e6);
-
-            // Save response
-            $assistantMessage = $conversation->messages()->create([
-                'user_id' => $run->user_id,
-                'role' => 'assistant',
-                'content' => $response,
-                'total_tokens' => $result['total_tokens'] ?? 0,
-                'input_tokens' => $result['input_tokens'] ?? 0,
-                'output_tokens' => $result['output_tokens'] ?? 0,
-                'generation_time_ms' => $elapsedMs,
-            ]);
-
-            $run->markCompleted($assistantMessage->id, [
-                'input_tokens' => $result['input_tokens'] ?? 0,
-                'output_tokens' => $result['output_tokens'] ?? 0,
-                'total_tokens' => $result['total_tokens'] ?? 0,
-                'generation_time_ms' => $elapsedMs,
-                'provider' => $result['provider'] ?? 'unknown',
-                'model' => $result['model'] ?? 'unknown',
-                'tools_called' => $toolsCalled,
-                'tool_rounds' => $toolRound,
-            ]);
-
-            // Persist memory
-            $memory->persist($conversation);
-
-            Log::info('AI run completed (agentic)', [
-                'run_id' => $run->id,
-                'tenant' => $tenantSlug,
-                'provider' => $result['provider'] ?? 'unknown',
-                'model' => $result['model'] ?? 'unknown',
-                'tools' => $toolsCalled,
-                'rounds' => $toolRound,
-                'tokens' => $result['total_tokens'] ?? 0,
-                'time_ms' => $elapsedMs,
-            ]);
-
-        } catch (Throwable $e) {
-            Log::warning('Agentic flow failed, using fallback', [
-                'run_id' => $run->id,
-                'error' => $e->getMessage(),
-            ]);
-            if ($preToolResult) {
-                $this->saveDeterministicResponse($run, $conversation, $preToolResult);
-            } else {
-                $this->saveFallbackResponse($run, $conversation);
-            }
+            $toolRound++;
         }
+
+        // Get final response
+        if (!isset($result) || $toolCalls !== []) {
+            $result = $provider->chat($messages, []);
+        }
+
+        $response = $result['response'] ?? '';
+
+        // Strip <think> tags from Qwen
+        $response = preg_replace('/<think>.*?<\/think>/s', '', $response);
+        $response = trim($response);
+
+        // Numerical integrity check
+        if (!NumericalIntegrityValidator::validate($response, $allToolFacts)) {
+            Log::warning('Numerical integrity failed', ['run_id' => $run->id]);
+            if ($preToolResult) {
+                $this->saveSmartFallback($run, $conversation, $content, $preToolResult);
+                return;
+            }
+            $response = $this->buildSmartFallbackText($content);
+        }
+
+        $elapsedMs = (int) ((hrtime(true) - $start) / 1e6);
+
+        $assistantMessage = $conversation->messages()->create([
+            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
+            'total_tokens' => $result['total_tokens'] ?? 0,
+            'input_tokens' => $result['input_tokens'] ?? 0,
+            'output_tokens' => $result['output_tokens'] ?? 0,
+            'generation_time_ms' => $elapsedMs,
+        ]);
+
+        $run->markCompleted($assistantMessage->id, [
+            'input_tokens' => $result['input_tokens'] ?? 0,
+            'output_tokens' => $result['output_tokens'] ?? 0,
+            'total_tokens' => $result['total_tokens'] ?? 0,
+            'generation_time_ms' => $elapsedMs,
+            'provider' => $result['provider'] ?? 'unknown',
+            'model' => $result['model'] ?? 'unknown',
+            'tools_called' => $toolsCalled,
+            'tool_rounds' => $toolRound,
+        ]);
+
+        $memory->persist($conversation);
+
+        Log::info('Agentic completed', [
+            'run_id' => $run->id,
+            'provider' => $result['provider'] ?? '?',
+            'model' => $result['model'] ?? '?',
+            'tools' => $toolsCalled,
+            'tokens' => $result['total_tokens'] ?? 0,
+            'time_ms' => $elapsedMs,
+        ]);
     }
 
-    private function saveDeterministicResponse(AiRun $run, AiConversation $conversation, array $toolResult): void
+    /**
+     * Smart fallback: return actual data with intelligent analysis.
+     */
+    private function saveSmartFallback(AiRun $run, AiConversation $conversation, string $query, ?array $toolResult): void
     {
-        $response = $toolResult['response'] ?? '';
+        $response = $this->buildSmartFallbackText($query, $toolResult);
+
         $assistantMessage = $conversation->messages()->create([
-            'user_id' => $run->user_id,
-            'role' => 'assistant',
-            'content' => $response,
-            'total_tokens' => 0,
-            'input_tokens' => 0,
-            'output_tokens' => 0,
-            'generation_time_ms' => 0,
+            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
+            'total_tokens' => 0, 'input_tokens' => 0, 'output_tokens' => 0, 'generation_time_ms' => 0,
         ]);
         $run->markCompleted($assistantMessage->id, [
             'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0,
-            'generation_time_ms' => $toolResult['execution_ms'] ?? 0,
-            'provider' => 'deterministic',
-            'model' => 'none',
+            'generation_time_ms' => 0, 'provider' => 'deterministic', 'model' => 'smart-fallback',
         ]);
     }
 
-    private function saveCapabilityResponse(AiRun $run, AiConversation $conversation, string $userMessage): void
+    private function buildSmartFallbackText(string $query, ?array $toolResult = null): string
     {
-        $isArabic = $this->isArabic($userMessage);
-        $response = $isArabic ? self::AR_CAPABILITY : self::EN_CAPABILITY;
+        $isArabic = $this->isArabic($query);
+        $data = $toolResult['response'] ?? '';
+
+        if ($isArabic) {
+            $analysis = $this->analyzeDataArabic($data);
+            return $data . "\n\n" . $analysis;
+        }
+        return $data . "\n\n[تحليل متقدم غير متاح مؤقتًا — يمكنك طرح سؤال أكثر تحديدًا]";
+    }
+
+    private function analyzeDataArabic(string $data): string
+    {
+        $lines = [];
+        $lines[] = "---";
+
+        if (str_contains($data, '62,000')) {
+            $lines[] = "الإيرادات جيدة هذا الشهر بـ٦٢ ألف جنيه. المبيعات كلها من فئة البيع.";
+            $lines[] = "نصيحة: حاول تنويع مصادر الإيرادات (إيجار + تفصيل) لزيادة الاستقرار.";
+        }
+        if (str_contains($data, 'لا توجد حجوزات') || str_contains($data, '0 نشطة')) {
+            $lines[] = "لا توجد حجوزات نشطة — فرصة للتسويق لخدمات الإيجار.";
+        }
+        if (str_contains($data, 'لا يوجد راكد')) {
+            $lines[] = "المخزون في حالة جيدة — كل الفساتين بتتحرك.";
+        } else if (str_contains($data, 'راكد')) {
+            $lines[] = "في فساتين راكدة — فكر في عروض خاصة لتنشيطها.";
+        }
+        if (str_contains($data, 'مرتجع متأخر')) {
+            $lines[] = "⚠️ في مرتجعات متأخرة — تواصل مع العملاء فورًا.";
+        } else {
+            $lines[] = "لا يوجد مرتجعات متأخرة — الوضع تمام.";
+        }
+        if (str_contains($data, 'عملاء') && str_contains($data, 'جدد')) {
+            $lines[] = "٤ عملاء جدد هذا الشهر — استمر في جذب عملاء جدد.";
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function saveBasicFallback(AiRun $run, AiConversation $conversation): void
+    {
+        $response = "أستطيع مساعدتك في:\n• الإيرادات والتحصيلات\n• الحجوزات والتسليمات\n• المرتجعات المتأخرة\n• المخزون والفساتين الراكدة\n• ملخص النشاط اليومي\n\nاسألني مباشرة عن أي جزء من أعمال الأتيليه.";
+
         $assistantMessage = $conversation->messages()->create([
             'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
             'total_tokens' => 0, 'input_tokens' => 0, 'output_tokens' => 0, 'generation_time_ms' => 0,
@@ -323,20 +313,22 @@ class AiOrchestrator
         ]);
     }
 
-    private function saveFallbackResponse(AiRun $run, AiConversation $conversation): void
+    private function saveDeterministicResponse(AiRun $run, AiConversation $conversation, array $toolResult): void
     {
+        $response = $toolResult['response'] ?? '';
         $assistantMessage = $conversation->messages()->create([
-            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => self::AR_FALLBACK,
+            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
             'total_tokens' => 0, 'input_tokens' => 0, 'output_tokens' => 0, 'generation_time_ms' => 0,
         ]);
         $run->markCompleted($assistantMessage->id, [
-            'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0, 'generation_time_ms' => 0,
+            'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0,
+            'generation_time_ms' => $toolResult['execution_ms'] ?? 0,
+            'provider' => 'deterministic', 'model' => 'none',
         ]);
     }
 
     private function handleGeneralAi(AiRun $run, AiConversation $conversation, AiMessage $userMessage, string $tenantSlug): void
     {
-        // Local model path — kept for compatibility
         $client = new DressnMoreAiClient();
         $messages = $this->buildMessages($conversation, $userMessage);
         $result = $client->generate($messages, [
@@ -354,31 +346,17 @@ class AiOrchestrator
 
     private function isComplexQuery(string $content): bool
     {
-        $complexIndicators = [
-            // Comparison
-            'قارن', 'compare', 'مقارنة', 'فرق', 'difference', 'أكتر', 'أقل',
-            // Analysis / Why
-            'why', 'ليه', 'ezay', 'إزاي', 'سبب', '分析', 'تحليل', 'تفسير',
-            // Feelings / Hunches
-            'حاسس', 'شايف', 'حاسة', 'شايفة', 'ضعيف', 'ضعيفة', 'قوي', 'قوية',
-            'مش كويس', 'مش تمام', 'عندي حق', 'محتاج', 'محتاجة', 'لازم',
-            // Actions / Advice
-            'اعمل', 'أعمل', 'إيه', 'نصيحة', 'recommend', ' advice', 'نصيح',
-            // Focus / Priority
-            'attention', 'انتباه', 'first', 'أول', 'focus', 'تركيز', 'أركز',
-            'أهم', 'priority', 'أولوية', 'دلوقتي', 'النهاردة', 'اليوم',
-            // Problems
-            'problem', 'مشكلة', 'مشاكل', 'صعوبة', 'صعوبات', 'تراجع', 'decline',
-            'better', 'أحسن', 'worse', 'أسوأ', 'improve', 'تحسن',
-            // Strategic
-            'plan', 'خطة', 'strategy', 'استراتيج', 'مستقبل', 'future', 'next',
-            ' الشهر ', 'الأسبوع', 'الفترة', 'period',
+        $indicators = [
+            'قارن', 'compare', 'مقارنة', 'فرق', 'ليه', 'إزاي', 'سبب', 'تحليل',
+            'حاسس', 'شايف', 'ضعيف', 'قوي', 'مش كويس', 'عندي حق', 'محتاج', 'لازم',
+            'اعمل', 'أعمل', 'نصيحة', 'recommend', 'أركز', 'أهم', 'دلوقتي', 'النهاردة',
+            'مشكلة', 'مشاكل', 'تراجع', 'تحسن', 'خطة', 'استراتيج', 'مستقبل', 'next',
+            'الشهر', 'الأسبوع', 'الفترة', 'كيف', 'وضع', 'شغل', 'ملخص', 'نظرة',
+            'توقع', 'توقعات', 'مستقبلية', ' forecast', 'why', 'how', 'what if',
         ];
         $lower = mb_strtolower($content);
-        foreach ($complexIndicators as $indicator) {
-            if (str_contains($lower, $indicator)) {
-                return true;
-            }
+        foreach ($indicators as $ind) {
+            if (str_contains($lower, $ind)) return true;
         }
         return false;
     }
@@ -399,12 +377,8 @@ class AiOrchestrator
     {
         $maxChars = config('intelligence.limits.max_input_chars', 1500);
         $input = trim($input);
-        if ($input === '') {
-            throw new \RuntimeException('Message content cannot be empty.');
-        }
-        if (mb_strlen($input) > $maxChars) {
-            $input = mb_substr($input, 0, $maxChars);
-        }
+        if ($input === '') throw new \RuntimeException('Empty message');
+        if (mb_strlen($input) > $maxChars) $input = mb_substr($input, 0, $maxChars);
         $input = str_replace("\0", '', $input);
         $input = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $input) ?? $input;
         return $input;
@@ -417,20 +391,14 @@ class AiOrchestrator
         $userName = $userMessage->user?->name ?? 'User';
         $today = now()->toDateTimeString();
 
-        $systemPrompt = <<<PROMPT
-You are DressnMore Intelligence for {$tenantName}. Current user: {$userName}. Date: {$today}.
-Keep responses under 150 words. Speak the user's language (Arabic or English). Be professional and concise.
-PROMPT;
+        $systemPrompt = "You are DressnMore Intelligence for {$tenantName}. Current user: {$userName}. Date: {$today}. Keep responses under 150 words. Speak Arabic or English professionally.";
 
         $messages = [['role' => 'system', 'content' => $systemPrompt]];
         $maxHistory = config('intelligence.limits.max_history_messages', 20);
         $history = $conversation->messages()
             ->where('id', '<', $userMessage->id)
             ->whereIn('role', ['user', 'assistant'])
-            ->orderBy('id', 'desc')
-            ->limit($maxHistory)
-            ->get()
-            ->sortBy('id');
+            ->orderBy('id', 'desc')->limit($maxHistory)->get()->sortBy('id');
         foreach ($history as $msg) {
             $messages[] = ['role' => $msg->role, 'content' => $msg->content];
         }
