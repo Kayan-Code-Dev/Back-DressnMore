@@ -59,7 +59,7 @@ final class ToolSchemaBuilder
                 'description' => 'Get currently active rental reservations. Returns count, upcoming pickups, and reservation details.',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => new \stdClass(),
                     'required' => [],
                 ],
             ],
@@ -75,7 +75,7 @@ final class ToolSchemaBuilder
                 'description' => 'Get overdue rental returns. Returns count of late returns and details about which customers and dresses are overdue.',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => new \stdClass(),
                     'required' => [],
                 ],
             ],
@@ -91,7 +91,7 @@ final class ToolSchemaBuilder
                 'description' => 'Get pending deliveries scheduled for today or overdue. Returns count and delivery details.',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => new \stdClass(),
                     'required' => [],
                 ],
             ],
@@ -107,7 +107,7 @@ final class ToolSchemaBuilder
                 'description' => 'Get customer statistics. Returns total customer count, new customers this month, and activity metrics.',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => new \stdClass(),
                     'required' => [],
                 ],
             ],
@@ -123,7 +123,7 @@ final class ToolSchemaBuilder
                 'description' => 'Get dresses that have not been rented for a long time (inactive/stagnant inventory). Returns count and dress details.',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => new \stdClass(),
                     'required' => [],
                 ],
             ],
@@ -139,7 +139,7 @@ final class ToolSchemaBuilder
                 'description' => 'Get a comprehensive overview of the atelier including revenue, reservations, inventory, and customers. Use for broad questions like "how is business?"',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => new \stdClass(),
                     'required' => [],
                 ],
             ],
@@ -155,7 +155,7 @@ final class ToolSchemaBuilder
                 'description' => 'Get business health score with main strengths and risks. Returns a score out of 100 with analysis.',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => new \stdClass(),
                     'required' => [],
                 ],
             ],
@@ -171,7 +171,7 @@ final class ToolSchemaBuilder
                 'description' => 'Get today\'s business brief including revenue, new activity, and alerts. Use for "what should I focus on today?"',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => new \stdClass(),
                     'required' => [],
                 ],
             ],

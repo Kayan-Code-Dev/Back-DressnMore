@@ -68,7 +68,15 @@ class AiOrchestrator
                 return;
             }
 
-            // Step 2: Unsupported question — check general chat
+            // Step 2: No tool matched — check if complex query for Groq
+            $isComplexQuery = $this->isComplexQuery($content);
+            $externalEnabled = config('intelligence.external_enabled', false);
+
+            if ($isComplexQuery && $externalEnabled && $this->providerManager?->isExternal()) {
+                $this->executeAgenticFlow($run, $conversation, $userMessage, $content, null, $tenantSlug);
+                return;
+            }
+
             if (!$this->isGeneralChatEnabled()) {
                 $this->saveCapabilityResponse($run, $conversation, $content);
                 return;
@@ -347,11 +355,24 @@ class AiOrchestrator
     private function isComplexQuery(string $content): bool
     {
         $complexIndicators = [
-            'قارن', 'compare', 'مقارنة', 'why', 'ليه', 'ezay', 'إزاي', 'سبب', 'سبب',
-            'analysis', 'تحليل', 'اعمل ايه', 'أعمل إيه', 'نصيحة', 'recommend',
-            'attention', 'انتباه', 'first', 'أول', 'focus', 'تركيز', 'problem', 'مشكلة',
-            'better', 'أحسن', 'worse', 'أسوأ', 'decline', 'تراجع', 'improve', 'تحسن',
-            'ضعيف', 'ضعيفة', 'strong', 'قوي', 'should i', 'هل لازم',
+            // Comparison
+            'قارن', 'compare', 'مقارنة', 'فرق', 'difference', 'أكتر', 'أقل',
+            // Analysis / Why
+            'why', 'ليه', 'ezay', 'إزاي', 'سبب', '分析', 'تحليل', 'تفسير',
+            // Feelings / Hunches
+            'حاسس', 'شايف', 'حاسة', 'شايفة', 'ضعيف', 'ضعيفة', 'قوي', 'قوية',
+            'مش كويس', 'مش تمام', 'عندي حق', 'محتاج', 'محتاجة', 'لازم',
+            // Actions / Advice
+            'اعمل', 'أعمل', 'إيه', 'نصيحة', 'recommend', ' advice', 'نصيح',
+            // Focus / Priority
+            'attention', 'انتباه', 'first', 'أول', 'focus', 'تركيز', 'أركز',
+            'أهم', 'priority', 'أولوية', 'دلوقتي', 'النهاردة', 'اليوم',
+            // Problems
+            'problem', 'مشكلة', 'مشاكل', 'صعوبة', 'صعوبات', 'تراجع', 'decline',
+            'better', 'أحسن', 'worse', 'أسوأ', 'improve', 'تحسن',
+            // Strategic
+            'plan', 'خطة', 'strategy', 'استراتيج', 'مستقبل', 'future', 'next',
+            ' الشهر ', 'الأسبوع', 'الفترة', 'period',
         ];
         $lower = mb_strtolower($content);
         foreach ($complexIndicators as $indicator) {
