@@ -50,24 +50,25 @@ class AiOrchestrator
             $isComplex = $this->isComplexQuery($content);
             $externalEnabled = config('intelligence.external_enabled', false);
 
-            // Step 1: Try business tools (always for supported questions)
+            // Step 1: Always try business tools first to get real data
             $deterministicResult = $this->toolExecutor->tryAnswer($user, $content, $tenantSlug);
 
             if ($deterministicResult['handled'] ?? false) {
-                // Supported business question
+                // We have real data from tools
                 if ($isComplex && $externalEnabled && $this->providerManager?->isExternal()) {
-                    // Complex query + Groq → try agentic with fallback to deterministic
-                    $this->executeAgenticWithFallback($run, $conversation, $userMessage, $content, $deterministicResult, $tenantSlug);
+                    // Complex query + Groq available → use model to write natural response
+                    $this->executeNaturalLanguageFlow($run, $conversation, $userMessage, $content, $deterministicResult, $tenantSlug);
                     return;
                 }
-                // Simple query → deterministic response
+                // Simple query → return deterministic response directly
                 $this->saveDeterministicResponse($run, $conversation, $deterministicResult);
                 return;
             }
 
-            // Step 2: Not a tool question
+            // Step 2: Not a recognized tool question
             if ($isComplex && $externalEnabled && $this->providerManager?->isExternal()) {
-                $this->executeAgenticWithFallback($run, $conversation, $userMessage, $content, null, $tenantSlug);
+                // Try general knowledge with Groq
+                $this->executeGeneralChat($run, $conversation, $userMessage, $content, $tenantSlug);
                 return;
             }
 
@@ -76,12 +77,8 @@ class AiOrchestrator
                 return;
             }
 
-            // General AI
-            if ($this->providerManager?->isExternal()) {
-                $this->executeAgenticWithFallback($run, $conversation, $userMessage, $content, null, $tenantSlug);
-            } else {
-                $this->handleGeneralAi($run, $conversation, $userMessage, $tenantSlug);
-            }
+            // General AI (local model)
+            $this->handleGeneralAi($run, $conversation, $userMessage, $tenantSlug);
 
         } catch (Throwable $e) {
             $run->markFailed($e->getMessage());
@@ -91,122 +88,39 @@ class AiOrchestrator
     }
 
     /**
-     * Try Groq agentic, but fall back to deterministic data + smart response.
+     * NEW APPROACH: Instead of forcing tool calling (which models struggle with),
+     * we pre-fetch data deterministically and ask the model to write a natural
+     * human-like Arabic response based on that data.
      */
-    private function executeAgenticWithFallback(
+    private function executeNaturalLanguageFlow(
         AiRun $run, AiConversation $conversation, AiMessage $userMessage,
-        string $content, ?array $preToolResult, string $tenantSlug,
+        string $content, array $toolResult, string $tenantSlug,
     ): void {
-        try {
-            $this->executeAgenticFlow($run, $conversation, $userMessage, $content, $preToolResult, $tenantSlug);
-        } catch (Throwable $e) {
-            $errorCode = $e->getMessage();
-            Log::warning('Groq failed, using smart fallback', ['run_id' => $run->id, 'error' => $errorCode]);
-
-            if ($preToolResult) {
-                // Return deterministic data with smart analysis
-                $this->saveSmartFallback($run, $conversation, $content, $preToolResult);
-            } else {
-                $this->saveBasicFallback($run, $conversation);
-            }
-        }
-    }
-
-    private function executeAgenticFlow(AiRun $run, AiConversation $conversation,
-        AiMessage $userMessage, string $content, ?array $preToolResult, string $tenantSlug): void
-    {
         $provider = $this->providerManager?->primary();
         if (!$provider) {
-            throw new RuntimeException('NO_PROVIDER');
+            $this->saveDeterministicResponse($run, $conversation, $toolResult);
+            return;
         }
 
-        $memory = new ConversationMemory($conversation);
         $start = hrtime(true);
-        $allToolFacts = [];
-        $toolsCalled = [];
-        $toolRound = 0;
+        $toolData = $toolResult['response'] ?? '';
 
-        $tenant = $this->tenantContext->tenant();
-        $systemPrompt = BusinessConstitution::build(
-            $tenant?->name ?? 'Atelier',
-            $userMessage->user?->name ?? 'User',
-            now()->toDateTimeString()
-        );
+        // Build a simple rewrite prompt
+        $systemPrompt = "أنت صاحب أتيليه خبير بيتكلم مع زميلك صاحب الأتيليه بالعامية المصرية. حوّل البيانات اللي جاية لك لرد طبيعي ودافي زي المحادثة بين صحاب. استخدم كلمات زي 'النهاردة'، 'تمام'، 'مفيش'، 'شوية'. اختصر الرد. ما تضيفش معلومات من عندك.";
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
-            $memory->toContextMessage(),
+            ['role' => 'user', 'content' => "اكتب رد طبيعي:\n\n" . $toolData],
         ];
 
-        $history = $conversation->messages()
-            ->where('id', '<', $userMessage->id)
-            ->whereIn('role', ['user', 'assistant'])
-            ->orderBy('id', 'desc')->limit(6)->get()->sortBy('id');
-        foreach ($history as $msg) {
-            $messages[] = ['role' => $msg->role, 'content' => $msg->content];
-        }
-        $messages[] = ['role' => 'user', 'content' => $content];
-
-        $tools = ToolSchemaBuilder::all();
-
-        while ($toolRound < self::MAX_TOOL_ROUNDS) {
-            $result = $provider->chat($messages, $tools);
-
-            $toolCalls = $result['tool_calls'] ?? [];
-            if ($toolCalls === []) {
-                break;
-            }
-
-            foreach ($toolCalls as $toolCall) {
-                if (count($toolsCalled) >= self::MAX_TOOLS_PER_RUN) break 2;
-
-                $function = $toolCall['function'] ?? [];
-                $toolName = $function['name'] ?? '';
-                $args = json_decode($function['arguments'] ?? '{}', true) ?: [];
-                if (!$toolName) continue;
-
-                $context = BusinessToolContext::forUser($userMessage->user, $tenantSlug);
-                $toolResult = $this->toolRegistry->execute($toolName, $context);
-                $minimizedFacts = DataMinimizer::minimize($toolResult->facts);
-
-                $messages[] = [
-                    'role' => 'assistant',
-                    'content' => $result['response'] ?? '',
-                    'tool_calls' => [$toolCall],
-                ];
-                $messages[] = [
-                    'role' => 'tool',
-                    'tool_call_id' => $toolCall['id'] ?? '',
-                    'name' => $toolName,
-                    'content' => json_encode($minimizedFacts, JSON_UNESCAPED_UNICODE),
-                ];
-
-                $allToolFacts[] = $toolResult->facts;
-                $toolsCalled[] = $toolName;
-                $memory->recordToolUse($toolName);
-            }
-            $toolRound++;
-        }
-
-        // Get final response
-        if (!isset($result) || $toolCalls !== []) {
-            $result = $provider->chat($messages, []);
-        }
-
+        $result = $provider->chat($messages, []);
         $response = $result['response'] ?? '';
-
-        // Strip <think> tags from Qwen
         $response = preg_replace('/<think>.*?<\/think>/s', '', $response);
         $response = trim($response);
 
-        // Numerical integrity check
-        if (!NumericalIntegrityValidator::validate($response, $allToolFacts)) {
-            Log::warning('Numerical integrity failed', ['run_id' => $run->id]);
-            if ($preToolResult) {
-                $this->saveSmartFallback($run, $conversation, $content, $preToolResult);
-                return;
-            }
-            $response = $this->buildSmartFallbackText($content);
+        // If model returned garbage, use deterministic response
+        if ($response === '' || $this->isGenericRefusal($response) || strlen($response) < 10) {
+            $response = $toolData;
         }
 
         $elapsedMs = (int) ((hrtime(true) - $start) / 1e6);
@@ -226,20 +140,110 @@ class AiOrchestrator
             'generation_time_ms' => $elapsedMs,
             'provider' => $result['provider'] ?? 'unknown',
             'model' => $result['model'] ?? 'unknown',
-            'tools_called' => $toolsCalled,
-            'tool_rounds' => $toolRound,
+            'tools_called' => [],
+            'tool_rounds' => 0,
+            'flow' => 'natural-language-enhanced',
+        ]);
+    }
+
+    private function executeGeneralChat(
+        AiRun $run, AiConversation $conversation, AiMessage $userMessage,
+        string $content, string $tenantSlug,
+    ): void {
+        $provider = $this->providerManager?->primary();
+        if (!$provider) {
+            $this->saveBasicFallback($run, $conversation);
+            return;
+        }
+
+        $memory = new ConversationMemory($conversation);
+        $start = hrtime(true);
+
+        $tenant = $this->tenantContext->tenant();
+        $tenantName = $tenant?->name ?? 'Atelier';
+        $userName = $userMessage->user?->name ?? 'User';
+        $date = now()->toDateTimeString();
+
+        $systemPrompt = BusinessConstitution::build($tenantName, $userName, $date);
+        $systemPrompt .= "\n\nYou are having a general conversation. Be helpful, warm, and speak in natural Arabic. Keep responses concise.";
+
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+        ];
+
+        $history = $conversation->messages()
+            ->where('id', '<', $userMessage->id)
+            ->whereIn('role', ['user', 'assistant'])
+            ->orderBy('id', 'desc')
+            ->limit(6)
+            ->get()
+            ->sortBy('id');
+
+        foreach ($history as $msg) {
+            $messages[] = ['role' => $msg->role, 'content' => $msg->content];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $content];
+
+        $result = $provider->chat($messages, []);
+        $response = $result['response'] ?? '';
+        $response = preg_replace('/<think>.*?<\/think>/s', '', $response);
+        $response = trim($response);
+
+        if ($response === '') {
+            $response = "عذرًا، لم أفهم السؤال تمامًا. ممكن توضح أكتر؟";
+        }
+
+        $elapsedMs = (int) ((hrtime(true) - $start) / 1e6);
+
+        $assistantMessage = $conversation->messages()->create([
+            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
+            'total_tokens' => $result['total_tokens'] ?? 0,
+            'input_tokens' => $result['input_tokens'] ?? 0,
+            'output_tokens' => $result['output_tokens'] ?? 0,
+            'generation_time_ms' => $elapsedMs,
+        ]);
+
+        $run->markCompleted($assistantMessage->id, [
+            'input_tokens' => $result['input_tokens'] ?? 0,
+            'output_tokens' => $result['output_tokens'] ?? 0,
+            'total_tokens' => $result['total_tokens'] ?? 0,
+            'generation_time_ms' => $elapsedMs,
+            'provider' => $result['provider'] ?? 'unknown',
+            'model' => $result['model'] ?? 'unknown',
+            'tools_called' => [],
+            'tool_rounds' => 0,
+            'flow' => 'general-chat',
         ]);
 
         $memory->persist($conversation);
+    }
 
-        Log::info('Agentic completed', [
-            'run_id' => $run->id,
-            'provider' => $result['provider'] ?? '?',
-            'model' => $result['model'] ?? '?',
-            'tools' => $toolsCalled,
-            'tokens' => $result['total_tokens'] ?? 0,
-            'time_ms' => $elapsedMs,
-        ]);
+    /**
+     * Check if model returned a generic refusal instead of useful content.
+     */
+    private function isGenericRefusal(string $response): bool
+    {
+        $refusalPatterns = [
+            'لا يمكنني الوصول',
+            'لا أستطيع الوصول',
+            'غير متاح',
+            'عذراً',
+            'لا أملك',
+            'ليس لدي',
+            'لا أستطيع',
+            'I cannot access',
+            "I don't have access",
+            'I do not have',
+            'unavailable',
+        ];
+
+        foreach ($refusalPatterns as $pattern) {
+            if (str_contains($response, $pattern)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -256,6 +260,7 @@ class AiOrchestrator
         $run->markCompleted($assistantMessage->id, [
             'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0,
             'generation_time_ms' => 0, 'provider' => 'deterministic', 'model' => 'smart-fallback',
+            'tools_called' => [], 'tool_rounds' => 0,
         ]);
     }
 
@@ -302,14 +307,22 @@ class AiOrchestrator
 
     private function saveBasicFallback(AiRun $run, AiConversation $conversation): void
     {
-        $response = "أستطيع مساعدتك في:\n• الإيرادات والتحصيلات\n• الحجوزات والتسليمات\n• المرتجعات المتأخرة\n• المخزون والفساتين الراكدة\n• ملخص النشاط اليومي\n\nاسألني مباشرة عن أي جزء من أعمال الأتيليه.";
+        $response = "أستطيع مساعدتك في:
+• الإيرادات والتحصيلات
+• الحجوزات والتسليمات
+• المرتجعات المتأخرة
+• المخزون والفساتين الراكدة
+• ملخص النشاط اليومي
+
+اسألني مباشرة عن أي جزء من أعمال الأتيليه.";
 
         $assistantMessage = $conversation->messages()->create([
             'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
             'total_tokens' => 0, 'input_tokens' => 0, 'output_tokens' => 0, 'generation_time_ms' => 0,
         ]);
         $run->markCompleted($assistantMessage->id, [
-            'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0, 'generation_time_ms' => 0,
+            'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0,
+            'generation_time_ms' => 0,
         ]);
     }
 
