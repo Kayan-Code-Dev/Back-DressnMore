@@ -26,6 +26,7 @@ return [
     ],
     'features' => [
         'plan_feature_key' => 'ai_assistant.enabled',
+        'general_chat_enabled' => (bool) env('DRESSNMORE_AI_GENERAL_CHAT_ENABLED', false),
     ],
     'permissions' => [
         'view' => 'intelligence.view',

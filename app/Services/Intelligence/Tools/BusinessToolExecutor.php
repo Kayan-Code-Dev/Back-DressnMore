@@ -23,43 +23,138 @@ class BusinessToolExecutor
     {
         $start = microtime(true);
         $intents = $this->router->route($message);
-        if ($intents === []) { return ['handled' => false, 'response' => null, 'facts' => [], 'tools_executed' => [], 'execution_ms' => 0]; }
+
+        // No intent matched — not a business question
+        if ($intents === []) {
+            return [
+                'handled' => false,
+                'response' => null,
+                'facts' => [],
+                'tools_executed' => [],
+                'execution_ms' => 0,
+            ];
+        }
 
         $context = BusinessToolContext::forUser($user, $tenantSlug);
-        $results = []; $toolNames = [];
+        $results = [];
+        $toolNames = [];
+
         foreach ($intents as $intent) {
             foreach ($this->router->toolsForIntent($intent) as $toolName) {
                 $result = $this->registry->execute($toolName, $context);
-                $results[] = $result; $toolNames[] = $toolName;
+                $results[] = $result;
+                $toolNames[] = $toolName;
                 $this->persistExecution($result, $toolName, $context);
             }
         }
-        $ms = (int) ((microtime(true) - $start) * 1000);
 
-        $allOk = collect($results)->every(fn ($r) => $r->isOk() || $r->isEmpty());
-        if ($allOk && count($results) === 1) {
-            $fast = (new TrustedFactsPromptBuilder())->formatFast($results, $this->detectLanguage($message));
-            if ($fast !== null && mb_strlen($fast) < 500) { return ['handled' => true, 'response' => $fast, 'facts' => array_map(fn ($r) => $r->jsonSerialize(), $results), 'tools_executed' => $toolNames, 'execution_ms' => $ms, 'model_needed' => false]; }
+        $ms = (int) ((microtime(true) - $start) * 1000);
+        $lang = $this->detectLanguage($message);
+        $isArabic = $lang === 'ar';
+
+        // Build deterministic Arabic response — NEVER call the model
+        $response = $this->buildDeterministicResponse($results, $isArabic);
+
+        return [
+            'handled' => true,
+            'response' => $response,
+            'facts' => array_map(fn ($r) => $r->jsonSerialize(), $results),
+            'tools_executed' => $toolNames,
+            'execution_ms' => $ms,
+            'model_needed' => false,
+        ];
+    }
+
+    /**
+     * Build a deterministic response directly from tool results.
+     * No model call. Guaranteed fast Arabic formatting.
+     */
+    private function buildDeterministicResponse(array $results, bool $isArabic): string
+    {
+        if (!$isArabic) {
+            return $this->buildEnglishResponse($results);
         }
 
         $okResults = array_filter($results, fn ($r) => $r->isOk());
-        if ($okResults === []) {
-            return ['handled' => true, 'response' => $this->detectLanguage($message) === 'ar' ? 'لا توجد بيانات متاحة للفترة المطلوبة.' : 'No data available for the requested period.', 'facts' => array_map(fn ($r) => $r->jsonSerialize(), $results), 'tools_executed' => $toolNames, 'execution_ms' => $ms, 'model_needed' => false];
+        $emptyResults = array_filter($results, fn ($r) => $r->isEmpty());
+
+        // All empty
+        if ($okResults === [] && $emptyResults !== []) {
+            return 'لا توجد بيانات متاحة للفترة المطلوبة.';
         }
 
-        $lang = $this->detectLanguage($message);
-        $promptBuilder = new TrustedFactsPromptBuilder();
-        $factsPrompt = $promptBuilder->build($okResults, $message, $lang);
-        return ['handled' => true, 'response' => null, 'facts_prompt' => $factsPrompt, 'facts' => array_map(fn ($r) => $r->jsonSerialize(), $results), 'tools_executed' => $toolNames, 'execution_ms' => $ms, 'model_needed' => true];
+        // All denied
+        if (collect($results)->every(fn ($r) => $r->isDenied())) {
+            return 'ليس لديك صلاحية الوصول لهذه البيانات.';
+        }
+
+        // Single tool — direct formatting
+        if (count($okResults) === 1) {
+            return reset($okResults)->formatArabic();
+        }
+
+        // Multiple tools — composite snapshot
+        return $this->buildCompositeArabic($okResults);
     }
 
-    public function toolMetadata(): array { return $this->registry->metadata(); }
+    /**
+     * Composite response for multi-tool questions like "كيف وضع الشغل؟"
+     */
+    private function buildCompositeArabic(array $results): string
+    {
+        $sections = [];
+
+        foreach ($results as $result) {
+            $sections[] = $result->formatArabic();
+        }
+
+        if ($sections === []) {
+            return 'لا توجد بيانات كافية.';
+        }
+
+        return implode("\n\n", $sections);
+    }
+
+    private function buildEnglishResponse(array $results): string
+    {
+        $okResults = array_filter($results, fn ($r) => $r->isOk());
+        if ($okResults === []) {
+            return 'No data available for the requested period.';
+        }
+        if (count($okResults) === 1) {
+            return reset($okResults)->toTrustedFactsBlock();
+        }
+        return implode("\n\n", array_map(fn ($r) => $r->toTrustedFactsBlock(), $okResults));
+    }
+
+    public function toolMetadata(): array
+    {
+        return $this->registry->metadata();
+    }
 
     private function persistExecution(BusinessToolResult $result, string $toolName, BusinessToolContext $context): void
     {
         try {
-            AiToolExecution::create(['tool_name' => $toolName, 'tool_version' => $result->version, 'status' => $result->status, 'facts' => $result->facts, 'scope' => array_merge($result->scope, ['tenant' => $context->tenantSlug(), 'user_id' => $context->userId()]), 'warnings' => $result->warnings, 'error' => $result->error, 'execution_ms' => $result->executionMs, 'executed_at' => now()]);
-        } catch (\Throwable $e) { Log::warning('Failed to persist tool execution', ['tool' => $toolName, 'error' => $e->getMessage()]); }
+            AiToolExecution::create([
+                'tool_name' => $toolName,
+                'tool_version' => $result->version,
+                'status' => $result->status,
+                'facts' => $result->facts,
+                'scope' => array_merge($result->scope, [
+                    'tenant' => $context->tenantSlug(),
+                    'user_id' => $context->userId(),
+                ]),
+                'warnings' => $result->warnings,
+                'error' => $result->error,
+                'execution_ms' => $result->executionMs,
+                'executed_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to persist tool execution', [
+                'tool' => $toolName,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function detectLanguage(string $text): string
