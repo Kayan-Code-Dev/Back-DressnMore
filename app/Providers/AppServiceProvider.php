@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Console\Commands\TenantHealthCommand;
 use App\Models\Central\PersonalAccessToken;
+use App\Services\Intelligence\Providers\IntelligenceProviderManager;
 use App\Services\Tenant\TenantContext;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -16,6 +17,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantContext::class, fn () => new TenantContext);
+        $this->app->singleton(IntelligenceProviderManager::class, fn () => new IntelligenceProviderManager);
     }
 
     /**

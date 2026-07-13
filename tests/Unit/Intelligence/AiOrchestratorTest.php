@@ -77,7 +77,7 @@ class AiOrchestratorTest extends TestCase
             'model_needed' => false,
         ]);
         $toolExecutor->shouldIgnoreMissing();
-        return new AiOrchestrator($client, $tenantContext, $toolExecutor);
+        return new AiOrchestrator(null, $tenantContext, $toolExecutor);
     }
 
     public function test_default_output_tokens_are_96(): void
@@ -119,7 +119,8 @@ class AiOrchestratorTest extends TestCase
             'model_needed' => false,
         ]);
         $toolExecutor->shouldIgnoreMissing();
-        $orch = new AiOrchestrator($client, $tenantContext, $toolExecutor);
+        $orch = new AiOrchestrator(null, $tenantContext, $toolExecutor);
+        // $client not needed for deterministic path
 
         $conv = AiConversation::on('orch_test')->create(['user_id' => $this->user->id, 'title' => 'Test', 'status' => 'active']);
         $msg = $conv->messages()->create(['user_id' => $this->user->id, 'role' => 'user', 'content' => 'What is revenue?']);
@@ -154,7 +155,8 @@ class AiOrchestratorTest extends TestCase
             'model_needed' => false,
         ]);
         $toolExecutor->shouldIgnoreMissing();
-        $orch = new AiOrchestrator($client, $tenantContext, $toolExecutor);
+        $orch = new AiOrchestrator(null, $tenantContext, $toolExecutor);
+        // $client not needed for deterministic path
 
         $conv = AiConversation::on('orch_test')->create(['user_id' => $this->user->id, 'title' => 'Test', 'status' => 'active']);
         $msg = $conv->messages()->create(['user_id' => $this->user->id, 'role' => 'user', 'content' => 'Hello test']);
@@ -189,7 +191,8 @@ class AiOrchestratorTest extends TestCase
             'model_needed' => false,
         ]);
         $toolExecutor->shouldIgnoreMissing();
-        $orch = new AiOrchestrator($client, $tenantContext, $toolExecutor);
+        $orch = new AiOrchestrator(null, $tenantContext, $toolExecutor);
+        // $client not needed for deterministic path
 
         $conv = AiConversation::on('orch_test')->create(['user_id' => $this->user->id, 'title' => 'Test', 'status' => 'active']);
         $msg = $conv->messages()->create(['user_id' => $this->user->id, 'role' => 'user', 'content' => 'Hi']);

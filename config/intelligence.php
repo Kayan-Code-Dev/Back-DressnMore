@@ -32,4 +32,15 @@ return [
         'view' => 'intelligence.view',
         'chat' => 'intelligence.chat',
     ],
+    'provider' => env('DRESSNMORE_AI_PROVIDER', 'local'),
+    'external_enabled' => (bool) env('DRESSNMORE_AI_EXTERNAL_ENABLED', false),
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY', ''),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+        'primary_model' => env('GROQ_PRIMARY_MODEL', 'qwen/qwen3-32b'),
+        'secondary_model' => env('GROQ_SECONDARY_MODEL', 'openai/gpt-oss-120b'),
+        'connect_timeout' => (int) env('GROQ_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('GROQ_REQUEST_TIMEOUT', 25),
+        'max_output_tokens' => (int) env('GROQ_MAX_OUTPUT_TOKENS', 800),
+    ],
 ];
