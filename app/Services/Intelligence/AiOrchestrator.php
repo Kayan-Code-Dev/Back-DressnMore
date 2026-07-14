@@ -7,6 +7,7 @@ namespace App\Services\Intelligence;
 use App\Models\Tenant\Intelligence\AiConversation;
 use App\Models\Tenant\Intelligence\AiMessage;
 use App\Models\Tenant\Intelligence\AiRun;
+use App\Services\Intelligence\Providers\IntelligenceProviderManager;
 use App\Services\Intelligence\Tools\BusinessToolContext;
 use App\Services\Intelligence\Tools\BusinessToolExecutor;
 use App\Services\Intelligence\Tools\BusinessToolRegistry;
