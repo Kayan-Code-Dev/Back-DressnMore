@@ -41,6 +41,11 @@ class BusinessToolExecutor
 
         foreach ($intents as $intent) {
             foreach ($this->router->toolsForIntent($intent) as $toolName) {
+                // Skip tools not registered in the system
+                if (!$this->registry->has($toolName)) {
+                    Log::warning('Tool not found in registry, skipping', ['tool' => $toolName, 'intent' => $intent]);
+                    continue;
+                }
                 $result = $this->registry->execute($toolName, $context);
                 $results[] = $result;
                 $toolNames[] = $toolName;

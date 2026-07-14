@@ -280,21 +280,23 @@ class AiOrchestrator
 
     private function handleBusinessData(string $content, array $intent, array $ctx, $user, string $tenantSlug, AiRun $run): string
     {
+        // Check for known unsupported-but-recognized intents
+        $subIntents = $intent['sub_intents'] ?? [];
+        if (in_array('cashbox_balance', $subIntents)) {
+            return "معلومات الخزنة غير متاحة حاليًا في الـ Intelligence.\n\nممكن تفتح تقرير الخزنة مباشرة من القائمة الجانبية: 💰 التقارير ← الخزنة.\n\nأقدر أساعدك في:
+• إيراداتك والتحصيلات
+• حجوزات الإيجار
+• المخزون";
+        }
+
         // Execute tools
         $deterministicResult = $this->toolExecutor->tryAnswer($user, $content, $tenantSlug);
 
         if (!($deterministicResult['handled'] ?? false)) {
-            // Not a recognized business question → treat as unsupported
             return $this->handleUnsupported($content, $intent, $ctx);
         }
 
         $response = $deterministicResult['response'] ?? '';
-
-        // If we have a model-intent context for follow-up, enhance the response
-        if ($ctx['last_intent'] === 'business_data' && $ctx['last_tool']) {
-            // This is a follow-up — the response is already contextual from the router
-        }
-
         return $response;
     }
 
@@ -498,6 +500,11 @@ private function decisionHire($user, string $tenantSlug): string
 
     private function buildComparisonFromContext(string $content, array $ctx): string
     {
+        // If previous intent was revenue, try to get monthly + previous month data
+        if ($ctx['last_tool'] === 'revenue_summary' || ($ctx['last_intent'] === 'business_data' && $ctx['last_category'] === 'business')) {
+            return "محتاج أجيب البيانات الفعلية لمقارنة الشهر الحالي بالشهر اللي فات.\n\nللأسف، بيانات الشهر الماضي غير متاحة حاليًا في الـ Intelligence.\n\nممكن تفتح تقرير الإيرادات المفصل من القائمة الجانبية: 📊 التقارير ← الإيرادات.\n\nأقدر أساعدك في حاجة تانية؟";
+        }
+
         return "محتاج أجيب البيانات لمقارنة الفترات.\n\nممكن تحدد:
 • إيه اللي عايز تقارنه؟ (إيرادات/حجوزات/مصاريف)
 • الفترة الحالية مقابل أي فترة؟";
