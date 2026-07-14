@@ -32,8 +32,8 @@ return [
         'view' => 'intelligence.view',
         'chat' => 'intelligence.chat',
     ],
-    'provider' => env('DRESSNMORE_AI_PROVIDER', 'local'),
-    'external_enabled' => (bool) env('DRESSNMORE_AI_EXTERNAL_ENABLED', false),
+    'provider' => 'local',
+    'external_enabled' => false,
     'groq' => [
         'api_key' => env('GROQ_API_KEY', ''),
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),

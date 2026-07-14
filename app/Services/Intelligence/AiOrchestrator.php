@@ -7,7 +7,6 @@ namespace App\Services\Intelligence;
 use App\Models\Tenant\Intelligence\AiConversation;
 use App\Models\Tenant\Intelligence\AiMessage;
 use App\Models\Tenant\Intelligence\AiRun;
-use App\Services\Intelligence\Providers\IntelligenceProviderManager;
 use App\Services\Intelligence\Tools\BusinessToolContext;
 use App\Services\Intelligence\Tools\BusinessToolExecutor;
 use App\Services\Intelligence\Tools\BusinessToolRegistry;
@@ -15,14 +14,24 @@ use App\Services\Tenant\TenantContext;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * DressnMore Intelligence Orchestrator
+ * 
+ * Pipeline: User message → Intent → Context → Tools → Template response
+ *            → (Optional: Model polish for small talk) → Save → Return
+ */
 class AiOrchestrator
 {
-    private ?IntelligenceProviderManager $providerManager;
     private TenantContext $tenantContext;
     private BusinessToolExecutor $toolExecutor;
     private BusinessToolRegistry $toolRegistry;
+    private DressnMoreAiClient $aiClient;
+    private ?IntelligenceProviderManager $providerManager;
+    private ConversationContext $conversationContext;
 
-    private const MAX_TOOL_ROUNDS = 3;
+    // Max time to wait for model (ms)
+    private const MODEL_TIMEOUT_MS = 8000;
+    // Max tools per run
     private const MAX_TOOLS_PER_RUN = 6;
 
     public function __construct(
@@ -34,12 +43,18 @@ class AiOrchestrator
         $this->tenantContext = $tenantContext;
         $this->toolExecutor = $toolExecutor;
         $this->toolRegistry = BusinessToolRegistry::withStandardTools();
+        $this->aiClient = new DressnMoreAiClient();
+        $this->conversationContext = new ConversationContext();
     }
 
+    /**
+     * Main entry point. Executes a single AI run for a user message.
+     */
     public function executeRun(AiRun $run): void
     {
         $run->markProcessing();
         $tenantSlug = $this->tenantContext->slug() ?? 'unknown';
+        $startTime = hrtime(true);
 
         try {
             $conversation = $run->conversation;
@@ -47,344 +62,449 @@ class AiOrchestrator
             $userMessage = $run->userMessage;
             $content = $this->sanitizeInput($userMessage->content);
             $user = $userMessage->user;
-            $isComplex = $this->isComplexQuery($content);
-            $externalEnabled = config('intelligence.external_enabled', false);
 
-            // Step 1: Always try business tools first to get real data
-            $deterministicResult = $this->toolExecutor->tryAnswer($user, $content, $tenantSlug);
+            // ─── Stage 1: Resolve conversation context ───
+            $ctx = $this->conversationContext->resolve($conversation, $content);
 
-            if ($deterministicResult['handled'] ?? false) {
-                // We have real data from tools
-                if ($isComplex && $externalEnabled && $this->providerManager?->isExternal()) {
-                    // Complex query + Groq available → use model to write natural response
-                    $this->executeNaturalLanguageFlow($run, $conversation, $userMessage, $content, $deterministicResult, $tenantSlug);
-                    return;
-                }
-                // Simple query → return deterministic response directly
-                $this->saveDeterministicResponse($run, $conversation, $deterministicResult);
-                return;
-            }
+            // ─── Stage 2: Classify intent ───
+            $intent = $this->classifyIntent($content, $ctx);
+            Log::info('Intent classified', [
+                'run_id' => $run->id,
+                'intent' => $intent['intent'],
+                'confidence' => $intent['confidence'],
+            ]);
 
-            // Step 2: Not a recognized tool question
-            if ($isComplex && $externalEnabled && $this->providerManager?->isExternal()) {
-                // Try general knowledge with Groq
-                $this->executeGeneralChat($run, $conversation, $userMessage, $content, $tenantSlug);
-                return;
-            }
+            // ─── Stage 3: Route to handler ───
+            $response = match ($intent['intent']) {
+                'small_talk' => $this->handleSmallTalk($content, $intent, $ctx),
+                'business_data' => $this->handleBusinessData($content, $intent, $ctx, $user, $tenantSlug, $run),
+                'comparison' => $this->handleComparison($content, $intent, $ctx, $user, $tenantSlug, $run),
+                'decision_support' => $this->handleDecisionSupport($content, $intent, $ctx, $user, $tenantSlug, $run),
+                'ambiguous' => $this->handleAmbiguous($content, $intent, $ctx),
+                'unsupported' => $this->handleUnsupported($content, $intent, $ctx),
+                default => $this->handleBusinessData($content, $intent, $ctx, $user, $tenantSlug, $run),
+            };
 
-            if (!$this->isGeneralChatEnabled()) {
-                $this->saveSmartFallback($run, $conversation, $content, $deterministicResult);
-                return;
-            }
+            // ─── Stage 4: Sanitize response ───
+            $response = $this->sanitizeResponse($response);
 
-            // General AI (local model)
-            $this->handleGeneralAi($run, $conversation, $userMessage, $tenantSlug);
+            // ─── Stage 5: Persist ───
+            $elapsedMs = (int) ((hrtime(true) - $startTime) / 1e6);
+            $assistantMessage = $conversation->messages()->create([
+                'user_id' => $run->user_id,
+                'role' => 'assistant',
+                'content' => $response,
+                'total_tokens' => 0,
+                'input_tokens' => 0,
+                'output_tokens' => 0,
+                'generation_time_ms' => $elapsedMs,
+            ]);
+
+            $run->markCompleted($assistantMessage->id, [
+                'input_tokens' => 0,
+                'output_tokens' => 0,
+                'total_tokens' => 0,
+                'generation_time_ms' => $elapsedMs,
+                'provider' => 'deterministic',
+                'model' => 'none',
+                'intent' => $intent['intent'],
+                'confidence' => $intent['confidence'],
+                'flow' => 'template-based',
+            ]);
+
+            // ─── Stage 6: Update conversation context ───
+            $this->conversationContext->persist($conversation, $intent, $content, $response);
+
+            Log::info('Run completed', [
+                'run_id' => $run->id,
+                'intent' => $intent['intent'],
+                'time_ms' => $elapsedMs,
+            ]);
 
         } catch (Throwable $e) {
             $run->markFailed($e->getMessage());
-            Log::error('AI run failed', ['run_id' => $run->id, 'tenant' => $tenantSlug, 'error' => $e->getMessage()]);
+            Log::error('AI run failed', [
+                'run_id' => $run->id,
+                'tenant' => $tenantSlug,
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
     }
 
-    /**
-     * NEW APPROACH: Instead of forcing tool calling (which models struggle with),
-     * we pre-fetch data deterministically and ask the model to write a natural
-     * human-like Arabic response based on that data.
-     */
-    private function executeNaturalLanguageFlow(
-        AiRun $run, AiConversation $conversation, AiMessage $userMessage,
-        string $content, array $toolResult, string $tenantSlug,
-    ): void {
-        $provider = $this->providerManager?->primary();
-        if (!$provider) {
-            $this->saveDeterministicResponse($run, $conversation, $toolResult);
-            return;
-        }
+    // ═══════════════════════════════════════════════════════════════
+    // INTENT CLASSIFICATION
+    // ═══════════════════════════════════════════════════════════════
 
-        $start = hrtime(true);
-        $toolData = $toolResult['response'] ?? '';
-
-        // Build a simple rewrite prompt
-        $systemPrompt = "أنت صاحب أتيليه خبير بيتكلم مع زميلك صاحب الأتيليه بالعامية المصرية. حوّل البيانات اللي جاية لك لرد طبيعي ودافي زي المحادثة بين صحاب. استخدم كلمات زي 'النهاردة'، 'تمام'، 'مفيش'، 'شوية'. اختصر الرد. ما تضيفش معلومات من عندك.";
-
-        $messages = [
-            ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user', 'content' => "اكتب رد طبيعي:\n\n" . $toolData],
-        ];
-
-        $result = $provider->chat($messages, []);
-        $response = $result['response'] ?? '';
-        $response = preg_replace('/<think>.*?<\/think>/s', '', $response);
-        $response = trim($response);
-
-        // If model returned garbage, use deterministic response
-        if ($response === '' || $this->isGenericRefusal($response) || strlen($response) < 10) {
-            $response = $toolData;
-        }
-
-        $elapsedMs = (int) ((hrtime(true) - $start) / 1e6);
-
-        $assistantMessage = $conversation->messages()->create([
-            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
-            'total_tokens' => $result['total_tokens'] ?? 0,
-            'input_tokens' => $result['input_tokens'] ?? 0,
-            'output_tokens' => $result['output_tokens'] ?? 0,
-            'generation_time_ms' => $elapsedMs,
-        ]);
-
-        $run->markCompleted($assistantMessage->id, [
-            'input_tokens' => $result['input_tokens'] ?? 0,
-            'output_tokens' => $result['output_tokens'] ?? 0,
-            'total_tokens' => $result['total_tokens'] ?? 0,
-            'generation_time_ms' => $elapsedMs,
-            'provider' => $result['provider'] ?? 'unknown',
-            'model' => $result['model'] ?? 'unknown',
-            'tools_called' => [],
-            'tool_rounds' => 0,
-            'flow' => 'natural-language-enhanced',
-        ]);
-    }
-
-    private function executeGeneralChat(
-        AiRun $run, AiConversation $conversation, AiMessage $userMessage,
-        string $content, string $tenantSlug,
-    ): void {
-        $provider = $this->providerManager?->primary();
-        if (!$provider) {
-            $this->saveBasicFallback($run, $conversation);
-            return;
-        }
-
-        $memory = new ConversationMemory($conversation);
-        $start = hrtime(true);
-
-        $tenant = $this->tenantContext->tenant();
-        $tenantName = $tenant?->name ?? 'Atelier';
-        $userName = $userMessage->user?->name ?? 'User';
-        $date = now()->toDateTimeString();
-
-        $systemPrompt = BusinessConstitution::build($tenantName, $userName, $date);
-        $systemPrompt .= "\n\nYou are having a general conversation. Be helpful, warm, and speak in natural Arabic. Keep responses concise.";
-
-        $messages = [
-            ['role' => 'system', 'content' => $systemPrompt],
-        ];
-
-        $history = $conversation->messages()
-            ->where('id', '<', $userMessage->id)
-            ->whereIn('role', ['user', 'assistant'])
-            ->orderBy('id', 'desc')
-            ->limit(6)
-            ->get()
-            ->sortBy('id');
-
-        foreach ($history as $msg) {
-            $messages[] = ['role' => $msg->role, 'content' => $msg->content];
-        }
-
-        $messages[] = ['role' => 'user', 'content' => $content];
-
-        $result = $provider->chat($messages, []);
-        $response = $result['response'] ?? '';
-        $response = preg_replace('/<think>.*?<\/think>/s', '', $response);
-        $response = trim($response);
-
-        if ($response === '') {
-            $response = "عذرًا، لم أفهم السؤال تمامًا. ممكن توضح أكتر؟";
-        }
-
-        $elapsedMs = (int) ((hrtime(true) - $start) / 1e6);
-
-        $assistantMessage = $conversation->messages()->create([
-            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
-            'total_tokens' => $result['total_tokens'] ?? 0,
-            'input_tokens' => $result['input_tokens'] ?? 0,
-            'output_tokens' => $result['output_tokens'] ?? 0,
-            'generation_time_ms' => $elapsedMs,
-        ]);
-
-        $run->markCompleted($assistantMessage->id, [
-            'input_tokens' => $result['input_tokens'] ?? 0,
-            'output_tokens' => $result['output_tokens'] ?? 0,
-            'total_tokens' => $result['total_tokens'] ?? 0,
-            'generation_time_ms' => $elapsedMs,
-            'provider' => $result['provider'] ?? 'unknown',
-            'model' => $result['model'] ?? 'unknown',
-            'tools_called' => [],
-            'tool_rounds' => 0,
-            'flow' => 'general-chat',
-        ]);
-
-        $memory->persist($conversation);
-    }
-
-    /**
-     * Check if model returned a generic refusal instead of useful content.
-     */
-    private function isGenericRefusal(string $response): bool
+    private function classifyIntent(string $content, array $ctx): array
     {
-        $refusalPatterns = [
-            'لا يمكنني الوصول',
-            'لا أستطيع الوصول',
-            'غير متاح',
-            'عذراً',
-            'لا أملك',
-            'ليس لدي',
-            'لا أستطيع',
-            'I cannot access',
-            "I don't have access",
-            'I do not have',
-            'unavailable',
-        ];
+        $lower = mb_strtolower($content);
 
-        foreach ($refusalPatterns as $pattern) {
-            if (str_contains($response, $pattern)) {
-                return true;
+        // ─── 1. Small talk (highest priority, never call tools) ───
+        $smallTalkPatterns = [
+            'مرحب', 'السلام عليك', 'صباح', 'مساء', 'أهلا', 'أهلين', 'هلا',
+            'هاي', 'حياك', 'أهلاً', 'أهلا وسهلا', 'تصبح', 'تصبحي',
+            'كيف الحال', 'كيفك', 'إزيك', 'أخبارك', 'أخبارك إيه',
+            'شكرا', 'شكراً', 'يسلمو', 'تسلم', 'مشكور', 'الله يخليك',
+            'باي', 'مع السلامة', 'سلام', 'إلى اللقاء', 'بأمان الله',
+            'مين انت', 'مين أنت', 'انت مين', 'إنت مين', 'بتعمل إيه',
+            'شو بتقدر تساعدني', 'شو بتقدر', 'بتساعد في ايه',
+            'بتعمل ايه', 'وظيفتك ايه', 'شو بتسوي',
+        ];
+        foreach ($smallTalkPatterns as $pattern) {
+            if (str_contains($lower, mb_strtolower($pattern))) {
+                return ['intent' => 'small_talk', 'confidence' => 0.99, 'category' => 'greeting'];
             }
         }
-        return false;
-    }
 
-    /**
-     * Smart fallback: return actual data with intelligent analysis.
-     */
-    private function saveSmartFallback(AiRun $run, AiConversation $conversation, string $query, ?array $toolResult): void
-    {
-        $response = $this->buildSmartFallbackText($query, $toolResult);
-
-        $assistantMessage = $conversation->messages()->create([
-            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
-            'total_tokens' => 0, 'input_tokens' => 0, 'output_tokens' => 0, 'generation_time_ms' => 0,
-        ]);
-        $run->markCompleted($assistantMessage->id, [
-            'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0,
-            'generation_time_ms' => 0, 'provider' => 'deterministic', 'model' => 'smart-fallback',
-            'tools_called' => [], 'tool_rounds' => 0,
-        ]);
-    }
-
-    private function buildSmartFallbackText(string $query, ?array $toolResult = null): string
-    {
-        $isArabic = $this->isArabic($query);
-        $data = $toolResult['response'] ?? '';
-
-        if ($isArabic) {
-            $analysis = $this->analyzeDataArabic($data);
-            return $data . "\n\n" . $analysis;
-        }
-        return $data . "\n\n[تحليل متقدم غير متاح مؤقتًا — يمكنك طرح سؤال أكثر تحديدًا]";
-    }
-
-    private function analyzeDataArabic(string $data): string
-    {
-        $lines = [];
-        $lines[] = "---";
-
-        if (str_contains($data, '62,000')) {
-            $lines[] = "الإيرادات جيدة هذا الشهر بـ٦٢ ألف جنيه. المبيعات كلها من فئة البيع.";
-            $lines[] = "نصيحة: حاول تنويع مصادر الإيرادات (إيجار + تفصيل) لزيادة الاستقرار.";
-        }
-        if (str_contains($data, 'لا توجد حجوزات') || str_contains($data, '0 نشطة')) {
-            $lines[] = "لا توجد حجوزات نشطة — فرصة للتسويق لخدمات الإيجار.";
-        }
-        if (str_contains($data, 'لا يوجد راكد')) {
-            $lines[] = "المخزون في حالة جيدة — كل الفساتين بتتحرك.";
-        } else if (str_contains($data, 'راكد')) {
-            $lines[] = "في فساتين راكدة — فكر في عروض خاصة لتنشيطها.";
-        }
-        if (str_contains($data, 'مرتجع متأخر')) {
-            $lines[] = "⚠️ في مرتجعات متأخرة — تواصل مع العملاء فورًا.";
-        } else {
-            $lines[] = "لا يوجد مرتجعات متأخرة — الوضع تمام.";
-        }
-        if (str_contains($data, 'عملاء') && str_contains($data, 'جدد')) {
-            $lines[] = "٤ عملاء جدد هذا الشهر — استمر في جذب عملاء جدد.";
-        }
-
-        return implode("\n", $lines);
-    }
-
-    private function saveBasicFallback(AiRun $run, AiConversation $conversation): void
-    {
-        $response = "أستطيع مساعدتك في:
-• الإيرادات والتحصيلات
-• الحجوزات والتسليمات
-• المرتجعات المتأخرة
-• المخزون والفساتين الراكدة
-• ملخص النشاط اليومي
-
-اسألني مباشرة عن أي جزء من أعمال الأتيليه.";
-
-        $assistantMessage = $conversation->messages()->create([
-            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
-            'total_tokens' => 0, 'input_tokens' => 0, 'output_tokens' => 0, 'generation_time_ms' => 0,
-        ]);
-        $run->markCompleted($assistantMessage->id, [
-            'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0,
-            'generation_time_ms' => 0,
-        ]);
-    }
-
-    private function saveDeterministicResponse(AiRun $run, AiConversation $conversation, array $toolResult): void
-    {
-        $response = $toolResult['response'] ?? '';
-        $assistantMessage = $conversation->messages()->create([
-            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $response,
-            'total_tokens' => 0, 'input_tokens' => 0, 'output_tokens' => 0, 'generation_time_ms' => 0,
-        ]);
-        $run->markCompleted($assistantMessage->id, [
-            'input_tokens' => 0, 'output_tokens' => 0, 'total_tokens' => 0,
-            'generation_time_ms' => $toolResult['execution_ms'] ?? 0,
-            'provider' => 'deterministic', 'model' => 'none',
-        ]);
-    }
-
-    private function handleGeneralAi(AiRun $run, AiConversation $conversation, AiMessage $userMessage, string $tenantSlug): void
-    {
-        $client = new DressnMoreAiClient();
-        $messages = $this->buildMessages($conversation, $userMessage);
-        $result = $client->generate($messages, [
-            'temperature' => config('intelligence.generation.temperature', 0.7),
-            'max_tokens' => config('intelligence.generation.default_output_tokens', 96),
-        ]);
-
-        $assistantMessage = $conversation->messages()->create([
-            'user_id' => $run->user_id, 'role' => 'assistant', 'content' => $result['response'],
-            'total_tokens' => $result['total_tokens'], 'input_tokens' => $result['input_tokens'],
-            'output_tokens' => $result['output_tokens'], 'generation_time_ms' => $result['generation_time_ms'],
-        ]);
-        $run->markCompleted($assistantMessage->id, $result);
-    }
-
-    private function isComplexQuery(string $content): bool
-    {
-        $indicators = [
-            'قارن', 'compare', 'مقارنة', 'فرق', 'ليه', 'إزاي', 'سبب', 'تحليل',
-            'حاسس', 'شايف', 'ضعيف', 'قوي', 'مش كويس', 'عندي حق', 'محتاج', 'لازم',
-            'اعمل', 'أعمل', 'نصيحة', 'recommend', 'أركز', 'أهم', 'دلوقتي', 'النهاردة',
-            'مشكلة', 'مشاكل', 'تراجع', 'تحسن', 'خطة', 'استراتيج', 'مستقبل', 'next',
-            'الشهر', 'الأسبوع', 'الفترة', 'كيف', 'وضع', 'شغل', 'ملخص', 'نظرة',
-            'توقع', 'توقعات', 'مستقبلية', ' forecast', 'why', 'how', 'what if',
+        // ─── 2. Decision support ───
+        $decisionPatterns = [
+            'ساعدني باتخاذ قرار', 'ساعدني بقرار', 'أعمل خصم', 'أشتري فساتين',
+            'أزود موظفين', 'أفتح فرع', 'أوقف نوع', 'أزود سعر', 'أقلل سعر',
+            'أغير', 'أعدل', 'نصيحة', 'تنصحني', 'تنصحني', 'توصي',
+            'قرار', 'قراري', 'القرار', 'أعمل ولا', 'ولا لا',
         ];
-        $lower = mb_strtolower($content);
-        foreach ($indicators as $ind) {
-            if (str_contains($lower, $ind)) return true;
+        foreach ($decisionPatterns as $pattern) {
+            if (str_contains($lower, mb_strtolower($pattern))) {
+                return ['intent' => 'decision_support', 'confidence' => 0.92, 'category' => 'decision'];
+            }
         }
-        return false;
+
+        // ─── 3. Comparison ───
+        $comparisonPatterns = [
+            'قارن', 'مقارنة', 'أحسن ولا', 'أفضل ولا', 'زادت ولا', 'قلت ولا',
+            'فرق بين', 'الفرق بين', 'مقارنة بين', 'versus', 'vs',
+            'الشهر ده أحسن', 'الشهر اللي فات', 'الأسبوع الماضي',
+            'زيادة عن', 'نقصان عن', 'ارتفعت', 'انخفضت',
+        ];
+        foreach ($comparisonPatterns as $pattern) {
+            if (str_contains($lower, mb_strtolower($pattern))) {
+                return ['intent' => 'comparison', 'confidence' => 0.90, 'category' => 'comparison'];
+            }
+        }
+
+        // ─── 4. Follow-up context ───
+        if ($ctx['last_intent'] !== null) {
+            $followUpPatterns = [
+                'والشهر اللي فات', 'والفترة اللي فاتت', 'واللي قبله',
+                'طيب وليه', 'وليه', 'ليه كده', 'إزاي',
+                'خزنة الفرع', 'الفرع الرئيسي', 'فرع بس',
+                'المصاريف', 'والمصاريف', 'والتكاليف',
+            ];
+            foreach ($followUpPatterns as $pattern) {
+                if (str_contains($lower, mb_strtolower($pattern))) {
+                    // Map follow-up to comparison if asking about previous period
+                    if (str_contains($lower, 'الشهر اللي فات') || str_contains($lower, 'الفترة اللي فاتت') || str_contains($lower, 'واللي قبله')) {
+                        return ['intent' => 'comparison', 'confidence' => 0.88, 'category' => 'follow_up', 'base_intent' => $ctx['last_intent']];
+                    }
+                    // Map to business data with context
+                    return ['intent' => 'business_data', 'confidence' => 0.85, 'category' => 'follow_up', 'base_intent' => $ctx['last_intent']];
+                }
+            }
+
+            // Generic follow-up: "ليه؟" "و؟" "اكتر"
+            if (in_array(trim($content), ['ليه؟', 'ليه', 'و؟', 'اكتر', 'أكتر', 'كمان', 'كمان؟', 'طيب؟', 'طيب'])) {
+                return ['intent' => 'business_data', 'confidence' => 0.80, 'category' => 'follow_up', 'base_intent' => $ctx['last_intent']];
+            }
+        }
+
+        // ─── 5. Business data (route to BusinessQuestionRouter) ───
+        $router = new Tools\BusinessQuestionRouter();
+        $intents = $router->route($content);
+        if ($intents !== []) {
+            return ['intent' => 'business_data', 'confidence' => 0.85, 'category' => 'business', 'sub_intents' => $intents];
+        }
+
+        // ─── 6. Check if ambiguous ───
+        if (mb_strlen($content) < 5 || count(array_filter(explode(' ', $content))) < 2) {
+            return ['intent' => 'ambiguous', 'confidence' => 0.70, 'category' => 'ambiguous'];
+        }
+
+        // ─── 7. Unsupported ───
+        return ['intent' => 'unsupported', 'confidence' => 0.95, 'category' => 'unsupported'];
     }
 
-    private function isGeneralChatEnabled(): bool
+    // ═══════════════════════════════════════════════════════════════
+    // HANDLERS
+    // ═══════════════════════════════════════════════════════════════
+
+    private function handleSmallTalk(string $content, array $intent, array $ctx): string
     {
-        return config('intelligence.features.general_chat_enabled', false);
+        $lower = mb_strtolower($content);
+
+        // Greetings
+        if (str_contains($lower, 'مرحب') || str_contains($lower, 'السلام عليك') || str_contains($lower, 'أهلا') || str_contains($lower, 'هاي') || str_contains($lower, 'هلا') || str_contains($lower, 'حياك')) {
+            return 'أهلًا وسهلًا! 👋 أنا مستشار DressnMore الذكي. كيف أقدر أساعدك في شغل الأتيليه اليوم؟';
+        }
+        if (str_contains($lower, 'صباح') || str_contains($lower, 'صباحو')) {
+            return 'صباح الخير! ☀️ جاهز أساعدك في أي استفسار عن إيراداتك، حجوزاتك، أو مخزونك.';
+        }
+        if (str_contains($lower, 'مساء')) {
+            return 'مساء الخير! 🌙 شلون أقدر أساعدك اليوم؟';
+        }
+
+        // Thanks
+        if (str_contains($lower, 'شكر') || str_contains($lower, 'يسلمو') || str_contains($lower, 'تسلم') || str_contains($lower, 'مشكور') || str_contains($lower, 'الله يخليك')) {
+            return 'العفو! 😊 في أي وقت. لو محتاج حاجة تانية، أنا جاهز.';
+        }
+
+        // Goodbye
+        if (str_contains($lower, 'مع السلامة') || str_contains($lower, 'باي') || str_contains($lower, 'إلى اللقاء') || str_contains($lower, 'بأمان')) {
+            return 'مع السلامة! 🙏 لو احتجتني، أنا موجود.';
+        }
+
+        // Identity
+        if (str_contains($lower, 'مين انت') || str_contains($lower, 'إنت مين') || str_contains($lower, 'بتعمل إيه') || str_contains($lower, 'شو بتقدر') || str_contains($lower, 'وظيفتك')) {
+            return 'أنا مستشار DressnMore الذكي، متخصص في مساعدة أصحاب الأتيليهات.
+
+أقدر أساعدك في:
+• إيراداتك والتحصيلات
+• حجوزات الإيجار والتسليمات
+• المخزون والفساتين الراكدة
+• المرتجعات المتأخرة
+• مقارنة الفترات
+• دعم قراراتك التشغيلية
+
+إزاي أقدر أساعدك؟';
+        }
+
+        // How are you
+        if (str_contains($lower, 'كيف الحال') || str_contains($lower, 'كيفك') || str_contains($lower, 'إزيك') || str_contains($lower, 'أخبارك')) {
+            return 'تمام الحمد لله! 🙌 أنا جاهز أساعدك. عندك أي استفسار عن الأتيليه؟';
+        }
+
+        // Fallback greeting
+        return 'أهلًا! 👋 أنا مستشار DressnMore. كيف أقدر أساعدك في شغل الأتيليه اليوم؟';
     }
 
-    private function isArabic(string $text): bool
+    private function handleBusinessData(string $content, array $intent, array $ctx, $user, string $tenantSlug, AiRun $run): string
     {
-        $arabicCount = preg_match_all('/[\x{0600}-\x{06FF}]/u', $text);
-        $totalChars = mb_strlen(preg_replace('/\s/', '', $text)) ?: 1;
-        return ($arabicCount / $totalChars) > 0.3;
+        // Execute tools
+        $deterministicResult = $this->toolExecutor->tryAnswer($user, $content, $tenantSlug);
+
+        if (!($deterministicResult['handled'] ?? false)) {
+            // Not a recognized business question → treat as unsupported
+            return $this->handleUnsupported($content, $intent, $ctx);
+        }
+
+        $response = $deterministicResult['response'] ?? '';
+
+        // If we have a model-intent context for follow-up, enhance the response
+        if ($ctx['last_intent'] === 'business_data' && $ctx['last_tool']) {
+            // This is a follow-up — the response is already contextual from the router
+        }
+
+        return $response;
     }
+
+    private function handleComparison(string $content, array $intent, array $ctx, $user, string $tenantSlug, AiRun $run): string
+    {
+        $lower = mb_strtolower($content);
+
+        // Determine what to compare based on context
+        $compareWhat = 'revenue'; // default
+        if ($ctx['last_intent'] === 'business_data' && $ctx['last_tool']) {
+            $compareWhat = $ctx['last_tool'];
+        }
+        if (str_contains($lower, 'مصاريف') || str_contains($lower, 'تكاليف')) {
+            $compareWhat = 'expenses';
+        }
+        if (str_contains($lower, 'حجز') || str_contains($lower, 'ايجار')) {
+            $compareWhat = 'reservations';
+        }
+
+        // Get current period data
+        $deterministicResult = $this->toolExecutor->tryAnswer($user, $content, $tenantSlug);
+
+        if (!($deterministicResult['handled'] ?? false)) {
+            return $this->buildComparisonFromContext($content, $ctx);
+        }
+
+        $response = $deterministicResult['response'] ?? '';
+
+        // Add comparison context if we have previous period data in facts
+        $facts = $deterministicResult['facts'] ?? [];
+        foreach ($facts as $factSet) {
+            if (isset($factSet['previous_period_revenue']) && isset($factSet['total_revenue'])) {
+                $prev = $factSet['previous_period_revenue'];
+                $curr = $factSet['total_revenue'];
+                $change = $factSet['change_percent'] ?? 0;
+                $direction = $change >= 0 ? 'أعلى' : 'أقل';
+                $changeAbs = abs($change);
+                $response .= "\n\n📊 مقارنة بالفترة السابقة:\n";
+                $response .= "الفترة السابقة: " . number_format($prev) . " جنيه\n";
+                $response .= "التغير: {$changeAbs}% {$direction}";
+            }
+        }
+
+        return $response;
+    }
+
+    private function handleDecisionSupport(string $content, array $intent, array $ctx, $user, string $tenantSlug, AiRun $run): string
+    {
+        $lower = mb_strtolower($content);
+
+        // Specific decision: discount
+        if (str_contains($lower, 'خصم')) {
+            return $this->decisionDiscount($user, $tenantSlug);
+        }
+
+        // Specific decision: hire employees
+        if (str_contains($lower, 'موظف') || str_contains($lower, 'موظفين')) {
+            return $this->decisionHire($user, $tenantSlug);
+        }
+
+        // Specific decision: buy dresses
+        if (str_contains($lower, 'اشتري') || str_contains($lower, 'فستان') || str_contains($lower, 'فساتين')) {
+            return $this->decisionInventory($user, $tenantSlug);
+        }
+
+        // Specific decision: open branch
+        if (str_contains($lower, 'فرع')) {
+            return $this->decisionBranch($user, $tenantSlug);
+        }
+
+        // Generic decision → ask for clarification
+        return "أكيد. القرار بخصوص إيه تحديدًا؟ 🤔\n\nممكن يكون:
+• الأسعار (خصم/زيادة)
+• الموظفين (تعيين/تقليل)
+• المخزون (شراء/تصفية)
+• التسويق والإعلان
+• التوسع (فرع جديد)
+\nأوصف موقفك وأنا أساعدك بالأرقام.";
+    }
+
+    private function handleAmbiguous(string $content, array $intent, array $ctx): string
+    {
+        return "عذرًا، مش فاهم سؤالك تمامًا. 🙏\n\nممكن توضح أكتر؟ مثلاً:
+• إيرادات الشهر كام؟
+• عندي مرتجعات متأخرة؟
+• وضع المخزون إيه؟";
+    }
+
+    private function handleUnsupported(string $content, array $intent, array $ctx): string
+    {
+        $lower = mb_strtolower($content);
+
+        // Check if it's a cashbox question (missing tool)
+        if (str_contains($lower, 'خزنة') || str_contains($lower, 'رصيد') || str_contains($lower, 'كاش') || str_contains($lower, 'صندوق')) {
+            return "المعلومات المالية التفصيلية (رصيد الخزنة) غير متاحة حاليًا في الـ Intelligence.\n\nممكن تفتح تقرير الخزنة مباشرة من القائمة الجانبية: 💰 التقارير ← الخزنة.\n\nأما إذا حابب، أقدر أساعدك في:
+• إيراداتك والتحصيلات
+• حجوزات الإيجار
+• المخزون";
+        }
+
+        return "عذرًا، السؤال ده برّا نطاق المساعدة الحالي. 🙏\n\nأنا متخصص في شؤون الأتيليه:
+• 📊 الإيرادات والتحصيلات
+• 👗 حجوزات الإيجار
+• 📦 المخزون والفساتين
+• ⚠️ المرتجعات المتأخرة
+• 📈 مقارنة الفترات
+\nإزاي أقدر أساعدك في أي من دول؟";
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DECISION SUPPORT ENGINES
+    // ═══════════════════════════════════════════════════════════════
+
+        private function decisionDiscount($user, string $tenantSlug): string
+    {
+        $resResult = $this->toolExecutor->tryAnswer($user, 'كيف وضع الشغل؟', $tenantSlug);
+        $revenue = $resResult['response'] ?? 'لا توجد بيانات حديثة.';
+
+        $response = "📊 قرار: عمل خصم على الإيجارات
+
+";
+        $response .= "══ الوضع الحالي ══
+{$revenue}
+
+";
+        $response .= "══ الخيارات ══
+
+";
+        $response .= "1️⃣ خصم 10% مؤقت — يجذب عملاء جدد سريعًا. مخاطر: يقلل هامش الربح.
+
+";
+        $response .= "2️⃣ عرض إيجار يومين بسعر يوم — يزيد معدل التدوير. مخاطر: يستنزف المخزون.
+
+";
+        $response .= "3️⃣ ما تعملش خصم — تحافظ على القيمة. مخاطر: ممكن يفوتك فرصة.
+
+";
+        $response .= "══ التوصية ══
+
+";
+        $response .= "لو عندك فساتين راكدة ومش بتتأجر — خصم مؤقت 10-15% يفيد.
+";
+        $response .= "لو المخزون قليل والطلب عالي — ما تعملش خصم.
+
+";
+        $response .= "إيه وضع مخزونك تحديدًا؟ أقدر أفحصلك الفساتين الراكدة.";
+        return $response;
+    }
+
+private function decisionHire($user, string $tenantSlug): string
+    {
+        return "📊 قرار: تعيين موظفين\n\n══ الوضع الحالي ══\nلو عندك بيانات أداء الموظفين الحاليين، أقدر أحلللك هل التحم زايد ولا لا.\n\n══ الخيارات ══\n
+1️⃣ **وظّف موظف جديد** — لو الإيرادات زايدة والشغل كتير.
+
+2️⃣ **استخدم freelancers مؤقت** — لفترات الذروة بس.
+
+3️⃣ **حسّن كفاءة الفريق الحالي** — تدريب + تحفيز.
+
+══ التوصية ══\n
+أفتح تقرير أداء الموظفين الأول. لو كلهم مشغولين 80%+ من الوقت — فكّر في التعيين.
+
+أقدر أساعدك في فحص إيراداتك الحالية وشوف هل الشغل يستحق موظف جديد ولا لأ.";
+    }
+
+    private function decisionInventory($user, string $tenantSlug): string
+    {
+        $invResult = $this->toolExecutor->tryAnswer($user, 'إيه الفساتين الراكدة؟', $tenantSlug);
+        $inventory = $invResult['response'] ?? 'لا توجد بيانات مخزون.';
+
+        return "📊 قرار: شراء فساتين جديدة\n\n══ الوضع الحالي ══\n{$inventory}\n\n══ الخيارات ══\n
+1️⃣ **اشتري فساتين جديدة** — لو المخزون قليل أو في فئات ناقصة.
+
+2️⃣ **صفي الفساتين الراكدة أولاً** — أعمل عرض على القديم قبل ما تجيب جديد.
+
+3️⃣ **استأجر فساتين مؤقتًا** — جرّب الطلب قبل الشراء.
+
+══ التوصية ══\n
+لو فوق 30% من المخزون راكد → صفي القديم أولاً.\n
+لو المخزون أقل من 20 فستان → جدّد.
+
+لو كل حاجة بتتحرك → أضف تشكيلة جديدة لزيادة الطلب.";
+    }
+
+    private function decisionBranch($user, string $tenantSlug): string
+    {
+        return "📊 قرار: فتح فرع جديد\n\n══ الوضع الحالي ══\nفتح فرع جديد قرار كبير يحتاج:
+• استقرار إيرادي (6 شهور+)
+• إيرادات شهرية ثابتة
+• فريق إداري قوي\n\n══ الخيارات ══\n
+1️⃣ **افتح فرع جديد** — لو الإيرادات ثابتة والطلب زايد.
+
+2️⃣ **وسّع الفرع الحالي** — أرخص وأقل مخاطرة.
+
+3️⃣ **استخدم online booking** — وصل لعملاء جدد بدون فرع.
+
+══ التوصية ══\n
+إيراداتك الحالية كام الشهر؟ لو أقل من 100,000 جنيه شهريًا → ركّز على الفرع الحالي الأول.
+
+أقدر أفحصلك إيراداتك وتأكد إنت جاهز ولا لأ.";
+    }
+
+    private function buildComparisonFromContext(string $content, array $ctx): string
+    {
+        return "محتاج أجيب البيانات لمقارنة الفترات.\n\nممكن تحدد:
+• إيه اللي عايز تقارنه؟ (إيرادات/حجوزات/مصاريف)
+• الفترة الحالية مقابل أي فترة؟";
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // UTILITIES
+    // ═══════════════════════════════════════════════════════════════
 
     private function sanitizeInput(string $input): string
     {
@@ -397,25 +517,23 @@ class AiOrchestrator
         return $input;
     }
 
-    private function buildMessages(AiConversation $conversation, AiMessage $userMessage): array
+    private function sanitizeResponse(string $response): string
     {
-        $tenant = $this->tenantContext->tenant();
-        $tenantName = $tenant?->name ?? 'Unknown';
-        $userName = $userMessage->user?->name ?? 'User';
-        $today = now()->toDateTimeString();
-
-        $systemPrompt = "You are DressnMore Intelligence for {$tenantName}. Current user: {$userName}. Date: {$today}. Keep responses under 150 words. Speak Arabic or English professionally.";
-
-        $messages = [['role' => 'system', 'content' => $systemPrompt]];
-        $maxHistory = config('intelligence.limits.max_history_messages', 20);
-        $history = $conversation->messages()
-            ->where('id', '<', $userMessage->id)
-            ->whereIn('role', ['user', 'assistant'])
-            ->orderBy('id', 'desc')->limit($maxHistory)->get()->sortBy('id');
-        foreach ($history as $msg) {
-            $messages[] = ['role' => $msg->role, 'content' => $msg->content];
-        }
-        $messages[] = ['role' => 'user', 'content' => $this->sanitizeInput($userMessage->content)];
-        return $messages;
+        // Remove think tags
+        $response = preg_replace('/<think>.*?<\/think>/s', '', $response);
+        // Remove tool call markers
+        $response = preg_replace('/\[تم استدعاء.*$/m', '', $response);
+        // Remove planning language
+        $response = preg_replace('/سأقوم ب.*?\./s', '', $response);
+        $response = preg_replace('/يرجى الانتظار.*?$/m', '', $response);
+        // Remove function call syntax
+        $response = preg_replace('/\b\w+\(.*\)/', '', $response);
+        // Remove JSON-like blocks
+        $response = preg_replace('/\{[^}]+\}/', '', $response);
+        // Clean up
+        $response = trim($response);
+        // Remove empty lines
+        $response = preg_replace('/\n{3,}/', "\n\n", $response);
+        return trim($response);
     }
 }
