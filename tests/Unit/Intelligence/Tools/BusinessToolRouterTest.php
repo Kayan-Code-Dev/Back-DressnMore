@@ -88,7 +88,7 @@ class BusinessToolRouterTest extends TestCase
         $this->assertContains('business_snapshot', $intents);
         $this->assertContains('business_health', $intents);
         $this->assertContains('daily_brief', $intents);
-        $this->assertCount(9, $intents);
+        $this->assertCount(10, $intents);
     }
 
     public function test_tools_for_intent_mapping(): void
